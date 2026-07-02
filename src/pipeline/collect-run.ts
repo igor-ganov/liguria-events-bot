@@ -101,6 +101,9 @@ const toRecord = (
     ...(raw.priceInfo === undefined ? {} : { priceInfo: raw.priceInfo }),
     ...(raw.rawDescription === undefined ? {} : { rawDescription: raw.rawDescription }),
     ...(raw.image === undefined ? {} : { image: raw.image }),
+    ...(raw.altLinks === undefined || raw.altLinks.length === 0
+      ? {}
+      : { altLinks: raw.altLinks }),
     ...(free ? { free: true } : {}),
   };
 };

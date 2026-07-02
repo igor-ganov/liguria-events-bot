@@ -95,6 +95,8 @@ export type RawEvent = Readonly<{
   source: string;
   categoryHint?: Category;
   image?: string;
+  /** Links of other sources that saw this event in the same run (AC-1.8). */
+  altLinks?: readonly SourceLink[];
 }>;
 
 export const normalizeTitle = (title: string): string =>
@@ -118,6 +120,20 @@ export const eventIdOf = async (title: string, startDate: string): Promise<strin
 export const freeFromPrice = (priceInfo: string | undefined): boolean =>
   priceInfo !== undefined &&
   /gratuit|ingresso libero|free entry|free admission|бесплатно/i.test(priceInfo);
+
+const mergedAltLinks = (
+  existing: EventRecord,
+  incoming: RawEvent,
+): Readonly<{ altLinks?: readonly SourceLink[] }> => {
+  const next = unionLinks(
+    existing.url,
+    existing.altLinks,
+    incoming.altLinks,
+    [{ source: incoming.source, url: incoming.url }],
+  );
+  const changed = next.length !== (existing.altLinks ?? []).length;
+  return changed && next.length > 0 ? { altLinks: next } : {};
+};
 
 /**
  * Merge a re-collected raw event into the stored record: fill gaps only,
@@ -150,12 +166,8 @@ export const mergeEvent = (
     ...(existing.image === undefined && incoming.image !== undefined
       ? { image: incoming.image }
       : {}),
-    // A different source resighted this event → keep its link too (AC-1.8).
-    ...(incoming.source !== existing.source &&
-    incoming.url !== existing.url &&
-    !(existing.altLinks ?? []).some((link) => link.url === incoming.url)
-      ? { altLinks: [...(existing.altLinks ?? []), { source: incoming.source, url: incoming.url }] }
-      : {}),
+    // Other sources resighted this event → keep every link (AC-1.8).
+    ...mergedAltLinks(existing, incoming),
   };
   const changed =
     event.endDate !== existing.endDate ||
@@ -169,11 +181,33 @@ export const mergeEvent = (
   return { event, changed };
 };
 
-/** Merge two raw sightings of the same event within one run: first wins, gaps fill. */
-export const mergeRaw = (first: RawEvent, second: RawEvent): RawEvent => ({
-  ...second,
-  ...first,
-});
+/** Union of source links, first-wins deduped by url, excluding `primaryUrl`. */
+const unionLinks = (
+  primaryUrl: string,
+  ...groups: readonly (readonly SourceLink[] | undefined)[]
+): readonly SourceLink[] =>
+  groups
+    .flatMap((group) => group ?? [])
+    .reduce<readonly SourceLink[]>(
+      (kept, link) =>
+        link.url === primaryUrl || kept.some((existing) => existing.url === link.url)
+          ? kept
+          : [...kept, link],
+      [],
+    );
+
+/** Merge two raw sightings of the same event within one run: first wins,
+ *  gaps fill, and the second source's link is preserved (AC-1.8). */
+export const mergeRaw = (first: RawEvent, second: RawEvent): RawEvent => {
+  const altLinks = unionLinks(first.url, first.altLinks, second.altLinks, [
+    { source: second.source, url: second.url },
+  ]);
+  return {
+    ...second,
+    ...first,
+    ...(altLinks.length === 0 ? {} : { altLinks }),
+  };
+};
 
 export const toCompact = (event: EventRecord): CompactEvent => ({
   id: event.id,

@@ -141,7 +141,14 @@ describe('runCollect', () => {
     const a = okCollector([rawEvent({ title: 'Electropark' })]);
     const b: Collector = async () => ({
       source: 'tg:genova',
-      events: [rawEvent({ title: 'ELECTROPARK', venue: 'Porto Antico', source: 'tg:genova' })],
+      events: [
+        rawEvent({
+          title: 'ELECTROPARK',
+          venue: 'Porto Antico',
+          source: 'tg:genova',
+          url: 'https://example.org/tg',
+        }),
+      ],
       posts: [],
       failed: false,
     });
@@ -152,5 +159,10 @@ describe('runCollect', () => {
     const stored = await readEventRecord(kv, id);
     assert.equal(stored?.venue, 'Porto Antico');
     assert.equal(stored?.source, 'visitgenoa'); // first sighting wins
+    // …but the second source's link survives the within-run merge (AC-1.8).
+    assert.deepEqual(stored?.altLinks, [
+      { source: 'tg:genova', url: 'https://example.org/tg' },
+    ]);
+    assert.deepEqual(index[0]?.l, [{ source: 'tg:genova', url: 'https://example.org/tg' }]);
   });
 });

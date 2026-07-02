@@ -81,23 +81,33 @@ describe('mergeEvent', () => {
 });
 
 describe('mergeRaw', () => {
+  const first: RawEvent = {
+    title: 'A',
+    startDate: '2026-07-10',
+    url: 'https://a',
+    source: 'visitgenoa',
+  };
+  const second: RawEvent = {
+    title: 'A!',
+    startDate: '2026-07-10',
+    venue: 'Somewhere',
+    url: 'https://b',
+    source: 'tg:x',
+  };
   test('first sighting wins, gaps fill from the second', () => {
-    const first: RawEvent = {
-      title: 'A',
-      startDate: '2026-07-10',
-      url: 'https://a',
-      source: 'visitgenoa',
-    };
-    const second: RawEvent = {
-      title: 'A!',
-      startDate: '2026-07-10',
-      venue: 'Somewhere',
-      url: 'https://b',
-      source: 'tg:x',
-    };
     const merged = mergeRaw(first, second);
     assert.equal(merged.url, 'https://a');
     assert.equal(merged.venue, 'Somewhere');
+  });
+  test("keeps the second source's link and dedupes across chains (AC-1.8)", () => {
+    const merged = mergeRaw(first, second);
+    assert.deepEqual(merged.altLinks, [{ source: 'tg:x', url: 'https://b' }]);
+    const third = mergeRaw(merged, { ...second, source: 'mentelocale', url: 'https://c' });
+    assert.deepEqual(third.altLinks, [
+      { source: 'tg:x', url: 'https://b' },
+      { source: 'mentelocale', url: 'https://c' },
+    ]);
+    assert.deepEqual(mergeRaw(merged, second).altLinks, [{ source: 'tg:x', url: 'https://b' }]);
   });
 });
 
