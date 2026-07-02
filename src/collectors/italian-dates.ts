@@ -90,3 +90,29 @@ export const parseItalianDateInfo = (text: string): DatedInfo | undefined => {
     ...(time === undefined ? {} : { time }),
   };
 };
+
+/** Shared month+year range, e.g. `Dal 16 al 25 ottobre 2026`,
+ *  `Dall'11 al 13 dicembre 2026`. Both days share the trailing month/year. */
+const SHARED_MONTH_RANGE =
+  /(?:dal|dall['’])\s*(\d{1,2})\s+(?:al|all['’])\s*(\d{1,2})\s+(gen|feb|mar|apr|mag|giu|lug|ago|set|ott|nov|dic)\w*\s+(\d{4})/i;
+
+/**
+ * Season-listing dates (Teatro Carlo Felice): either a shared-month range or
+ * a single `<day> <month> <year>` (handled by `parseItalianDateInfo`).
+ */
+export const parseSeasonDate = (text: string): DateRange | undefined => {
+  const range = SHARED_MONTH_RANGE.exec(text);
+  if (range !== null) {
+    const [, d1, d2, month, year] = range;
+    const monthNumber = ITALIAN_MONTHS[(month ?? '').toLowerCase()];
+    if (d1 !== undefined && d2 !== undefined && monthNumber !== undefined && year !== undefined) {
+      const startDate = `${year}-${monthNumber}-${d1.padStart(2, '0')}`;
+      const endDate = `${year}-${monthNumber}-${d2.padStart(2, '0')}`;
+      return endDate === startDate ? { startDate } : { startDate, endDate };
+    }
+  }
+  const single = parseItalianDateInfo(text);
+  return single === undefined
+    ? undefined
+    : { startDate: single.startDate, ...(single.endDate === undefined ? {} : { endDate: single.endDate }) };
+};

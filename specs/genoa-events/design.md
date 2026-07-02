@@ -162,13 +162,36 @@ Source verification log:
   Comune's public events channel is visitgenoa.it (§4.1), already covered.
 - `genova.mentelocale.it` host → DNS dead, use `www.mentelocale.it/genova/`.
 
-### 4.6 Public Telegram channels (`src/collectors/tg-public.ts`)
+### 4.6 Teatro Carlo Felice (`src/collectors/carlofelice.ts`)
+
+*Amendment 2026-07-02 (4th pass).* Genoa's opera house — opera, ballet,
+symphonic concerts, a category the other sources barely carry. Season
+homepage is an Elementor slider (`a.swiper-slide-inner` →
+`.elementor-slide-heading` title + `.elementor-slide-description` date);
+dates use full Italian months and a shared-month range grammar
+(`Dal 16 al 25 ottobre 2026`, `Dall'11 al 13 dicembre 2026`) parsed by
+`parseSeasonDate`. robots.txt allows crawling (only `/wp-admin/`), no TDM
+opt-out, no llms.txt. `categoryHint: 'music'`; the LLM refines (opera →
+music+theatre). Slides repeat — deduped by href.
+
+Rejected in this pass: **Eventbrite** — the public event-search API was
+removed Feb 2020 (only by-id / by-venue / by-org you own remains), so
+city-wide search is impossible; **TicketOne** — anti-bot wall (robots times
+out), concerts largely duplicate Porto Antico; **Facebook** — public event
+data is behind the Graph API auth wall, automated access breaches ToS.
+
+### 4.7 Public Telegram channels (`src/collectors/tg-public.ts`)
 
 Reference `public-web.ts` pattern verbatim: `t.me/s/<channel>` preview via
 HTMLRewriter → posts. Channels come from env `TG_CHANNELS` (JSON array,
-operator-configurable). Posts are *not* structured events; they enter the
-pipeline as `RawEvent{kind:'post'}` and the enrichment step (§5) extracts
-zero-or-more events from each post batch via the LLM.
+operator-configurable; e.g. `aluhaevents` = Aluha/Balena Festival promoter).
+Posts are *not* structured events; the LLM extracts zero-or-more events from
+each post batch. Freshness window is 180 days, not days — event promoters
+announce months ahead then go quiet, so what gates a post is the *event's*
+date (LLM-dropped when past), not the post's age; re-extraction is idempotent
+via dedupe. This is also the path for hyper-local grassroots events (a
+neighbourhood show, a Pro Loco sagra) that never reach the big aggregators —
+add the organiser's public channel to `TG_CHANNELS`.
 
 ## 5. LLM layer (US-2, US-4, US-6)
 

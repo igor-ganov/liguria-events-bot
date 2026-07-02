@@ -21,19 +21,28 @@ describe('parsePreviewHtml (fixture)', () => {
 });
 
 describe('makeTgCollector', () => {
-  test('keeps only fresh posts and never throws (AC-1.3)', async () => {
-    const now = (): number => Date.now();
-    const okFetch = async (): Promise<Response> => new Response(html);
-    const outcome = await makeTgCollector(okFetch, 'telegram', now)();
-    assert.equal(outcome.failed, false);
-    assert.equal(outcome.source, 'tg:telegram');
-    // Fixture posts are from the past — all filtered by the 3-day freshness cut.
-    assert.equal(outcome.posts.length, 0);
+  const okFetch = async (): Promise<Response> => new Response(html);
 
+  test('keeps posts within the ~180d window, drops ancient ones', async () => {
+    const posts = await parsePreviewHtml('telegram', html);
+    const newestMs = Math.max(...posts.map((post) => post.date)) * 1000;
+
+    // A day after the newest post: promoter-style window keeps them.
+    const soon = await makeTgCollector(okFetch, 'telegram', () => newestMs + 86_400_000)();
+    assert.equal(soon.failed, false);
+    assert.equal(soon.source, 'tg:telegram');
+    assert.ok(soon.posts.length > 0);
+
+    // A year after: everything is past the window.
+    const late = await makeTgCollector(okFetch, 'telegram', () => newestMs + 365 * 86_400_000)();
+    assert.equal(late.posts.length, 0);
+  });
+
+  test('never throws on network failure (AC-1.3)', async () => {
     const dead = async (): Promise<Response> => {
       throw new Error('network down');
     };
-    const failed = await makeTgCollector(dead, 'telegram', now)();
+    const failed = await makeTgCollector(dead, 'telegram', () => Date.now())();
     assert.equal(failed.failed, true);
   });
 });

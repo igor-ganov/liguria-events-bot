@@ -8,15 +8,17 @@ questions grounded strictly on the collected corpus. Runs entirely on a
 
 ## What it does
 
-- **Collects** on a cron (3×/day) from five live-verified sources —
+- **Collects** on a cron (3×/day) from six live-verified sources —
   **visitgenoa.it** (official tourism calendar), **mentelocale.it/genova**
   (15-day agenda), **genovateatro.it** (federated theatre agenda),
-  **palazzoducale.genova.it** ("in programma" tab) and **portoantico.it**
-  (open WordPress REST API) — all parsers tested on captured fixtures — plus
-  any configured public Telegram channels (`t.me/s/` web preview; the LLM
-  extracts dated events from post text). Evaluated and rejected: GenovaToday
-  (robots.txt explicitly prohibits scraping/AI use — not circumvented),
-  smart.comune.genova.it (404; the Comune publishes via visitgenoa.it).
+  **palazzoducale.genova.it** ("in programma" tab), **portoantico.it**
+  (open WordPress REST API) and **Teatro Carlo Felice** (opera/ballet/
+  symphonic season) — all parsers tested on captured fixtures — plus any
+  configured public Telegram channels (`t.me/s/` web preview; the LLM
+  extracts dated events from post text; the path for hyper-local grassroots
+  events). Evaluated and rejected: GenovaToday (robots.txt explicitly
+  prohibits scraping/AI use — not circumvented), Eventbrite (public search
+  API removed 2020), TicketOne (anti-bot), Facebook (Graph API auth wall).
 - **Deduplicates** by normalized title + start date; re-sightings merge
   missing fields instead of duplicating.
 - **Enriches** every event with one category (fixed 11-item taxonomy) and a

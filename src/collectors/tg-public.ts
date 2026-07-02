@@ -7,8 +7,13 @@ import type { CollectOutcome, Collector, FetchFn, RawPost } from './types.ts';
 
 const PREVIEW_BASE = 'https://t.me/s/';
 const USER_AGENT = 'Mozilla/5.0 (compatible; event-collecter/0.0)';
-/** Only fresh posts are worth LLM extraction — skip anything older. */
-const MAX_POST_AGE_SECONDS = 3 * 24 * 60 * 60;
+/**
+ * Event promoters announce months ahead, then go quiet — so what matters is
+ * the event's date (the LLM extractor drops past events; the pipeline prunes
+ * them), not the post's age. Keep a wide window only to skip truly ancient
+ * posts; re-extracting the same posts each run is idempotent via dedupe.
+ */
+const MAX_POST_AGE_SECONDS = 180 * 24 * 60 * 60;
 
 type Draft = { messageId: number; date: number; text: string };
 

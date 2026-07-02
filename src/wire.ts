@@ -8,6 +8,7 @@ import { makeMentelocaleCollector } from './collectors/mentelocale.ts';
 import { makeGenovateatroCollector } from './collectors/genovateatro.ts';
 import { makePalazzoducaleCollector } from './collectors/palazzoducale.ts';
 import { makePortoanticoCollector } from './collectors/portoantico.ts';
+import { makeCarlofeliceCollector } from './collectors/carlofelice.ts';
 import { makeTgCollector } from './collectors/tg-public.ts';
 import { makeChat } from './llm/client.ts';
 import type { ChatFn } from './llm/client.ts';
@@ -34,6 +35,7 @@ export const buildCollectDeps = (env: Env): CollectDeps => {
       makeGenovateatroCollector(fetch),
       makePalazzoducaleCollector(fetch),
       makePortoanticoCollector(fetch),
+      makeCarlofeliceCollector(fetch),
       ...tgChannelsOf(env).map((channel) => makeTgCollector(fetch, channel, now)),
     ],
     extract: makeExtractFromPosts(chat),

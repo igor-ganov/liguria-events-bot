@@ -24,9 +24,10 @@
   "vars": {
     // Telegram chat id of the operator (may run /collect, sees /status).
     "OWNER_CHAT_ID": "241140119",
-    // JSON array of public Telegram channel usernames to also collect from,
-    // e.g. ["genovaeventi"]. Read via the t.me/s/ web preview — no userbot.
-    "TG_CHANNELS": "[]",
+    // JSON array of public Telegram channel usernames to also collect from.
+    // Read via the t.me/s/ web preview (no userbot); the LLM extracts dated
+    // events from post text. aluhaevents = Aluha/Balena Festival promoter.
+    "TG_CHANNELS": "[\"aluhaevents\"]",
     // How many visitgenoa listing pages to fetch per collection run.
     "SOURCE_PAGES": "3"
     // Secrets (bun x wrangler secret put …): BOT_TOKEN, WEBHOOK_SECRET,
