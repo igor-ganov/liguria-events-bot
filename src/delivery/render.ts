@@ -2,7 +2,7 @@
  * Pure rendering (design §7): compact events → Telegram HTML. Splitting
  * respects entry boundaries (AC-3.7).
  */
-import { CATEGORIES } from '../domain/event.ts';
+import { CATEGORIES, primaryCategory } from '../domain/event.ts';
 import type { Category, CompactEvent, EventRecord } from '../domain/event.ts';
 import { t } from '../i18n.ts';
 import type { TranslationKey } from '../i18n.ts';
@@ -57,7 +57,7 @@ export const renderEventLine = (event: CompactEvent): string => {
 /** Category-grouped digest body (AC-3.1); category order = taxonomy order. */
 export const renderGrouped = (events: readonly CompactEvent[], lang: Language): string =>
   CATEGORIES.flatMap((category) => {
-    const matching = events.filter((event) => event.c === category);
+    const matching = events.filter((event) => primaryCategory(event.c) === category);
     return matching.length === 0
       ? []
       : [
@@ -77,7 +77,7 @@ export const renderList = (
 
 /** Rich single-event card (AC-6.1). */
 export const renderCard = (event: EventRecord, lang: Language): string => {
-  const emoji = CATEGORY_EMOJI[event.category];
+  const emoji = CATEGORY_EMOJI[primaryCategory(event.categories)];
   const when =
     (event.endDate === undefined
       ? shortDate(event.startDate)
@@ -88,7 +88,9 @@ export const renderCard = (event: EventRecord, lang: Language): string => {
   );
   const lines = [
     `<b>${escapeHtml(event.title)}</b>`,
-    `${emoji} ${escapeHtml(categoryLabel(event.category, lang))} · ${when}`,
+    `${emoji} ${escapeHtml(
+      event.categories.map((category) => categoryLabel(category, lang)).join(' · '),
+    )} · ${when}`,
     ...(where.length === 0 ? [] : [`📍 ${escapeHtml(where.join(', '))}`]),
     ...(event.priceInfo === undefined
       ? event.free === true

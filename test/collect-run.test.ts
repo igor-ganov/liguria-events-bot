@@ -53,7 +53,7 @@ describe('runCollect', () => {
     ];
     const id = await eventIdOf('Fresh Concert', '2026-07-10');
     const enrichments = new Map([
-      [id, { category: 'music', description: 'A concert.' } satisfies Enrichment],
+      [id, { categories: ['music'], description: 'A concert.' } satisfies Enrichment],
     ]);
     const summary = await runCollect(makeDeps(kv, [okCollector(events)], enrichments));
     assert.equal(summary.kind, 'done');
@@ -101,7 +101,7 @@ describe('runCollect', () => {
     const stored = await readEventRecord(kv, id);
     assert.ok(stored !== undefined);
     assert.equal(stored.enriched, false);
-    assert.equal(stored.category, 'food'); // hint survives as the fallback
+    assert.deepEqual(stored.categories, ['food']); // hint survives as the fallback
     if (summary.kind === 'done') {
       assert.equal(summary.entry.sources.some((source) => source.failed), true);
     }
@@ -120,12 +120,12 @@ describe('runCollect', () => {
     assert.equal((await readEventRecord(kv, id))?.enriched, false);
 
     const enrichments = new Map([
-      [id, { category: 'workshop', description: 'Hands-on.' } satisfies Enrichment],
+      [id, { categories: ['workshop'], description: 'Hands-on.' } satisfies Enrichment],
     ]);
     await runCollect(makeDeps(kv, [okCollector([raw])], enrichments));
     const stored = await readEventRecord(kv, id);
     assert.equal(stored?.enriched, true);
-    assert.equal(stored?.category, 'workshop');
+    assert.deepEqual(stored?.categories, ['workshop']);
   });
 
   test('locked run refuses and leaves state untouched (AC-8.2)', async () => {

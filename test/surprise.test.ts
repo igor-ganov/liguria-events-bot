@@ -12,7 +12,7 @@ const compact = (id: string, c: CompactEvent['c']): CompactEvent => ({
   u: 'https://example.org',
 });
 
-const index = [compact('plain', 'other'), compact('fav', 'music')];
+const index = [compact('plain', ['other']), compact('fav', ['music'])];
 
 describe('pickSurprise', () => {
   test('deterministic with an injected rng', () => {

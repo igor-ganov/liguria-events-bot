@@ -87,7 +87,8 @@ const toRecord = (
     id: item.id,
     title: raw.title,
     startDate: raw.startDate,
-    category: enrichment?.category ?? raw.categoryHint ?? 'other',
+    categories:
+      enrichment?.categories ?? (raw.categoryHint === undefined ? ['other'] : [raw.categoryHint]),
     description: enrichment?.description ?? raw.rawDescription ?? raw.title,
     url: raw.url,
     source: raw.source,
@@ -99,6 +100,7 @@ const toRecord = (
     ...(raw.address === undefined ? {} : { address: raw.address }),
     ...(raw.priceInfo === undefined ? {} : { priceInfo: raw.priceInfo }),
     ...(raw.rawDescription === undefined ? {} : { rawDescription: raw.rawDescription }),
+    ...(raw.image === undefined ? {} : { image: raw.image }),
     ...(free ? { free: true } : {}),
   };
 };
@@ -170,9 +172,13 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       return raw === undefined ? item : { id: item.id, raw };
     });
 
+    // Bound LLM work per run: the whole run must fit the 30s waitUntil
+    // window, so a large retry backlog drains across several runs instead
+    // of killing this one mid-flight (which would strand the lock).
+    const RETRY_CAP = 60;
     const pending = [
       ...freshDetailed.map(pendingOf),
-      ...retryRecords.map(pendingOfRecord),
+      ...retryRecords.slice(0, RETRY_CAP).map(pendingOfRecord),
     ];
     const enrichments =
       pending.length === 0
@@ -189,7 +195,7 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
         ? record
         : {
             ...record,
-            category: enrichment.category,
+            categories: enrichment.categories,
             description: enrichment.description,
             enriched: true,
           };

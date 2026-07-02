@@ -33,6 +33,8 @@ describe('parseMentelocaleHtml (fixture)', () => {
       assert.ok(event.title.length > 3);
       assert.equal(event.source, 'mentelocale');
     }
+    const withImage = events.filter((event) => event.image !== undefined);
+    assert.ok(withImage.length >= 5, 'expected card images');
     const ranged = events.find((event) => event.endDate !== undefined);
     assert.ok(ranged !== undefined, 'expected at least one multi-day event');
     const trincia = events.find((event) => event.title.includes('sette isole'));

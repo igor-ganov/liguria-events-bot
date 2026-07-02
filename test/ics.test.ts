@@ -17,7 +17,7 @@ const allDay: CompactEvent = {
   t: 'Mostra; lunga, bella \\ storica',
   s: '2026-07-10',
   e: '2026-07-20',
-  c: 'art',
+  c: ['art'],
   v: 'Palazzo Ducale',
   u: 'https://example.org/mostra',
 };
@@ -27,7 +27,7 @@ const timed: CompactEvent = {
   t: 'Concerto',
   s: '2026-07-04',
   h: '21:00',
-  c: 'music',
+  c: ['music'],
   f: true,
   u: 'https://example.org/concerto',
 };

@@ -20,7 +20,7 @@ export const pickSurprise = (
   );
   if (candidates.length === 0) return undefined;
   const weightOf = (event: CompactEvent): number =>
-    preferred.includes(event.c) ? PREFERRED_WEIGHT : 1;
+    event.c.some((category) => preferred.includes(category)) ? PREFERRED_WEIGHT : 1;
   const total = candidates.reduce((sum, event) => sum + weightOf(event), 0);
   let roll = rng() * total;
   for (const event of candidates) {

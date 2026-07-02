@@ -21,7 +21,7 @@ const record: EventRecord = {
   title: 'Test',
   startDate: '2026-07-10',
   endDate: '2026-07-12',
-  category: 'art',
+  categories: ['art'],
   description: 'A test event.',
   url: 'https://example.org',
   source: 'visitgenoa',

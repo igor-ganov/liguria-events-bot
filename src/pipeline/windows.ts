@@ -55,8 +55,8 @@ export const tonightEvents = (
       (event) =>
         coversDay(event, today) &&
         ((event.h !== undefined && event.h >= '18:00') ||
-          event.c === 'nightlife' ||
-          event.c === 'music'),
+          event.c.includes('nightlife') ||
+          event.c.includes('music')),
     )
     .toSorted(byStartThenTitle);
 
@@ -73,7 +73,9 @@ export const categoryEvents = (
   today: string,
   days = 14,
 ): readonly CompactEvent[] =>
-  eventsInWindow(index, upcomingWindow(today, days)).filter((event) => event.c === category);
+  eventsInWindow(index, upcomingWindow(today, days)).filter((event) =>
+    event.c.includes(category),
+  );
 
 /** Drop events fully in the past (AC-1.5). */
 export const pruneIndex = (

@@ -23,7 +23,7 @@ const BASE_URL = 'https://www.genovateatro.it';
 const LISTING_URL = `${BASE_URL}/eventi/`;
 const USER_AGENT = 'Mozilla/5.0 (compatible; event-collecter/0.0)';
 
-type Draft = { href: string; title: string; date: string; abstract: string };
+type Draft = { href: string; title: string; date: string; abstract: string; img: string };
 
 export const parseGenovateatroHtml = async (html: string): Promise<readonly RawEvent[]> => {
   const drafts: Draft[] = [];
@@ -31,7 +31,7 @@ export const parseGenovateatroHtml = async (html: string): Promise<readonly RawE
   const rewriter = new HTMLRewriter()
     .on('div.Evento', {
       element: () => {
-        drafts.push({ href: '', title: '', date: '', abstract: '' });
+        drafts.push({ href: '', title: '', date: '', abstract: '', img: '' });
       },
     })
     .on('div.Evento > a', {
@@ -41,6 +41,13 @@ export const parseGenovateatroHtml = async (html: string): Promise<readonly RawE
         if (draft !== undefined && draft.href === '' && href !== null && href.startsWith('/')) {
           draft.href = href;
         }
+      },
+    })
+    .on('div.Evento img', {
+      element: (element) => {
+        const draft = current();
+        const src = element.getAttribute('src');
+        if (draft !== undefined && draft.img === '' && src !== null) draft.img = src;
       },
     })
     .on('div.Evento span.Title', {
@@ -77,6 +84,7 @@ export const parseGenovateatroHtml = async (html: string): Promise<readonly RawE
         categoryHint: 'theatre',
         ...(range.endDate === undefined ? {} : { endDate: range.endDate }),
         ...(abstract === '' ? {} : { rawDescription: abstract }),
+        ...(draft.img === '' ? {} : { image: new URL(draft.img, BASE_URL).toString() }),
       },
     ];
   });

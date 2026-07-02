@@ -16,7 +16,7 @@ import type { CompactEvent } from '../src/domain/event.ts';
 
 const make = (overrides: Partial<CompactEvent> & Pick<CompactEvent, 'id' | 's'>): CompactEvent => ({
   t: `Event ${overrides.id}`,
-  c: 'other',
+  c: ['other'],
   u: 'https://example.org',
   ...overrides,
 });
@@ -53,9 +53,9 @@ describe('window queries', () => {
     make({ id: 'past', s: '2026-06-20', e: '2026-06-30' }),
     make({ id: 'today', s: '2026-07-01' }),
     make({ id: 'span', s: '2026-06-01', e: '2026-08-31' }),
-    make({ id: 'sat', s: '2026-07-04', h: '21:00', c: 'nightlife' }),
+    make({ id: 'sat', s: '2026-07-04', h: '21:00', c: ['nightlife'] }),
     make({ id: 'freebie', s: '2026-07-03', f: true }),
-    make({ id: 'far', s: '2026-09-01', c: 'music' }),
+    make({ id: 'far', s: '2026-09-01', c: ['music'] }),
   ];
 
   test('coversDay covers multi-day ranges', () => {

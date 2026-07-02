@@ -18,7 +18,7 @@ const compact: CompactEvent = {
   s: '2026-07-04',
   e: '2026-07-05',
   h: '21:00',
-  c: 'music',
+  c: ['music'],
   v: 'Porto Antico',
   f: true,
   u: 'https://example.org/1',
@@ -47,7 +47,7 @@ describe('renderEventLine', () => {
 
 describe('renderGrouped / renderList', () => {
   test('groups by category with emoji headers (AC-3.1)', () => {
-    const other: CompactEvent = { ...compact, id: 'b', c: 'art', t: 'Mostra' };
+    const other: CompactEvent = { ...compact, id: 'b', c: ['art'], t: 'Mostra' };
     const text = renderGrouped([compact, other], 'en');
     assert.ok(text.indexOf('🎵') < text.indexOf('🖼')); // taxonomy order
     assert.ok(text.includes('<b>Music</b>'));
@@ -65,7 +65,7 @@ describe('renderCard', () => {
     startDate: '2026-07-10',
     time: '21:00',
     venue: 'Porto Antico',
-    category: 'music',
+    categories: ['music'],
     description: 'Electronic music by the sea.',
     priceInfo: '€ 15,00',
     url: 'https://example.org/1',

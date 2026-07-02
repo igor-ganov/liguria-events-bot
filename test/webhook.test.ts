@@ -88,8 +88,8 @@ describe('public calendar feed (public-calendar AC-1.1/1.2/1.6, AC-2.x)', () => 
   test('GET /calendar.ics is public, cached, and serves filtered VEVENTs', async () => {
     const env = makeEnv();
     const index = [
-      { id: 'aaa', t: 'Concerto', s: '2026-07-04', h: '21:00', c: 'music', f: true, u: 'https://x/1' },
-      { id: 'bbb', t: 'Mostra', s: '2026-07-05', c: 'art', u: 'https://x/2' },
+      { id: 'aaa', t: 'Concerto', s: '2026-07-04', h: '21:00', c: ['music'], f: true, u: 'https://x/1' },
+      { id: 'bbb', t: 'Mostra', s: '2026-07-05', c: ['art'], u: 'https://x/2' },
     ];
     await env.EVENTS.put('events:index', JSON.stringify(index));
     const { ctx } = makeCtx();
@@ -119,8 +119,8 @@ describe('public calendar feed (public-calendar AC-1.1/1.2/1.6, AC-2.x)', () => 
   test('GET /events.json serves the filtered corpus with CORS (AC-4.x)', async () => {
     const env = makeEnv();
     const index = [
-      { id: 'aaa', t: 'Concerto', s: '2026-07-04', c: 'music', f: true, u: 'https://x/1' },
-      { id: 'bbb', t: 'Mostra', s: '2026-07-05', c: 'art', u: 'https://x/2' },
+      { id: 'aaa', t: 'Concerto', s: '2026-07-04', c: ['music'], f: true, u: 'https://x/1' },
+      { id: 'bbb', t: 'Mostra', s: '2026-07-05', c: ['art'], u: 'https://x/2' },
     ];
     await env.EVENTS.put('events:index', JSON.stringify(index));
     const { ctx } = makeCtx();

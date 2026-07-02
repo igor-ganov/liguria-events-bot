@@ -9,7 +9,7 @@ const compact = (id: string, s: string): CompactEvent => ({
   id,
   t: `Event ${id}`,
   s,
-  c: 'other',
+  c: ['other'],
   u: 'https://example.org',
 });
 

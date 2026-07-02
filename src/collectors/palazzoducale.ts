@@ -33,7 +33,7 @@ const TYPE_HINTS: readonly (readonly [RegExp, Category])[] = [
 export const mapDucaleType = (label: string): Category | undefined =>
   TYPE_HINTS.find(([pattern]) => pattern.test(label))?.[1];
 
-type Draft = { href: string; title: string; type: string; info: string };
+type Draft = { href: string; title: string; type: string; info: string; img: string };
 
 export const parsePalazzoducaleHtml = async (html: string): Promise<readonly RawEvent[]> => {
   const drafts: Draft[] = [];
@@ -41,7 +41,14 @@ export const parsePalazzoducaleHtml = async (html: string): Promise<readonly Raw
   const rewriter = new HTMLRewriter()
     .on('article.exhibition-item', {
       element: () => {
-        drafts.push({ href: '', title: '', type: '', info: '' });
+        drafts.push({ href: '', title: '', type: '', info: '', img: '' });
+      },
+    })
+    .on('article.exhibition-item img', {
+      element: (element) => {
+        const draft = current();
+        const src = element.getAttribute('src');
+        if (draft !== undefined && draft.img === '' && src !== null) draft.img = src;
       },
     })
     .on('article.exhibition-item h2.exhibition-title a', {
@@ -85,6 +92,7 @@ export const parsePalazzoducaleHtml = async (html: string): Promise<readonly Raw
         ...(info.time === undefined ? {} : { time: info.time }),
         ...(venue === '' ? {} : { venue }),
         ...(hint === undefined ? {} : { categoryHint: hint }),
+        ...(draft.img === '' ? {} : { image: draft.img }),
       },
     ];
   });

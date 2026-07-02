@@ -20,7 +20,7 @@ const BASE_URL = 'https://www.mentelocale.it';
 const LISTING_URL = `${BASE_URL}/genova/eventi/`;
 const USER_AGENT = 'Mozilla/5.0 (compatible; event-collecter/0.0)';
 
-type Draft = { href: string; title: string; date: string };
+type Draft = { href: string; title: string; date: string; img: string };
 
 export const parseMentelocaleHtml = async (html: string): Promise<readonly RawEvent[]> => {
   const drafts: Draft[] = [];
@@ -28,7 +28,7 @@ export const parseMentelocaleHtml = async (html: string): Promise<readonly RawEv
   const rewriter = new HTMLRewriter()
     .on('div.Evento', {
       element: () => {
-        drafts.push({ href: '', title: '', date: '' });
+        drafts.push({ href: '', title: '', date: '', img: '' });
       },
     })
     .on('div.Evento > a', {
@@ -40,6 +40,13 @@ export const parseMentelocaleHtml = async (html: string): Promise<readonly RawEv
         if (draft !== undefined && draft.href === '' && href !== null && href.startsWith('/')) {
           draft.href = href;
         }
+      },
+    })
+    .on('div.Evento img', {
+      element: (element) => {
+        const draft = current();
+        const src = element.getAttribute('data-src') ?? element.getAttribute('src');
+        if (draft !== undefined && draft.img === '' && src !== null) draft.img = src;
       },
     })
     .on('div.Evento span.Titolo', {
@@ -67,6 +74,7 @@ export const parseMentelocaleHtml = async (html: string): Promise<readonly RawEv
         url: new URL(draft.href, BASE_URL).toString(),
         source: MENTELOCALE_SOURCE,
         ...(range.endDate === undefined ? {} : { endDate: range.endDate }),
+        ...(draft.img === '' ? {} : { image: new URL(draft.img, BASE_URL).toString() }),
       },
     ];
   });

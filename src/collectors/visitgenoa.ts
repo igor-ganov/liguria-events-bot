@@ -51,7 +51,7 @@ export const mapCategoryHint = (labels: string): Category | undefined =>
 export const stripLeadingDateRange = (heading: string): string =>
   decodeEntities(heading.replace(DATE_RANGE, ' '));
 
-type ListingDraft = { href: string; heading: string; categories: string };
+type ListingDraft = { href: string; heading: string; categories: string; img: string };
 
 export const parseListingHtml = async (html: string): Promise<readonly RawEvent[]> => {
   const drafts: ListingDraft[] = [];
@@ -59,7 +59,7 @@ export const parseListingHtml = async (html: string): Promise<readonly RawEvent[
   const rewriter = new HTMLRewriter()
     .on('div.grid-item', {
       element: () => {
-        drafts.push({ href: '', heading: '', categories: '' });
+        drafts.push({ href: '', heading: '', categories: '', img: '' });
       },
     })
     .on('div.grid-item > a', {
@@ -67,6 +67,13 @@ export const parseListingHtml = async (html: string): Promise<readonly RawEvent[
         const draft = current();
         const href = element.getAttribute('href');
         if (draft !== undefined && draft.href === '' && href !== null) draft.href = href;
+      },
+    })
+    .on('div.grid-item img', {
+      element: (element) => {
+        const draft = current();
+        const src = element.getAttribute('src');
+        if (draft !== undefined && draft.img === '' && src !== null) draft.img = src;
       },
     })
     .on('div.grid-item h4', {
@@ -96,6 +103,7 @@ export const parseListingHtml = async (html: string): Promise<readonly RawEvent[
         source: VISITGENOA_SOURCE,
         ...(range.endDate === undefined ? {} : { endDate: range.endDate }),
         ...(hint === undefined ? {} : { categoryHint: hint }),
+        ...(draft.img === '' ? {} : { image: new URL(draft.img, BASE_URL).toString() }),
       },
     ];
   });

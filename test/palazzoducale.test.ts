@@ -58,6 +58,8 @@ describe('parsePalazzoducaleHtml (fixture)', () => {
     // Venue and time are card-dependent — require them on most, not all.
     const withVenue = events.filter((event) => (event.venue?.length ?? 0) > 3);
     assert.ok(withVenue.length >= Math.ceil(events.length / 2));
+    const withImage = events.filter((event) => event.image !== undefined);
+    assert.ok(withImage.length >= 5, 'expected card images');
     const timed = events.filter((event) => event.time !== undefined);
     assert.ok(timed.length >= 5, 'expected timed events with `ore HH:MM`');
   });

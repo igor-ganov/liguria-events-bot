@@ -27,7 +27,15 @@ const WORKERS_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_TIMEOUT_MS = 25_000;
 const GEMINI_ATTEMPTS = 2;
-const MAX_TOKENS = 2048;
+const MAX_TOKENS = 4096;
+
+/** Workers AI replies either legacy `{response}` or OpenAI-style
+ *  `{choices:[{message:{content}}]}` depending on the model route. */
+export const workersAiText = (result: unknown): string | undefined =>
+  asNonEmptyString(readProp(result, 'response')) ??
+  asNonEmptyString(
+    readProp(readProp(readAt(readProp(result, 'choices'), 0), 'message'), 'content'),
+  );
 
 const runWorkersAi = async (
   ai: AiBinding,
@@ -42,7 +50,7 @@ const runWorkersAi = async (
       ],
       max_tokens: MAX_TOKENS,
     });
-    return asNonEmptyString(readProp(result, 'response'));
+    return workersAiText(result);
   } catch {
     return undefined;
   }

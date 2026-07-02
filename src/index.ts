@@ -646,7 +646,9 @@ const pushDigest = async (
   const window = digestDueWindow(settings, today, hour);
   if (window === undefined) return;
   const events = eventsInWindow(index, window).filter(
-    (event) => settings.categories.length === 0 || settings.categories.includes(event.c),
+    (event) =>
+      settings.categories.length === 0 ||
+      event.c.some((category) => settings.categories.includes(category)),
   );
   if (events.length === 0) return; // silent skip (AC-5.3)
   const lang = uiLanguage(settings, 'en');
@@ -708,6 +710,28 @@ const worker = {
     }
     if (url.pathname === '/events.json' && request.method === 'GET') {
       return serveEventsJson(env, url);
+    }
+    // Operator diagnostics: raw Workers AI probe, gated by the tick secret.
+    if (url.pathname === '/debug-llm' && request.method === 'POST') {
+      if (request.headers.get('x-tick-secret') !== env.WEBHOOK_SECRET) {
+        return new Response('unauthorized', { status: 401 });
+      }
+      try {
+        const body: unknown = await request.json().catch(() => undefined);
+        const system =
+          asNonEmptyString(readProp(body, 'system')) ?? 'You are a terse assistant.';
+        const user =
+          asNonEmptyString(readProp(body, 'user')) ?? 'Reply with the single word: pong';
+        const reply = await chatOf(env)(system, user);
+        return new Response(JSON.stringify({ ok: true, reply }), {
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (error) {
+        const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        return new Response(JSON.stringify({ ok: false, reason }), {
+          headers: { 'content-type': 'application/json' },
+        });
+      }
     }
     // External hourly pulse (GitHub Actions cron) — the account's CF cron
     // slots are exhausted, so the schedule arrives over HTTP instead. Same

@@ -22,9 +22,21 @@ describe('extractJson', () => {
   });
 });
 
+describe('workersAiText', () => {
+  test('reads both the legacy and the OpenAI-style response shapes', async () => {
+    const { workersAiText } = await import('../src/llm/client.ts');
+    assert.equal(workersAiText({ response: 'legacy' }), 'legacy');
+    assert.equal(
+      workersAiText({ choices: [{ message: { content: 'openai style' } }] }),
+      'openai style',
+    );
+    assert.equal(workersAiText({ unrelated: true }), undefined);
+  });
+});
+
 describe('makeChat', () => {
   const workingAi: AiBinding = {
-    run: async () => ({ response: 'from workers ai' }),
+    run: async () => ({ choices: [{ message: { content: 'from workers ai' } }] }),
   };
   const brokenAi: AiBinding = {
     run: async () => {

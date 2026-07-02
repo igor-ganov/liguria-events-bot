@@ -18,9 +18,11 @@ export type PendingEnrich = Readonly<{
   raw?: string;
 }>;
 
-export type Enrichment = Readonly<{ category: Category; description: string }>;
+export type Enrichment = Readonly<{ categories: readonly Category[]; description: string }>;
 
-const ENRICH_BATCH = 15;
+// Each enriched event costs ~120 output tokens (2 sentences + JSON armor);
+// 6 per call stays well under the completion cap even when llama rambles.
+const ENRICH_BATCH = 6;
 const EXTRACT_BATCH = 20;
 
 export const chunk = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
@@ -32,20 +34,24 @@ export const chunk = <T>(items: readonly T[], size: number): readonly (readonly 
 
 const ENRICH_SYSTEM = [
   'You are a data curator for a Genoa (Italy) events guide.',
-  'For EVERY input event return exactly one category from this fixed list:',
+  'For EVERY input event return 1 to 3 categories from this fixed list,',
+  'most specific first (a food festival with concerts is ["food","music"]):',
   CATEGORIES.join(', '),
-  'and a neutral 1-2 sentence English description: what it is, where, and why',
-  'it is interesting. Do not invent facts absent from the input.',
+  'and a fresh, neutral 1-2 sentence English description IN YOUR OWN WORDS —',
+  'summarize what it is, where, and why it is interesting. Never copy source',
+  'sentences verbatim and do not invent facts absent from the input.',
   'Respond with STRICT valid JSON, no markdown, no backticks:',
-  '{ "events": [ { "id": "<input id>", "category": "<category>", "description": "<1-2 sentences>" } ] }',
+  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "description": "<1-2 sentences>" } ] }',
 ].join('\n');
 
 const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment])[] => {
   const id = asNonEmptyString(readProp(value, 'id'));
-  const category = readProp(value, 'category');
   const description = asNonEmptyString(readProp(value, 'description'));
-  if (id === undefined || !isCategory(category) || description === undefined) return [];
-  return [[id, { category, description }]];
+  const many = (asArray(readProp(value, 'categories')) ?? []).filter(isCategory);
+  const legacy = readProp(value, 'category');
+  const categories = [...many, ...(isCategory(legacy) ? [legacy] : [])].slice(0, 3);
+  if (id === undefined || categories.length === 0 || description === undefined) return [];
+  return [[id, { categories, description }]];
 };
 
 export const makeEnrichEvents =

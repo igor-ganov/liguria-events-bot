@@ -17,7 +17,7 @@ const record: EventRecord = {
   id: 'abc123def456',
   title: 'Electropark Festival',
   startDate: '2026-07-10',
-  category: 'music',
+  categories: ['music'],
   description: 'Electronic music festival.',
   url: 'https://www.visitgenoa.it/en/node/26370',
   source: 'visitgenoa',
@@ -64,9 +64,15 @@ describe('mergeEvent', () => {
     assert.equal(event.free, true);
     assert.equal(event.url, record.url); // existing fields never overwritten
     assert.equal(event.source, record.source);
+    // The other source's link is preserved (AC-1.8).
+    assert.deepEqual(event.altLinks, [{ source: 'tg:genova', url: 'https://example.org' }]);
   });
-  test('does not overwrite present fields', () => {
-    const withVenue: EventRecord = { ...record, venue: 'Teatro' };
+  test('does not overwrite present fields; a known link adds nothing', () => {
+    const withVenue: EventRecord = {
+      ...record,
+      venue: 'Teatro',
+      altLinks: [{ source: 'tg:genova', url: 'https://example.org' }],
+    };
     const { priceInfo: _dropped, ...noPrice } = incoming;
     const { event, changed } = mergeEvent(withVenue, noPrice);
     assert.equal(event.venue, 'Teatro');

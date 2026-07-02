@@ -21,6 +21,10 @@ const DESCRIPTION_CAP = 400;
 
 const stripTags = (html: string): string => decodeEntities(html.replace(/<[^>]+>/g, ' '));
 
+const IMG_SRC = /<img[^>]+src="(https?:[^"]+)"/;
+
+const firstImage = (html: string): string | undefined => IMG_SRC.exec(html)?.[1];
+
 export const parseLocations = (payload: unknown): ReadonlyMap<number, string> =>
   new Map(
     (asArray(payload) ?? []).flatMap((term): readonly (readonly [number, string])[] => {
@@ -46,6 +50,7 @@ export const parsePortoanticoPosts = (
     if (info === undefined) return [];
     const locationId = asNumber((asArray(readProp(post, 'location-eventi')) ?? [])[0]);
     const venue = locationId === undefined ? undefined : locations.get(locationId);
+    const image = firstImage(contentHtml);
     return [
       {
         title: decodeEntities(title),
@@ -56,6 +61,7 @@ export const parsePortoanticoPosts = (
         ...(info.endDate === undefined ? {} : { endDate: info.endDate }),
         ...(info.time === undefined ? {} : { time: info.time }),
         ...(venue === undefined ? {} : { venue }),
+        ...(image === undefined ? {} : { image }),
       },
     ];
   });

@@ -5,7 +5,7 @@
  * timed events.
  */
 import type { Category, CompactEvent } from '../domain/event.ts';
-import { isCategory } from '../domain/event.ts';
+import { isCategory, primaryCategory } from '../domain/event.ts';
 import { CATEGORY_EMOJI } from '../delivery/render.ts';
 import { addDays } from '../pipeline/clock.ts';
 
@@ -24,7 +24,7 @@ export const filterEvents = (
       (event) =>
         filter.categories === undefined ||
         filter.categories.length === 0 ||
-        filter.categories.includes(event.c),
+        event.c.some((category) => filter.categories?.includes(category) === true),
     )
     .filter((event) => filter.freeOnly !== true || event.f === true);
 
@@ -125,7 +125,7 @@ const eventLines = (event: CompactEvent, stamp: string): readonly string[] => {
           `DTEND;TZID=Europe/Rome:${timedValue(event.s, event.h, DEFAULT_EVENT_HOURS)}`,
         ];
   const description = [
-    CATEGORY_LABEL[event.c],
+    event.c.map((category) => CATEGORY_LABEL[category]).join('/'),
     ...(event.f === true ? ['free entry'] : []),
     event.u,
   ].join(' · ');
@@ -134,11 +134,11 @@ const eventLines = (event: CompactEvent, stamp: string): readonly string[] => {
     `UID:${event.id}@event-collecter`,
     `DTSTAMP:${stamp}`,
     ...timing,
-    `SUMMARY:${escapeIcsText(`${CATEGORY_EMOJI[event.c]} ${event.t}`)}`,
+    `SUMMARY:${escapeIcsText(`${CATEGORY_EMOJI[primaryCategory(event.c)]} ${event.t}`)}`,
     ...(event.v === undefined ? [] : [`LOCATION:${escapeIcsText(event.v)}`]),
     `DESCRIPTION:${escapeIcsText(description)}`,
     `URL:${event.u}`,
-    `CATEGORIES:${CATEGORY_LABEL[event.c].toUpperCase()}`,
+    `CATEGORIES:${event.c.map((category) => CATEGORY_LABEL[category].toUpperCase()).join(',')}`,
     'END:VEVENT',
   ];
 };

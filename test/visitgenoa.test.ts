@@ -66,6 +66,9 @@ describe('parseListingHtml (fixture)', () => {
       assert.ok(event.title.length > 3);
       assert.equal(event.source, 'visitgenoa');
     }
+    const withImage = events.filter((event) => event.image !== undefined);
+    assert.ok(withImage.length >= 5, 'expected cover images from listing cards');
+    assert.match(withImage[0]?.image ?? '', /^https:\/\/www\.visitgenoa\.it\//);
     const unesco = events.find((event) => event.title.includes('Ventennale'));
     assert.ok(unesco !== undefined);
     assert.equal(unesco.startDate, '2026-02-01');

@@ -45,7 +45,11 @@ a schedule, so the corpus stays fresh without manual work.
   failure in the run log; a partial run is a valid run.
 - **AC-1.4** WHEN an event is stored THE SYSTEM SHALL persist at least: id,
   title, start date, source, source URL; and when present in the source:
-  end date, time, venue, address, price info, raw description.
+  end date, time, venue, address, price info, raw description, and an
+  **image URL** *(added 2026-07-02 for the site's event cards)*.
+- **AC-1.8** *(added 2026-07-02)* WHEN the same event is sighted by another
+  source THE SYSTEM SHALL keep every source's link (`altLinks`), so event
+  cards can reference all origins.
 - **AC-1.5** WHEN an event's start date is in the past (before today, Europe/
   Rome) THE SYSTEM SHALL exclude it from storage and from every user-facing
   answer; stored events expire automatically (TTL) after their date passes.
@@ -60,8 +64,11 @@ a schedule, so the corpus stays fresh without manual work.
 As a user, I want every event categorized and described in a consistent,
 compact way, so lists are scannable and filters work.
 
-- **AC-2.1** WHEN a new event is stored THE SYSTEM SHALL assign exactly one
-  category from the fixed taxonomy via the LLM.
+- **AC-2.1** *(revised 2026-07-02: events span several categories — a food
+  festival with live music is both)* WHEN a new event is stored THE SYSTEM
+  SHALL assign **one to three** categories from the fixed taxonomy via the
+  LLM, most specific first; the first is the primary category used where a
+  single one is needed (grouping, emoji).
 - **AC-2.2** WHEN a new event is stored THE SYSTEM SHALL generate a 1–2
   sentence neutral description (what/where/why interesting) in English as the
   canonical stored form.

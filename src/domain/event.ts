@@ -41,9 +41,14 @@ export type EventRecord = Readonly<{
   time?: string;
   venue?: string;
   address?: string;
-  category: Category;
+  /** 1–3 categories, most specific first; [0] is the primary (AC-2.1). */
+  categories: readonly Category[];
   /** Canonical 1–2 sentence English description (AC-2.2). */
   description: string;
+  /** Poster/cover image from the source, when the listing exposes one. */
+  image?: string;
+  /** Links from other sources that resighted this event (AC-1.8). */
+  altLinks?: readonly SourceLink[];
   rawDescription?: string;
   priceInfo?: string;
   free?: boolean;
@@ -54,18 +59,27 @@ export type EventRecord = Readonly<{
   addedAt: number;
 }>;
 
-/** Index projection: t=title s=start e=end c=category f=free v=venue h=time u=url. */
+export type SourceLink = Readonly<{ source: string; url: string }>;
+
+/** Index projection: t=title s=start e=end c=categories f=free v=venue
+ *  h=time u=url img=image d=description l=alt links. */
 export type CompactEvent = Readonly<{
   id: string;
   t: string;
   s: string;
   e?: string;
-  c: Category;
+  c: readonly Category[];
   f?: boolean;
   v?: string;
   h?: string;
   u: string;
+  img?: string;
+  d?: string;
+  l?: readonly SourceLink[];
 }>;
+
+export const primaryCategory = (categories: readonly Category[]): Category =>
+  categories[0] ?? 'other';
 
 /** Raw event as produced by a collector, before dedupe and enrichment. */
 export type RawEvent = Readonly<{
@@ -80,6 +94,7 @@ export type RawEvent = Readonly<{
   url: string;
   source: string;
   categoryHint?: Category;
+  image?: string;
 }>;
 
 export const normalizeTitle = (title: string): string =>
@@ -132,6 +147,15 @@ export const mergeEvent = (
     ...(existing.rawDescription === undefined && incoming.rawDescription !== undefined
       ? { rawDescription: incoming.rawDescription }
       : {}),
+    ...(existing.image === undefined && incoming.image !== undefined
+      ? { image: incoming.image }
+      : {}),
+    // A different source resighted this event → keep its link too (AC-1.8).
+    ...(incoming.source !== existing.source &&
+    incoming.url !== existing.url &&
+    !(existing.altLinks ?? []).some((link) => link.url === incoming.url)
+      ? { altLinks: [...(existing.altLinks ?? []), { source: incoming.source, url: incoming.url }] }
+      : {}),
   };
   const changed =
     event.endDate !== existing.endDate ||
@@ -139,7 +163,9 @@ export const mergeEvent = (
     event.venue !== existing.venue ||
     event.address !== existing.address ||
     event.priceInfo !== existing.priceInfo ||
-    event.rawDescription !== existing.rawDescription;
+    event.rawDescription !== existing.rawDescription ||
+    event.image !== existing.image ||
+    event.altLinks !== existing.altLinks;
   return { event, changed };
 };
 
@@ -153,12 +179,17 @@ export const toCompact = (event: EventRecord): CompactEvent => ({
   id: event.id,
   t: event.title,
   s: event.startDate,
-  c: event.category,
+  c: event.categories,
   u: event.url,
   ...(event.endDate === undefined ? {} : { e: event.endDate }),
   ...(event.free === true ? { f: true } : {}),
   ...(event.venue === undefined ? {} : { v: event.venue }),
   ...(event.time === undefined ? {} : { h: event.time }),
+  ...(event.image === undefined ? {} : { img: event.image }),
+  ...(event.description === '' ? {} : { d: event.description }),
+  ...(event.altLinks === undefined || event.altLinks.length === 0
+    ? {}
+    : { l: event.altLinks }),
 });
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -166,12 +197,27 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 export const isIsoDate = (value: string): boolean =>
   ISO_DATE.test(value) && !Number.isNaN(Date.parse(`${value}T12:00:00Z`));
 
+/** Accepts the multi-category array AND the legacy single `category` field. */
+const parseCategories = (value: unknown): readonly Category[] => {
+  const many = (asArray(readProp(value, 'categories')) ?? []).filter(isCategory);
+  const legacy = readProp(value, 'category');
+  const fallback = isCategory(legacy) ? [legacy] : [];
+  const merged = [...many, ...fallback];
+  return merged.length === 0 ? ['other'] : merged.slice(0, 3);
+};
+
+const parseSourceLinks = (value: unknown): readonly SourceLink[] =>
+  (asArray(value) ?? []).flatMap((item): readonly SourceLink[] => {
+    const source = asNonEmptyString(readProp(item, 'source'));
+    const url = asNonEmptyString(readProp(item, 'url'));
+    return source === undefined || url === undefined ? [] : [{ source, url }];
+  });
+
 export const parseEventRecord = (text: string): EventRecord | undefined => {
   const value = parseJson(text);
   const id = asNonEmptyString(readProp(value, 'id'));
   const title = asNonEmptyString(readProp(value, 'title'));
   const startDate = asNonEmptyString(readProp(value, 'startDate'));
-  const category = readProp(value, 'category');
   const description = asNonEmptyString(readProp(value, 'description'));
   const url = asNonEmptyString(readProp(value, 'url'));
   const source = asNonEmptyString(readProp(value, 'source'));
@@ -182,7 +228,6 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
     title === undefined ||
     startDate === undefined ||
     !isIsoDate(startDate) ||
-    !isCategory(category) ||
     description === undefined ||
     url === undefined ||
     source === undefined ||
@@ -198,11 +243,13 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
   const priceInfo = asNonEmptyString(readProp(value, 'priceInfo'));
   const rawDescription = asNonEmptyString(readProp(value, 'rawDescription'));
   const free = asBoolean(readProp(value, 'free'));
+  const image = asNonEmptyString(readProp(value, 'image'));
+  const altLinks = parseSourceLinks(readProp(value, 'altLinks'));
   return {
     id,
     title,
     startDate,
-    category,
+    categories: parseCategories(value),
     description,
     url,
     source,
@@ -215,32 +262,47 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
     ...(priceInfo === undefined ? {} : { priceInfo }),
     ...(rawDescription === undefined ? {} : { rawDescription }),
     ...(free === undefined ? {} : { free }),
+    ...(image === undefined ? {} : { image }),
+    ...(altLinks.length === 0 ? {} : { altLinks }),
   };
+};
+
+/** `c` was a single category before the multi-category revision — accept both. */
+const compactCategories = (value: unknown): readonly Category[] => {
+  const many = (asArray(value) ?? []).filter(isCategory);
+  const single = isCategory(value) ? [value] : [];
+  const merged = [...many, ...single];
+  return merged.length === 0 ? ['other'] : merged;
 };
 
 const parseCompact = (value: unknown): CompactEvent | undefined => {
   const id = asNonEmptyString(readProp(value, 'id'));
   const t = asNonEmptyString(readProp(value, 't'));
   const s = asNonEmptyString(readProp(value, 's'));
-  const c = readProp(value, 'c');
   const u = asNonEmptyString(readProp(value, 'u'));
-  if (id === undefined || t === undefined || s === undefined || !isCategory(c) || u === undefined) {
+  if (id === undefined || t === undefined || s === undefined || u === undefined) {
     return undefined;
   }
   const e = asNonEmptyString(readProp(value, 'e'));
   const f = asBoolean(readProp(value, 'f'));
   const v = asNonEmptyString(readProp(value, 'v'));
   const h = asNonEmptyString(readProp(value, 'h'));
+  const img = asNonEmptyString(readProp(value, 'img'));
+  const d = asNonEmptyString(readProp(value, 'd'));
+  const l = parseSourceLinks(readProp(value, 'l'));
   return {
     id,
     t,
     s,
-    c,
+    c: compactCategories(readProp(value, 'c')),
     u,
     ...(e === undefined ? {} : { e }),
     ...(f === true ? { f: true } : {}),
     ...(v === undefined ? {} : { v }),
     ...(h === undefined ? {} : { h }),
+    ...(img === undefined ? {} : { img }),
+    ...(d === undefined ? {} : { d }),
+    ...(l.length === 0 ? {} : { l }),
   };
 };
 

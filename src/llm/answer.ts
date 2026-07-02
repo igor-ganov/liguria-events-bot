@@ -22,7 +22,7 @@ const eventLine = (event: EventRecord): string =>
     event.startDate + (event.endDate === undefined ? '' : `..${event.endDate}`),
     event.time ?? '',
     event.venue ?? '',
-    event.category,
+    event.categories.join('/'),
     event.priceInfo ?? (event.free === true ? 'free' : ''),
     event.url,
     event.description,
