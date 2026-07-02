@@ -1,0 +1,21 @@
+{
+  // Tests run under `bun test`; assertions use node:assert/strict. The
+  // hand-rolled bun-test.d.ts avoids the bun-types/workers-types global
+  // clash while keeping HTMLRewriter (provided by Bun at runtime) typed via
+  // workers-types.
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023"],
+    "types": ["node", "@cloudflare/workers-types"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["."]
+}

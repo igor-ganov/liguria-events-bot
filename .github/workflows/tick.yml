@@ -1,0 +1,19 @@
+# Hourly schedule pulse. The Cloudflare account's free cron slots are all
+# taken by other workers, so the worker's scheduled dispatch (collection at
+# 05/11/17 Rome, reminders at 10:00, per-user digests) is driven from here
+# via the authenticated POST /tick route.
+name: Hourly tick
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pulse the worker
+        run: |
+          curl -sf -X POST "https://liguria-events-bot.igor-ganov.workers.dev/tick" \
+            -H "x-tick-secret: ${{ secrets.TICK_SECRET }}"

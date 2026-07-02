@@ -1,0 +1,35 @@
+{
+  // Cloudflare Worker config for the Genoa events bot.
+  // Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "liguria-events-bot",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-01",
+  "observability": { "enabled": true },
+
+  // Workers AI: primary LLM (Gemini is the REST fallback via GEMINI_API_KEY).
+  "ai": { "binding": "AI" },
+
+  // KV: events corpus + per-user state. Create with:
+  //   bun x wrangler kv namespace create EVENTS
+  // then paste the returned id below.
+  "kv_namespaces": [{ "binding": "EVENTS", "id": "65f380a2766d4b33b916ad8a6dac8cef" }],
+
+  // No CF cron: the account's 5 free cron slots are taken by other workers.
+  // The hourly pulse comes from a GitHub Actions schedule hitting POST /tick
+  // (authenticated with WEBHOOK_SECRET via the x-tick-secret header). The
+  // scheduled() handler stays wired — add {"triggers":{"crons":["0 * * * *"]}}
+  // back if a cron slot frees up and both paths work identically.
+
+  "vars": {
+    // Telegram chat id of the operator (may run /collect, sees /status).
+    "OWNER_CHAT_ID": "241140119",
+    // JSON array of public Telegram channel usernames to also collect from,
+    // e.g. ["genovaeventi"]. Read via the t.me/s/ web preview — no userbot.
+    "TG_CHANNELS": "[]",
+    // How many visitgenoa listing pages to fetch per collection run.
+    "SOURCE_PAGES": "3"
+    // Secrets (bun x wrangler secret put …): BOT_TOKEN, WEBHOOK_SECRET,
+    // and optional GEMINI_API_KEY. Local dev: .dev.vars (gitignored).
+  }
+}

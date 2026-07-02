@@ -1,0 +1,19 @@
+{
+  "name": "event-collecter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Genoa events Telegram bot — Cloudflare Worker",
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test/tsconfig.json",
+    "test": "bun test",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260522.1",
+    "@types/node": "^24.0.0",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.94.0"
+  }
+}
