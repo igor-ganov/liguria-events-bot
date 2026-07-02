@@ -17,3 +17,4 @@ jobs:
         run: |
           curl -sf -X POST "https://liguria-events-bot.igor-ganov.workers.dev/tick" \
             -H "x-tick-secret: ${{ secrets.TICK_SECRET }}"
+
