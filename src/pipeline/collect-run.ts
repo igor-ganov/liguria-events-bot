@@ -11,11 +11,15 @@ import {
   toCompact,
 } from '../domain/event.ts';
 import type { CompactEvent, EventRecord, RawEvent } from '../domain/event.ts';
+import { mergeDuplicates, orderByAge } from '../domain/merge-duplicates.ts';
 import type { Collector, RawPost } from '../collectors/types.ts';
 import type { Enrichment, PendingEnrich } from '../llm/enrich.ts';
+import { dedupeCandidates, urlDuplicates } from './dedupe-candidates.ts';
+import type { CandidatePair } from './dedupe-candidates.ts';
 import {
   acquireLock,
   appendRunLog,
+  eventKey,
   readEventRecord,
   readIndex,
   releaseLock,
@@ -41,6 +45,8 @@ export type RunLogEntry = Readonly<{
   extractedFromPosts: number;
   enrichedOk: number;
   enrichFailed: number;
+  /** Cross-source duplicates merged by the LLM judge (AC-1.9). */
+  fuzzyMerged?: number;
 }>;
 
 export type RunSummary =
@@ -53,6 +59,8 @@ export type CollectDeps = Readonly<{
   extract: (posts: readonly RawPost[], today: string) => Promise<readonly RawEvent[]>;
   enrich: (events: readonly PendingEnrich[]) => Promise<ReadonlyMap<string, Enrichment>>;
   details: (events: readonly RawEvent[]) => Promise<readonly RawEvent[]>;
+  /** LLM judge: which candidate pairs are the same real event (AC-1.9). */
+  judgeSameEvent: (pairs: readonly CandidatePair[]) => Promise<readonly CandidatePair[]>;
   now: () => number;
 }>;
 
@@ -130,6 +138,41 @@ const pendingOfRecord = (record: EventRecord): PendingEnrich => ({
     : { raw: record.rawDescription.slice(0, 500) }),
 });
 
+type FuzzyOutcome = Readonly<{
+  droppedIds: ReadonlySet<string>;
+  replacements: ReadonlyMap<string, CompactEvent>;
+}>;
+
+/** Judge candidate pairs, merge confirmed ones in KV, report index edits. */
+const mergeFuzzyDuplicates = async (
+  deps: CollectDeps,
+  index: readonly CompactEvent[],
+  nowMs: number,
+): Promise<FuzzyOutcome> => {
+  const dropped = new Set<string>();
+  const replacements = new Map<string, CompactEvent>();
+  const candidates = dedupeCandidates(index).filter(
+    (pair) => !dropped.has(pair.a.id) && !dropped.has(pair.b.id),
+  );
+  const judged =
+    candidates.length === 0 ? [] : await deps.judgeSameEvent(candidates).catch(() => []);
+  // Shared-url pairs are certain duplicates — no judge needed.
+  const confirmed = [...urlDuplicates(index), ...judged];
+  for (const pair of confirmed) {
+    if (dropped.has(pair.a.id) || dropped.has(pair.b.id)) continue;
+    const recordA = await readEventRecord(deps.kv, pair.a.id);
+    const recordB = await readEventRecord(deps.kv, pair.b.id);
+    if (recordA === undefined || recordB === undefined) continue;
+    const merged = mergeDuplicates(recordA, recordB);
+    const { secondary } = orderByAge(recordA, recordB);
+    await writeEventRecord(deps.kv, merged, nowMs);
+    await deps.kv.delete(eventKey(secondary.id));
+    dropped.add(secondary.id);
+    replacements.set(merged.id, toCompact(merged));
+  }
+  return { droppedIds: dropped, replacements };
+};
+
 export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
   if (!(await acquireLock(deps.kv))) return { kind: 'locked' };
   const startedAt = deps.now();
@@ -147,9 +190,23 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
     const upcoming = collected.filter(
       (raw) => (raw.endDate ?? raw.startDate) >= today, // AC-1.5
     );
-    const identified = dedupeWithinRun(await identify(upcoming));
-
     const index = await readIndex(deps.kv);
+    // URL → record alias map: a fuzzy-merged duplicate's url lives in the
+    // survivor's links, so the next collection maps that sighting back onto
+    // the survivor instead of resurrecting the deleted record (AC-1.9).
+    const urlToId = new Map(
+      index.flatMap((event): readonly (readonly [string, string])[] => [
+        [event.u, event.id],
+        ...(event.l ?? []).map((link): readonly [string, string] => [link.url, event.id]),
+      ]),
+    );
+    const identified = dedupeWithinRun(
+      (await identify(upcoming)).map((item) => ({
+        ...item,
+        id: urlToId.get(item.raw.url) ?? item.id,
+      })),
+    );
+
     const knownIds = new Set(index.map((event) => event.id));
     const freshItems = identified.filter((item) => !knownIds.has(item.id));
     const knownItems = identified.filter((item) => knownIds.has(item.id));
@@ -215,9 +272,16 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       index.map((event) => [event.id, event]),
     );
     for (const record of written.values()) compactById.set(record.id, toCompact(record));
-    const nextIndex = pruneIndex([...compactById.values()], today).toSorted((a, b) =>
-      a.s < b.s ? -1 : a.s > b.s ? 1 : a.t.localeCompare(b.t),
-    );
+    const prunedIndex = pruneIndex([...compactById.values()], today);
+
+    // Fuzzy cross-source dedupe (AC-1.9): sources title the same event
+    // differently, so the exact-id dedupe misses them. Cheap candidate
+    // pre-filter → LLM judge → merge, drop the newer record.
+    const fuzzyMerged = await mergeFuzzyDuplicates(deps, prunedIndex, startedAt);
+    const nextIndex = prunedIndex
+      .filter((event) => !fuzzyMerged.droppedIds.has(event.id))
+      .map((event) => fuzzyMerged.replacements.get(event.id) ?? event)
+      .toSorted((a, b) => (a.s < b.s ? -1 : a.s > b.s ? 1 : a.t.localeCompare(b.t)));
     await writeIndex(deps.kv, nextIndex);
 
     const freshIds = new Set(freshItems.map((item) => item.id));
@@ -247,6 +311,7 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       extractedFromPosts: extracted.length,
       enrichedOk: enrichments.size,
       enrichFailed: pending.length - enrichments.size,
+      fuzzyMerged: fuzzyMerged.droppedIds.size,
     };
     await appendRunLog(deps.kv, entry);
     return { kind: 'done', entry };

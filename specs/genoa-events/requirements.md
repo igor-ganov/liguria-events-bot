@@ -50,6 +50,13 @@ a schedule, so the corpus stays fresh without manual work.
 - **AC-1.8** *(added 2026-07-02)* WHEN the same event is sighted by another
   source THE SYSTEM SHALL keep every source's link (`altLinks`), so event
   cards can reference all origins.
+- **AC-1.9 (fuzzy dedupe)** *(added 2026-07-02)* Sources title the same event
+  differently, so exact title+date matching misses them. WHEN two stored
+  events overlap in dates, come via different links, and share a significant
+  title token or venue, THE SYSTEM SHALL ask the LLM whether they are the
+  same real-world event (conservative: uncertain = different, bounded pairs
+  per run); IF confirmed THEN the records SHALL merge (gaps fill, links and
+  categories union, the duplicate record is deleted).
 - **AC-1.5** WHEN an event's start date is in the past (before today, Europe/
   Rome) THE SYSTEM SHALL exclude it from storage and from every user-facing
   answer; stored events expire automatically (TTL) after their date passes.

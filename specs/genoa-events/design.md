@@ -202,6 +202,16 @@ runCollect(deps): Promise<RunSummary>   // lock → collect → normalize →
                                         // prune index → unlock → log
 ```
 
+- `src/pipeline/dedupe-candidates.ts` + `src/llm/same-event.ts` + 
+  `src/domain/merge-duplicates.ts` *(amendment 2026-07-02, AC-1.9)* — fuzzy
+  cross-source dedupe, three phases inside `runCollect`: (1) certain merges —
+  index entries sharing a url (resurrected duplicates) merge without a model
+  call; (2) scored candidates — date-overlapping pairs ranked by title-token
+  Jaccard ×4 + same-start ×2 + same-end + same-venue, threshold 2, top-20 per
+  run; (3) a conservative LLM judge confirms pairs, the older record absorbs
+  the newer (gaps fill, links/categories union) and the loser is deleted.
+  Collection maps sightings by url back onto survivors so merged duplicates
+  never resurrect.
 - `src/pipeline/windows.ts` — pure date-window math over the index:
   `today / tonight (≥18:00 or nightlife|music) / weekend (Sat–Sun, current if
   today∈{Sat,Sun}) / next14 / next30 / free` (AC-3.x). An event covers a day

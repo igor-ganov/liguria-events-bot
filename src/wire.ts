@@ -12,6 +12,7 @@ import { makeTgCollector } from './collectors/tg-public.ts';
 import { makeChat } from './llm/client.ts';
 import type { ChatFn } from './llm/client.ts';
 import { makeEnrichEvents, makeExtractFromPosts } from './llm/enrich.ts';
+import { makeJudgeSameEvent } from './llm/same-event.ts';
 import type { CollectDeps } from './pipeline/collect-run.ts';
 import { sourcePagesOf, tgChannelsOf } from './config.ts';
 import type { Env } from './config.ts';
@@ -38,6 +39,7 @@ export const buildCollectDeps = (env: Env): CollectDeps => {
     extract: makeExtractFromPosts(chat),
     enrich: makeEnrichEvents(chat),
     details: makeDetailFetcher(fetch),
+    judgeSameEvent: makeJudgeSameEvent(chat),
     now,
   };
 };

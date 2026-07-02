@@ -41,6 +41,7 @@ const makeDeps = (
   extract: async () => [],
   enrich: async () => enrichments,
   details: async (events) => events,
+  judgeSameEvent: async () => [],
   now: () => NOW_MS,
 });
 
@@ -126,6 +127,46 @@ describe('runCollect', () => {
     const stored = await readEventRecord(kv, id);
     assert.equal(stored?.enriched, true);
     assert.deepEqual(stored?.categories, ['workshop']);
+  });
+
+  test('fuzzy dedupe: LLM-confirmed pair merges, duplicate record dies (AC-1.9)', async () => {
+    const kv = makeKvStub();
+    const a = rawEvent({
+      title: 'FuoriFormato 26. Festival internazionale di danza',
+      url: 'https://a.example/1',
+    });
+    const b = rawEvent({
+      title: 'FuoriFormato Festival',
+      venue: 'Teatro della Tosse',
+      url: 'https://b.example/2',
+      source: 'genovateatro',
+    });
+    const deps: CollectDeps = {
+      ...makeDeps(kv, [okCollector([a, b])]),
+      judgeSameEvent: async (pairs) => pairs, // confirm everything the filter found
+    };
+    const summary = await runCollect(deps);
+    const index = await readIndex(kv);
+    assert.equal(index.length, 1);
+    assert.equal(index[0]?.v, 'Teatro della Tosse'); // gap filled from duplicate
+    assert.deepEqual(index[0]?.l, [{ source: 'genovateatro', url: 'https://b.example/2' }]);
+    const idA = await eventIdOf(a.title, a.startDate);
+    const idB = await eventIdOf(b.title, b.startDate);
+    assert.ok(await readEventRecord(kv, idA) !== undefined);
+    assert.equal(await readEventRecord(kv, idB), undefined); // secondary deleted
+    if (summary.kind === 'done') {
+      assert.equal(summary.entry.fuzzyMerged, 1);
+    }
+
+    // Re-collect: the source still lists the duplicate, but its url is an
+    // alias of the survivor now — it must NOT resurrect (AC-1.9).
+    const again = await runCollect(deps);
+    const indexAfter = await readIndex(kv);
+    assert.equal(indexAfter.length, 1);
+    assert.equal(await readEventRecord(kv, idB), undefined);
+    if (again.kind === 'done') {
+      assert.equal(again.entry.sources[0]?.fresh, 0);
+    }
   });
 
   test('locked run refuses and leaves state untouched (AC-8.2)', async () => {
