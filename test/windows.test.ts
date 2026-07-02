@@ -7,6 +7,7 @@ import {
   coversDay,
   eventsInWindow,
   freeEvents,
+  gemEvents,
   pruneIndex,
   todayWindow,
   tonightEvents,
@@ -78,6 +79,15 @@ describe('window queries', () => {
   test('free filter', () => {
     const ids = freeEvents(index, '2026-07-01').map((event) => event.id);
     assert.deepEqual(ids, ['freebie']);
+  });
+
+  test('gem filter picks unusual upcoming events (AC-2.6)', () => {
+    const gemmed: readonly CompactEvent[] = [
+      ...index,
+      make({ id: 'gem', s: '2026-07-08', x: true }),
+      make({ id: 'plainfar', s: '2026-07-09' }),
+    ];
+    assert.deepEqual(gemEvents(gemmed, '2026-07-01').map((event) => event.id), ['gem']);
   });
 
   test('category filter respects 14-day horizon', () => {

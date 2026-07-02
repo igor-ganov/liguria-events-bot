@@ -43,6 +43,7 @@ import {
   categoryEvents,
   eventsInWindow,
   freeEvents,
+  gemEvents,
   todayWindow,
   tomorrowWindow,
   tonightEvents,
@@ -337,6 +338,11 @@ const handleCommand = async (
     case '/free':
       await listCommand(env, bot, lang, 'header.free', (index, today) =>
         freeEvents(index, today),
+      );
+      return;
+    case '/gems':
+      await listCommand(env, bot, lang, 'header.gems', (index, today) =>
+        gemEvents(index, today),
       );
       return;
     case '/categories': {

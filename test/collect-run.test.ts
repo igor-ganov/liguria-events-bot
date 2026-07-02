@@ -54,7 +54,7 @@ describe('runCollect', () => {
     ];
     const id = await eventIdOf('Fresh Concert', '2026-07-10');
     const enrichments = new Map([
-      [id, { categories: ['music'], description: 'A concert.' } satisfies Enrichment],
+      [id, { categories: ['music'], description: 'A concert.', unusual: false } satisfies Enrichment],
     ]);
     const summary = await runCollect(makeDeps(kv, [okCollector(events)], enrichments));
     assert.equal(summary.kind, 'done');
@@ -121,12 +121,15 @@ describe('runCollect', () => {
     assert.equal((await readEventRecord(kv, id))?.enriched, false);
 
     const enrichments = new Map([
-      [id, { categories: ['workshop'], description: 'Hands-on.' } satisfies Enrichment],
+      [id, { categories: ['workshop'], description: 'Hands-on.', unusual: true } satisfies Enrichment],
     ]);
     await runCollect(makeDeps(kv, [okCollector([raw])], enrichments));
     const stored = await readEventRecord(kv, id);
     assert.equal(stored?.enriched, true);
     assert.deepEqual(stored?.categories, ['workshop']);
+    assert.equal(stored?.unusual, true); // gem flag flows through retry (AC-2.6)
+    const index = await readIndex(kv);
+    assert.equal(index[0]?.x, true);
   });
 
   test('fuzzy dedupe: LLM-confirmed pair merges, duplicate record dies (AC-1.9)', async () => {

@@ -51,7 +51,8 @@ export const renderEventLine = (event: CompactEvent): string => {
     ...(event.v === undefined ? [] : [escapeHtml(event.v)]),
     ...(event.f === true ? ['free'] : []),
   ];
-  return `• <a href="${event.u}">${escapeHtml(event.t)}</a> — ${parts.join(', ')}`;
+  const gem = event.x === true ? '💎 ' : '';
+  return `• ${gem}<a href="${event.u}">${escapeHtml(event.t)}</a> — ${parts.join(', ')}`;
 };
 
 /** Category-grouped digest body (AC-3.1); category order = taxonomy order. */
@@ -86,8 +87,9 @@ export const renderCard = (event: EventRecord, lang: Language): string => {
   const where = [event.venue, event.address].filter(
     (part): part is string => part !== undefined,
   );
+  const gem = event.unusual === true ? '💎 ' : '';
   const lines = [
-    `<b>${escapeHtml(event.title)}</b>`,
+    `${gem}<b>${escapeHtml(event.title)}</b>`,
     `${emoji} ${escapeHtml(
       event.categories.map((category) => categoryLabel(category, lang)).join(' · '),
     )} · ${when}`,

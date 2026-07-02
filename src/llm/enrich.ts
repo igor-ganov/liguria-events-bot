@@ -8,7 +8,7 @@ import type { Category, RawEvent } from '../domain/event.ts';
 import type { RawPost } from '../collectors/types.ts';
 import { extractJson } from './client.ts';
 import type { ChatFn } from './client.ts';
-import { asArray, asNonEmptyString, readProp } from '../util/json.ts';
+import { asArray, asBoolean, asNonEmptyString, readProp } from '../util/json.ts';
 
 export type PendingEnrich = Readonly<{
   id: string;
@@ -18,7 +18,11 @@ export type PendingEnrich = Readonly<{
   raw?: string;
 }>;
 
-export type Enrichment = Readonly<{ categories: readonly Category[]; description: string }>;
+export type Enrichment = Readonly<{
+  categories: readonly Category[];
+  description: string;
+  unusual: boolean;
+}>;
 
 // Each enriched event costs ~120 output tokens (2 sentences + JSON armor);
 // 6 per call stays well under the completion cap even when llama rambles.
@@ -37,11 +41,16 @@ const ENRICH_SYSTEM = [
   'For EVERY input event return 1 to 3 categories from this fixed list,',
   'most specific first (a food festival with concerts is ["food","music"]):',
   CATEGORIES.join(', '),
-  'and a fresh, neutral 1-2 sentence English description IN YOUR OWN WORDS —',
+  'a fresh, neutral 1-2 sentence English description IN YOUR OWN WORDS —',
   'summarize what it is, where, and why it is interesting. Never copy source',
   'sentences verbatim and do not invent facts absent from the input.',
+  'Also set "unusual": true ONLY for offbeat, niche, experimental or',
+  'distinctly non-touristy happenings (a neighbourhood performance, an',
+  'unconventional venue, an oddball one-off, immersive/site-specific art);',
+  'false for standard mainstream fare (big-name concerts, major museum',
+  'exhibitions, routine guided tours). When in doubt, false.',
   'Respond with STRICT valid JSON, no markdown, no backticks:',
-  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "description": "<1-2 sentences>" } ] }',
+  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "description": "<1-2 sentences>", "unusual": true|false } ] }',
 ].join('\n');
 
 const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment])[] => {
@@ -51,7 +60,7 @@ const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment
   const legacy = readProp(value, 'category');
   const categories = [...many, ...(isCategory(legacy) ? [legacy] : [])].slice(0, 3);
   if (id === undefined || categories.length === 0 || description === undefined) return [];
-  return [[id, { categories, description }]];
+  return [[id, { categories, description, unusual: asBoolean(readProp(value, 'unusual')) === true }]];
 };
 
 export const makeEnrichEvents =

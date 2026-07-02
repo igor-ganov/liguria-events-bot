@@ -32,7 +32,7 @@ describe('makeEnrichEvents', () => {
     }));
     const enriched = await makeEnrichEvents(chat)(events);
     assert.equal(calls.length, 2); // 7 events → two batches of ≤6
-    assert.deepEqual(enriched.get('one'), { categories: ['music'], description: 'A concert.' });
+    assert.deepEqual(enriched.get('one'), { categories: ['music'], description: 'A concert.', unusual: false });
     assert.equal(enriched.has('two'), false);
   });
 

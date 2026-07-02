@@ -59,5 +59,6 @@ export const mergeDuplicates = (a: EventRecord, b: EventRecord): EventRecord => 
       : {}),
     ...(altLinks.length === 0 ? {} : { altLinks }),
     ...(primary.free === true || secondary.free === true ? { free: true } : {}),
+    ...(primary.unusual === true || secondary.unusual === true ? { unusual: true } : {}),
   };
 };

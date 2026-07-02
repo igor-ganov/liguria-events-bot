@@ -52,6 +52,8 @@ export type EventRecord = Readonly<{
   rawDescription?: string;
   priceInfo?: string;
   free?: boolean;
+  /** LLM-flagged offbeat / non-touristy "hidden gem" (AC-2.6). */
+  unusual?: boolean;
   url: string;
   source: string;
   /** false → enrichment failed, retry next run (AC-2.3). */
@@ -62,7 +64,7 @@ export type EventRecord = Readonly<{
 export type SourceLink = Readonly<{ source: string; url: string }>;
 
 /** Index projection: t=title s=start e=end c=categories f=free v=venue
- *  h=time u=url img=image d=description l=alt links. */
+ *  h=time u=url img=image d=description l=alt links x=unusual/hidden-gem. */
 export type CompactEvent = Readonly<{
   id: string;
   t: string;
@@ -76,6 +78,7 @@ export type CompactEvent = Readonly<{
   img?: string;
   d?: string;
   l?: readonly SourceLink[];
+  x?: boolean;
 }>;
 
 export const primaryCategory = (categories: readonly Category[]): Category =>
@@ -224,6 +227,7 @@ export const toCompact = (event: EventRecord): CompactEvent => ({
   ...(event.altLinks === undefined || event.altLinks.length === 0
     ? {}
     : { l: event.altLinks }),
+  ...(event.unusual === true ? { x: true } : {}),
 });
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -277,6 +281,7 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
   const priceInfo = asNonEmptyString(readProp(value, 'priceInfo'));
   const rawDescription = asNonEmptyString(readProp(value, 'rawDescription'));
   const free = asBoolean(readProp(value, 'free'));
+  const unusual = asBoolean(readProp(value, 'unusual'));
   const image = asNonEmptyString(readProp(value, 'image'));
   const altLinks = parseSourceLinks(readProp(value, 'altLinks'));
   return {
@@ -296,6 +301,7 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
     ...(priceInfo === undefined ? {} : { priceInfo }),
     ...(rawDescription === undefined ? {} : { rawDescription }),
     ...(free === undefined ? {} : { free }),
+    ...(unusual === undefined ? {} : { unusual }),
     ...(image === undefined ? {} : { image }),
     ...(altLinks.length === 0 ? {} : { altLinks }),
   };
@@ -324,6 +330,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
   const img = asNonEmptyString(readProp(value, 'img'));
   const d = asNonEmptyString(readProp(value, 'd'));
   const l = parseSourceLinks(readProp(value, 'l'));
+  const x = asBoolean(readProp(value, 'x'));
   return {
     id,
     t,
@@ -337,6 +344,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
     ...(img === undefined ? {} : { img }),
     ...(d === undefined ? {} : { d }),
     ...(l.length === 0 ? {} : { l }),
+    ...(x === true ? { x: true } : {}),
   };
 };
 

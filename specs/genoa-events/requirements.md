@@ -82,6 +82,13 @@ compact way, so lists are scannable and filters work.
 - **AC-2.3** IF the LLM call fails for an event THEN THE SYSTEM SHALL store the
   event with category `other` and the raw source description, and mark it
   `enriched: false` so a later run can retry.
+- **AC-2.6 (hidden gem)** *(added 2026-07-02)* WHEN enriching an event THE
+  SYSTEM SHALL have the LLM set an `unusual` flag: true for offbeat, niche,
+  experimental or distinctly non-touristy happenings (a neighbourhood
+  performance, an unconventional venue, an oddball one-off), false for
+  standard mainstream fare (big-name concerts, major museum shows, routine
+  guided tours). Conservative: default false. The flag SHALL be exposed in
+  the public feed, surfaced by a bot command, and filterable on the site.
 - **AC-2.4** WHILE enriching a batch THE SYSTEM SHALL send events to the LLM in
   batches (not one call per event) to respect Worker CPU/API budgets.
 - **AC-2.5** WHEN Workers AI fails THE SYSTEM SHALL fall back to Gemini; only

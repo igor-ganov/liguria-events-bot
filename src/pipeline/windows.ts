@@ -67,6 +67,14 @@ export const freeEvents = (
 ): readonly CompactEvent[] =>
   eventsInWindow(index, upcomingWindow(today, days)).filter((event) => event.f === true);
 
+/** Upcoming hidden-gem / unusual picks (AC-2.6). */
+export const gemEvents = (
+  index: readonly CompactEvent[],
+  today: string,
+  days = 30,
+): readonly CompactEvent[] =>
+  eventsInWindow(index, upcomingWindow(today, days)).filter((event) => event.x === true);
+
 export const categoryEvents = (
   index: readonly CompactEvent[],
   category: Category,
