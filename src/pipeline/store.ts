@@ -29,7 +29,10 @@ const INDEX_KEY = 'events:index';
 const RUNLOG_KEY = 'runlog';
 const LOCK_KEY = 'lock:collect';
 const RUNLOG_CAP = 20;
-export const LOCK_TTL_SECONDS = 600;
+// Short enough that a run killed mid-flight (e.g. slow LLM fallback exceeding
+// the waitUntil budget) self-heals in a few minutes instead of blocking the
+// next collection for 10.
+export const LOCK_TTL_SECONDS = 180;
 
 export const eventKey = (id: string): string => `event:${id}`;
 

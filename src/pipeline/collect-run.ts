@@ -235,14 +235,16 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       return raw === undefined ? item : { id: item.id, raw };
     });
 
-    // Bound LLM work per run: the whole run must fit the 30s waitUntil
-    // window, so a large retry backlog drains across several runs instead
-    // of killing this one mid-flight (which would strand the lock).
-    const RETRY_CAP = 60;
-    const pending = [
-      ...freshDetailed.map(pendingOf),
-      ...retryRecords.slice(0, RETRY_CAP).map(pendingOfRecord),
-    ];
+    // Bound LLM work per run: the whole run must fit the 30s waitUntil window
+    // AND stay under the Gemini fallback's ~15 req/min rate limit (enrich
+    // batches run concurrently). Un-enriched fresh events are still stored
+    // (enriched:false) and drain across later runs. ENRICH_PER_RUN * 1/BATCH
+    // concurrent Gemini calls must stay well under the RPM ceiling.
+    const ENRICH_PER_RUN = 24;
+    const pending = [...freshDetailed.map(pendingOf), ...retryRecords.map(pendingOfRecord)].slice(
+      0,
+      ENRICH_PER_RUN,
+    );
     const enrichments =
       pending.length === 0
         ? new Map<string, Enrichment>()
