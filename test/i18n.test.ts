@@ -4,12 +4,16 @@ import assert from 'node:assert/strict';
 import { t } from '../src/i18n.ts';
 
 describe('i18n', () => {
-  test('every key renders in both languages', () => {
-    // t() is typed over the RU key set; EN is typed as a full record —
+  test('every key renders in all three languages', () => {
+    // t() is typed over the RU key set; EN and IT are full records —
     // compilation already guarantees parity. Spot-check rendering:
-    assert.notEqual(t('help.text', 'ru'), '');
-    assert.notEqual(t('help.text', 'en'), '');
+    for (const lang of ['ru', 'it', 'en'] as const) {
+      assert.notEqual(t('help.text', lang), '');
+      assert.notEqual(t('header.gems', lang), '');
+    }
     assert.notEqual(t('help.text', 'ru'), t('help.text', 'en'));
+    assert.notEqual(t('help.text', 'it'), t('help.text', 'en'));
+    assert.equal(t('lang.it', 'it'), 'Italiano');
   });
 
   test('interpolates variables and leaves unknown placeholders intact', () => {

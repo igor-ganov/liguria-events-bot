@@ -67,8 +67,8 @@ const REMINDER_HOUR = 10;
 const ok = (): Response => new Response('ok');
 
 const langHintOf = (from: unknown): Language => {
-  const code = asNonEmptyString(readProp(from, 'language_code'));
-  return code !== undefined && code.startsWith('ru') ? 'ru' : 'en';
+  const code = asNonEmptyString(readProp(from, 'language_code')) ?? '';
+  return code.startsWith('ru') ? 'ru' : code.startsWith('it') ? 'it' : 'en';
 };
 
 // ───────────────────────────────────────────────────────── event cards ──
@@ -115,10 +115,7 @@ const sendSurprise = async (
 // ──────────────────────────────────────────────────────────── settings ──
 
 const settingsSummary = (settings: Settings, lang: Language): string => {
-  const languageValue = t(
-    settings.language === 'auto' ? 'lang.auto' : settings.language === 'ru' ? 'lang.ru' : 'lang.en',
-    lang,
-  );
+  const languageValue = t(`lang.${settings.language}`, lang);
   const digestKey: TranslationKey =
     settings.digest === 'off' ? 'digest.off' : settings.digest === 'daily' ? 'digest.daily' : 'digest.weekly';
   const categoriesValue =
@@ -148,6 +145,7 @@ const languageKeyboard = (lang: Language): Keyboard => [
   [
     { text: t('lang.auto', lang), callbackData: 'set:lang:auto' },
     { text: t('lang.ru', lang), callbackData: 'set:lang:ru' },
+    { text: t('lang.it', lang), callbackData: 'set:lang:it' },
     { text: t('lang.en', lang), callbackData: 'set:lang:en' },
   ],
   [{ text: '←', callbackData: BACK }],
@@ -406,8 +404,10 @@ const handleQuestion = async (
   settings: Settings,
   question: string,
 ): Promise<void> => {
-  const lang =
-    settings.language === 'auto' ? detectLanguage(question) : settings.language;
+  // Auto → mirror the question's language (forced undefined); explicit → force.
+  const forced = settings.language === 'auto' ? undefined : settings.language;
+  // UI framing (typing, errors) uses a best-effort language.
+  const uiLang = forced ?? detectLanguage(question);
   await bot.sendTyping();
   try {
     const index = await readIndex(env.EVENTS);
@@ -417,11 +417,11 @@ const handleQuestion = async (
       env.EVENTS,
       compacts.slice(0, QA_CORPUS_CAP).map((event) => event.id),
     );
-    const answer = await makeAnswer(chatOf(env))(question, events, lang, today);
+    const answer = await makeAnswer(chatOf(env))(question, events, forced, today);
     await sendLong(bot, answer);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    await bot.sendMessage(t('qa.failed', lang, { reason }));
+    await bot.sendMessage(t('qa.failed', uiLang, { reason }));
   }
 };
 
@@ -471,7 +471,7 @@ const handleSettingsCallback = async (
   }
   if (payload.startsWith('lang:')) {
     const choice = payload.slice(5);
-    if (choice !== 'ru' && choice !== 'en' && choice !== 'auto') {
+    if (choice !== 'ru' && choice !== 'it' && choice !== 'en' && choice !== 'auto') {
       await bot.answerCallback(callbackId, t('cb.unknown', lang));
       return;
     }

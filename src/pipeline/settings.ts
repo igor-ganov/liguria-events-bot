@@ -3,15 +3,16 @@
  * UI strings use the Telegram client hint, Q&A answers follow the question's
  * language (AC-4.4) — an explicit choice in /settings overrides both.
  */
-import { isCategory } from '../domain/event.ts';
-import type { Category } from '../domain/event.ts';
+import { isCategory, isLang } from '../domain/event.ts';
+import type { Category, Lang } from '../domain/event.ts';
 import type { KvLike } from './store.ts';
 import { tomorrowWindow, weekendWindow } from './windows.ts';
 import type { DateWindow } from './windows.ts';
 import { weekdayOf } from './clock.ts';
 import { asArray, asNumber, parseJson, readProp } from '../util/json.ts';
 
-export type Language = 'ru' | 'en';
+/** UI/answer language — the shared domain `Lang` (en/it/ru). */
+export type Language = Lang;
 export type LanguageChoice = Language | 'auto';
 export type DigestMode = 'off' | 'daily' | 'weekly';
 
@@ -32,7 +33,7 @@ export const DEFAULT_SETTINGS: Settings = {
 const settingsKey = (userId: number): string => `user:${userId}:settings`;
 
 const isLanguageChoice = (value: unknown): value is LanguageChoice =>
-  value === 'ru' || value === 'en' || value === 'auto';
+  isLang(value) || value === 'auto';
 
 const isDigestMode = (value: unknown): value is DigestMode =>
   value === 'off' || value === 'daily' || value === 'weekly';

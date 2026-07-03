@@ -20,14 +20,14 @@ Phase B1 — data model & crawler (ship first; site depends on the `d` map):
 
 Phase B2 — bot UI & Q&A:
 
-- [ ] **I6. i18n IT column** — add `it` to TABLES, all keys + category labels;
+- [x] **I6. i18n IT column** — add `it` to TABLES, all keys + category labels;
   `Language`→`Lang`. _AC-3.1. Tests: `test/i18n.test.ts` (3-lang parity)._
-- [ ] **I7. Settings + hint** — LanguageChoice adds `it`; `/settings` menu +
+- [x] **I7. Settings + hint** — LanguageChoice adds `it`; `/settings` menu +
   callbacks; `langHintOf` ru/it/en. _AC-3.2/3.3. Tests: `test/settings.test.ts`._
-- [ ] **I8. Q&A mirror + plan lang** — answerSystem mirrors question language
+- [x] **I8. Q&A mirror + plan lang** — answerSystem mirrors question language
   (settings overrides); card/list pick `descriptions[lang]`. _AC-4.x. Tests:
   `test/answer.test.ts`, `test/render.test.ts`._
-- [ ] **I9. Deploy B2** — setMyCommands unchanged; verify /settings→Italiano,
+- [x] **I9. Deploy B2** — setMyCommands unchanged; verify /settings→Italiano,
   IT/RU Q&A, IT digest.
 
-- [ ] **I10. Green** — `bun test` + `bun run typecheck` clean; specs updated.
+- [x] **I10. Green** — `bun test` + `bun run typecheck` clean; specs updated.

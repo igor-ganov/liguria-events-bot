@@ -42,11 +42,14 @@ describe('serializeCorpus', () => {
 });
 
 describe('answerSystem', () => {
-  test('carries the honesty directive and the language (AC-4.2)', () => {
-    const system = answerSystem('en', '2026-07-01');
-    assert.ok(system.includes('ONLY the events'));
-    assert.ok(system.includes('Never invent'));
-    assert.ok(answerSystem('ru', '2026-07-01').includes('по-русски'));
+  test('honesty directive; forced language vs mirror (AC-4.1)', () => {
+    const forced = answerSystem('ru', '2026-07-01');
+    assert.ok(forced.includes('ONLY the events'));
+    assert.ok(forced.includes('Never invent'));
+    assert.ok(forced.includes('Always answer in Russian'));
+    assert.ok(answerSystem('it', '2026-07-01').includes('Always answer in Italian'));
+    // undefined → mirror the question's language
+    assert.ok(answerSystem(undefined, '2026-07-01').includes('SAME language as the user question'));
   });
 });
 

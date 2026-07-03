@@ -11,8 +11,15 @@ import type { DayForecast } from '../weather/open-meteo.ts';
 export const detectLanguage = (text: string): Language =>
   /[Ѐ-ӿ]/.test(text) ? 'ru' : 'en';
 
+const LANG_NAME: Readonly<Record<Language, string>> = {
+  ru: 'Russian',
+  it: 'Italian',
+  en: 'English',
+};
+
 const LANG_DIRECTIVE: Readonly<Record<Language, string>> = {
   ru: 'Отвечай по-русски.',
+  it: 'Rispondi in italiano.',
   en: 'Respond in English.',
 };
 
@@ -46,7 +53,9 @@ export const serializeCorpus = (
   return lines.join('\n');
 };
 
-export const answerSystem = (lang: Language, today: string): string =>
+/** `forced === undefined` → answer in the question's language (AC-4.1);
+ *  otherwise always answer in that language (explicit /settings choice). */
+export const answerSystem = (forced: Language | undefined, today: string): string =>
   [
     'You are a local events concierge for Genoa, Italy. Today is ' + today + '.',
     'Answer the user question using ONLY the events listed below.',
@@ -55,7 +64,9 @@ export const answerSystem = (lang: Language, today: string): string =>
     'list, if any.',
     'When you mention an event, include its link in parentheses.',
     'Be concise and friendly; plain text, no markdown headers.',
-    LANG_DIRECTIVE[lang],
+    forced === undefined
+      ? 'Answer in the SAME language as the user question (Russian, Italian or English).'
+      : `Always answer in ${LANG_NAME[forced]}.`,
   ].join('\n');
 
 export const makeAnswer =
@@ -63,11 +74,11 @@ export const makeAnswer =
   (
     question: string,
     events: readonly EventRecord[],
-    lang: Language,
+    forced: Language | undefined,
     today: string,
   ): Promise<string> =>
     chat(
-      answerSystem(lang, today),
+      answerSystem(forced, today),
       `EVENTS:\n${serializeCorpus(events)}\n\nQUESTION:\n${question}`,
     );
 
