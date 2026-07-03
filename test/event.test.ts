@@ -18,7 +18,7 @@ const record: EventRecord = {
   title: 'Electropark Festival',
   startDate: '2026-07-10',
   categories: ['music'],
-  description: 'Electronic music festival.',
+  descriptions: { en: 'Electronic music festival.', it: 'Festival.', ru: 'Фестиваль.' },
   url: 'https://www.visitgenoa.it/en/node/26370',
   source: 'visitgenoa',
   enriched: true,

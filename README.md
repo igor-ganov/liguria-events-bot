@@ -57,7 +57,12 @@ all-day spans. Filters compose:
 https://<worker>/calendar.ics                      # everything
 https://<worker>/calendar.ics?cat=music,art        # categories
 https://<worker>/calendar.ics?free=1               # free entry only
+https://<worker>/calendar.ics?lang=it              # descriptions in it/ru/en
 ```
+
+Descriptions are stored per-language (`en`/`it`/`ru`, translated by the LLM at
+enrichment); titles and venues stay original Italian. `/events.json` carries
+all three so the static site renders any locale from one fetch.
 
 Spec: [`specs/public-calendar/`](specs/public-calendar/).
 

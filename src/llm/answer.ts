@@ -25,7 +25,7 @@ const eventLine = (event: EventRecord): string =>
     event.categories.join('/'),
     event.priceInfo ?? (event.free === true ? 'free' : ''),
     event.url,
-    event.description,
+    event.descriptions.en,
   ]
     .filter((part) => part !== '')
     .join(' | ');

@@ -94,7 +94,7 @@ describe('mergeDuplicates', () => {
     startDate: '2026-06-30',
     endDate: '2026-07-03',
     categories: ['theatre'],
-    description: 'LLM summary.',
+    descriptions: { en: 'LLM summary.', it: 'Sintesi.', ru: 'Сводка.' },
     url: 'https://www.visitgenoa.it/en/node/27181',
     source: 'visitgenoa',
     enriched: true,
@@ -105,7 +105,7 @@ describe('mergeDuplicates', () => {
     title: 'FuoriFormato Festival',
     startDate: '2026-06-30',
     categories: ['music', 'theatre'],
-    description: 'Other summary.',
+    descriptions: { en: 'Other summary.', it: 'Altro.', ru: 'Другое.' },
     venue: 'Teatro della Tosse',
     image: 'https://img/x.jpg',
     url: 'https://www.genovateatro.it/x.htm',
@@ -116,7 +116,7 @@ describe('mergeDuplicates', () => {
   test('older stays primary; gaps fill; links and categories union', () => {
     const merged = mergeDuplicates(newer, older);
     assert.equal(merged.id, 'a');
-    assert.equal(merged.description, 'LLM summary.');
+    assert.equal(merged.descriptions.en, 'LLM summary.'); // primary's descriptions win
     assert.equal(merged.venue, 'Teatro della Tosse');
     assert.equal(merged.image, 'https://img/x.jpg');
     assert.deepEqual(merged.categories, ['theatre', 'music']);

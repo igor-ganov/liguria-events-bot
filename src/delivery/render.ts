@@ -100,7 +100,7 @@ export const renderCard = (event: EventRecord, lang: Language): string => {
         : []
       : [`💶 ${escapeHtml(event.priceInfo)}`]),
     '',
-    escapeHtml(event.description),
+    escapeHtml(event.descriptions[lang]),
     '',
     `<a href="${event.url}">→ ${escapeHtml(event.source)}</a>`,
   ];

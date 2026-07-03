@@ -6,6 +6,7 @@
 import {
   eventIdOf,
   freeFromPrice,
+  localized,
   mergeEvent,
   mergeRaw,
   toCompact,
@@ -97,7 +98,7 @@ const toRecord = (
     startDate: raw.startDate,
     categories:
       enrichment?.categories ?? (raw.categoryHint === undefined ? ['other'] : [raw.categoryHint]),
-    description: enrichment?.description ?? raw.rawDescription ?? raw.title,
+    descriptions: enrichment?.descriptions ?? localized(raw.rawDescription ?? raw.title),
     url: raw.url,
     source: raw.source,
     enriched: enrichment !== undefined,
@@ -257,7 +258,7 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
         : {
             ...record,
             categories: enrichment.categories,
-            description: enrichment.description,
+            descriptions: enrichment.descriptions,
             enriched: true,
             ...(enrichment.unusual === true ? { unusual: true } : {}),
           };

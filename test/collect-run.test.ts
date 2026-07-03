@@ -54,7 +54,7 @@ describe('runCollect', () => {
     ];
     const id = await eventIdOf('Fresh Concert', '2026-07-10');
     const enrichments = new Map([
-      [id, { categories: ['music'], description: 'A concert.', unusual: false } satisfies Enrichment],
+      [id, { categories: ['music'], descriptions: { en: 'A concert.', it: 'Concerto.', ru: 'Концерт.' }, unusual: false } satisfies Enrichment],
     ]);
     const summary = await runCollect(makeDeps(kv, [okCollector(events)], enrichments));
     assert.equal(summary.kind, 'done');
@@ -64,7 +64,7 @@ describe('runCollect', () => {
     const stored = await readEventRecord(kv, id);
     assert.ok(stored !== undefined);
     assert.equal(stored.enriched, true);
-    assert.equal(stored.description, 'A concert.');
+    assert.equal(stored.descriptions.en, 'A concert.');
     if (summary.kind === 'done') {
       assert.equal(summary.entry.sources[0]?.fresh, 1);
       assert.equal(summary.entry.sources[0]?.fetched, 2);
@@ -121,7 +121,7 @@ describe('runCollect', () => {
     assert.equal((await readEventRecord(kv, id))?.enriched, false);
 
     const enrichments = new Map([
-      [id, { categories: ['workshop'], description: 'Hands-on.', unusual: true } satisfies Enrichment],
+      [id, { categories: ['workshop'], descriptions: { en: 'Hands-on.', it: 'Pratico.', ru: 'Практика.' }, unusual: true } satisfies Enrichment],
     ]);
     await runCollect(makeDeps(kv, [okCollector([raw])], enrichments));
     const stored = await readEventRecord(kv, id);

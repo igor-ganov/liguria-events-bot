@@ -19,9 +19,9 @@ describe('makeEnrichEvents', () => {
       calls.push(user);
       return JSON.stringify({
         events: [
-          { id: 'one', categories: ['music'], description: 'A concert.' },
-          { id: 'two', categories: ['not-a-category'], description: 'Bad.' },
-          { id: '', categories: ['art'], description: 'No id.' },
+          { id: 'one', categories: ['music'], descriptions: { en: 'A concert.', it: 'Concerto.', ru: 'Концерт.' } },
+          { id: 'two', categories: ['not-a-category'], descriptions: { en: 'Bad.', it: 'x', ru: 'x' } },
+          { id: '', categories: ['art'], descriptions: { en: 'No id.', it: 'x', ru: 'x' } },
         ],
       });
     };
@@ -32,7 +32,7 @@ describe('makeEnrichEvents', () => {
     }));
     const enriched = await makeEnrichEvents(chat)(events);
     assert.equal(calls.length, 2); // 7 events → two batches of ≤6
-    assert.deepEqual(enriched.get('one'), { categories: ['music'], description: 'A concert.', unusual: false });
+    assert.deepEqual(enriched.get('one'), { categories: ['music'], descriptions: { en: 'A concert.', it: 'Concerto.', ru: 'Концерт.' }, unusual: false });
     assert.equal(enriched.has('two'), false);
   });
 

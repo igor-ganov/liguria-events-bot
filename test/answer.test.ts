@@ -16,7 +16,7 @@ const record = (id: string, startDate: string): EventRecord => ({
   title: `Event ${id}`,
   startDate,
   categories: ['music'],
-  description: 'Desc.',
+  descriptions: { en: 'Desc.', it: 'Desc.', ru: 'Desc.' },
   url: `https://example.org/${id}`,
   source: 'visitgenoa',
   enriched: true,

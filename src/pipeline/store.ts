@@ -39,6 +39,23 @@ export const readIndex = async (kv: KvLike): Promise<readonly CompactEvent[]> =>
   return parseIndex(raw) ?? [];
 };
 
+/** List every stored EventRecord by scanning `event:` keys — used to rebuild
+ *  a lost index without re-collecting (and without clobbering enrichment). */
+export const readAllRecords = async (kv: KvLike): Promise<readonly EventRecord[]> => {
+  const ids: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await kv.list({
+      prefix: 'event:',
+      ...(cursor === undefined ? {} : { cursor }),
+    });
+    for (const key of page.keys) ids.push(key.name.slice('event:'.length));
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor !== undefined);
+  const records = await Promise.all(ids.map((id) => readEventRecord(kv, id)));
+  return records.flatMap((record) => (record === undefined ? [] : [record]));
+};
+
 export const writeIndex = async (
   kv: KvLike,
   index: readonly CompactEvent[],

@@ -5,7 +5,7 @@
  */
 import { isOperator } from './config.ts';
 import type { Env } from './config.ts';
-import { isCategory } from './domain/event.ts';
+import { isCategory, toCompact } from './domain/event.ts';
 import type { Category, CompactEvent } from './domain/event.ts';
 import { makeBot, sendLong } from './delivery/bot-api.ts';
 import type { Bot, Keyboard } from './delivery/bot-api.ts';
@@ -32,10 +32,12 @@ import {
 } from './pipeline/settings.ts';
 import type { Language, Settings } from './pipeline/settings.ts';
 import {
+  readAllRecords,
   readEventRecord,
   readEventRecords,
   readIndex,
   readRunLog,
+  writeIndex,
 } from './pipeline/store.ts';
 import { pickSurprise } from './pipeline/surprise.ts';
 import { listUserIds, rememberUserChat } from './pipeline/users.ts';
@@ -44,6 +46,7 @@ import {
   eventsInWindow,
   freeEvents,
   gemEvents,
+  pruneIndex,
   todayWindow,
   tomorrowWindow,
   tonightEvents,
@@ -51,7 +54,7 @@ import {
   weekendWindow,
 } from './pipeline/windows.ts';
 import { fetchForecast } from './weather/open-meteo.ts';
-import { buildIcs, filterEvents, filterFromQuery } from './calendar/ics.ts';
+import { buildIcs, filterEvents, filterFromQuery, langFromQuery } from './calendar/ics.ts';
 import { buildCollectDeps, chatOf } from './wire.ts';
 import { CATEGORIES } from './domain/event.ts';
 import { asNonEmptyString, asNumber, readProp } from './util/json.ts';
@@ -615,7 +618,7 @@ const handleUpdate = async (env: Env, update: unknown, origin = ''): Promise<voi
 const serveCalendar = async (env: Env, url: URL): Promise<Response> => {
   const index = await readIndex(env.EVENTS);
   const events = filterEvents(index, filterFromQuery(url.searchParams));
-  return new Response(buildIcs(events, Date.now()), {
+  return new Response(buildIcs(events, Date.now(), langFromQuery(url.searchParams)), {
     headers: {
       'content-type': 'text/calendar; charset=utf-8',
       'cache-control': 'public, max-age=3600',
@@ -716,6 +719,22 @@ const worker = {
     }
     if (url.pathname === '/events.json' && request.method === 'GET') {
       return serveEventsJson(env, url);
+    }
+    // Rebuild events:index from the stored records (recovery after a lost
+    // index), without re-collecting or re-enriching. Gated by the tick secret.
+    if (url.pathname === '/rebuild-index' && request.method === 'POST') {
+      if (request.headers.get('x-tick-secret') !== env.WEBHOOK_SECRET) {
+        return new Response('unauthorized', { status: 401 });
+      }
+      const records = await readAllRecords(env.EVENTS);
+      const today = romeDate(Date.now());
+      const index = pruneIndex(records.map(toCompact), today).toSorted((a, b) =>
+        a.s < b.s ? -1 : a.s > b.s ? 1 : a.t.localeCompare(b.t),
+      );
+      await writeIndex(env.EVENTS, index);
+      return new Response(JSON.stringify({ ok: true, records: records.length, index: index.length }), {
+        headers: { 'content-type': 'application/json' },
+      });
     }
     // Operator diagnostics: raw Workers AI probe, gated by the tick secret.
     if (url.pathname === '/debug-llm' && request.method === 'POST') {

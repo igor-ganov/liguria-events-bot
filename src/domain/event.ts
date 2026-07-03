@@ -31,6 +31,25 @@ export type Category = (typeof CATEGORIES)[number];
 export const isCategory = (value: unknown): value is Category =>
   CATEGORIES.some((category) => category === value);
 
+/** Supported languages; en is the canonical fallback (i18n design §1). */
+export const LANGS = ['en', 'it', 'ru'] as const;
+export type Lang = (typeof LANGS)[number];
+export type LocalizedText = Readonly<Record<Lang, string>>;
+
+/** Build a localized map from an en base; it/ru default to en. */
+export const localized = (en: string, it?: string, ru?: string): LocalizedText => ({
+  en,
+  it: it ?? en,
+  ru: ru ?? en,
+});
+
+export const isLang = (value: unknown): value is Lang => LANGS.some((lang) => lang === value);
+
+/** Pick a language from a localized map, falling back to en; an empty string
+ *  counts as missing (AC-1.4). */
+export const descriptionOf = (text: LocalizedText | undefined, lang: Lang): string =>
+  (text?.[lang] || text?.en) ?? '';
+
 export type EventRecord = Readonly<{
   id: string;
   title: string;
@@ -43,8 +62,8 @@ export type EventRecord = Readonly<{
   address?: string;
   /** 1–3 categories, most specific first; [0] is the primary (AC-2.1). */
   categories: readonly Category[];
-  /** Canonical 1–2 sentence English description (AC-2.2). */
-  description: string;
+  /** 1–2 sentence description in every language (AC-1.1). */
+  descriptions: LocalizedText;
   /** Poster/cover image from the source, when the listing exposes one. */
   image?: string;
   /** Links from other sources that resighted this event (AC-1.8). */
@@ -76,7 +95,7 @@ export type CompactEvent = Readonly<{
   h?: string;
   u: string;
   img?: string;
-  d?: string;
+  d?: LocalizedText;
   l?: readonly SourceLink[];
   x?: boolean;
 }>;
@@ -223,7 +242,7 @@ export const toCompact = (event: EventRecord): CompactEvent => ({
   ...(event.venue === undefined ? {} : { v: event.venue }),
   ...(event.time === undefined ? {} : { h: event.time }),
   ...(event.image === undefined ? {} : { img: event.image }),
-  ...(event.description === '' ? {} : { d: event.description }),
+  ...(event.descriptions.en === '' ? {} : { d: event.descriptions }),
   ...(event.altLinks === undefined || event.altLinks.length === 0
     ? {}
     : { l: event.altLinks }),
@@ -251,12 +270,32 @@ const parseSourceLinks = (value: unknown): readonly SourceLink[] =>
     return source === undefined || url === undefined ? [] : [{ source, url }];
   });
 
+/** Read a localized map, tolerating the legacy plain string (→ en) and
+ *  filling absent languages from en (AC-1.2). Returns undefined only when
+ *  there is no usable text at all. */
+export const parseLocalized = (
+  mapValue: unknown,
+  legacy?: string,
+): LocalizedText | undefined => {
+  const en = asNonEmptyString(readProp(mapValue, 'en')) ?? legacy;
+  if (en === undefined) return undefined;
+  return {
+    en,
+    it: asNonEmptyString(readProp(mapValue, 'it')) ?? en,
+    ru: asNonEmptyString(readProp(mapValue, 'ru')) ?? en,
+  };
+};
+
 export const parseEventRecord = (text: string): EventRecord | undefined => {
   const value = parseJson(text);
   const id = asNonEmptyString(readProp(value, 'id'));
   const title = asNonEmptyString(readProp(value, 'title'));
   const startDate = asNonEmptyString(readProp(value, 'startDate'));
-  const description = asNonEmptyString(readProp(value, 'description'));
+  // Accept the new `descriptions` map or the legacy `description` string.
+  const descriptions = parseLocalized(
+    readProp(value, 'descriptions'),
+    asNonEmptyString(readProp(value, 'description')),
+  );
   const url = asNonEmptyString(readProp(value, 'url'));
   const source = asNonEmptyString(readProp(value, 'source'));
   const enriched = asBoolean(readProp(value, 'enriched'));
@@ -266,7 +305,7 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
     title === undefined ||
     startDate === undefined ||
     !isIsoDate(startDate) ||
-    description === undefined ||
+    descriptions === undefined ||
     url === undefined ||
     source === undefined ||
     enriched === undefined ||
@@ -289,7 +328,7 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
     title,
     startDate,
     categories: parseCategories(value),
-    description,
+    descriptions,
     url,
     source,
     enriched,
@@ -328,7 +367,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
   const v = asNonEmptyString(readProp(value, 'v'));
   const h = asNonEmptyString(readProp(value, 'h'));
   const img = asNonEmptyString(readProp(value, 'img'));
-  const d = asNonEmptyString(readProp(value, 'd'));
+  const d = parseLocalized(readProp(value, 'd'), asNonEmptyString(readProp(value, 'd')));
   const l = parseSourceLinks(readProp(value, 'l'));
   const x = asBoolean(readProp(value, 'x'));
   return {

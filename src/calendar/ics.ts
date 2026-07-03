@@ -4,10 +4,16 @@
  * escaped text, ≤75-octet folded lines, CRLF endings, VTIMEZONE for the
  * timed events.
  */
-import type { Category, CompactEvent } from '../domain/event.ts';
-import { isCategory, primaryCategory } from '../domain/event.ts';
+import type { Category, CompactEvent, Lang } from '../domain/event.ts';
+import { descriptionOf, isCategory, isLang, primaryCategory } from '../domain/event.ts';
 import { CATEGORY_EMOJI } from '../delivery/render.ts';
 import { addDays } from '../pipeline/clock.ts';
+
+/** Feed language (AC-5.1): `?lang=it|ru`, default and unknown → en. */
+export const langFromQuery = (params: URLSearchParams): Lang => {
+  const value = params.get('lang');
+  return isLang(value) ? value : 'en';
+};
 
 export type CalendarFilter = Readonly<{
   categories?: readonly Category[];
@@ -111,7 +117,7 @@ const CATEGORY_LABEL: Readonly<Record<Category, string>> = {
   other: 'Other',
 };
 
-const eventLines = (event: CompactEvent, stamp: string): readonly string[] => {
+const eventLines = (event: CompactEvent, stamp: string, lang: Lang): readonly string[] => {
   const lastDay = event.e ?? event.s;
   const timing =
     event.h === undefined
@@ -124,7 +130,9 @@ const eventLines = (event: CompactEvent, stamp: string): readonly string[] => {
           `DTSTART;TZID=Europe/Rome:${timedValue(event.s, event.h)}`,
           `DTEND;TZID=Europe/Rome:${timedValue(event.s, event.h, DEFAULT_EVENT_HOURS)}`,
         ];
+  const summary = descriptionOf(event.d, lang);
   const description = [
+    ...(summary === '' ? [] : [summary]),
     event.c.map((category) => CATEGORY_LABEL[category]).join('/'),
     ...(event.f === true ? ['free entry'] : []),
     event.u,
@@ -143,7 +151,11 @@ const eventLines = (event: CompactEvent, stamp: string): readonly string[] => {
   ];
 };
 
-export const buildIcs = (events: readonly CompactEvent[], nowMs: number): string => {
+export const buildIcs = (
+  events: readonly CompactEvent[],
+  nowMs: number,
+  lang: Lang = 'en',
+): string => {
   const stamp = dtStamp(nowMs);
   const lines = [
     'BEGIN:VCALENDAR',
@@ -154,7 +166,7 @@ export const buildIcs = (events: readonly CompactEvent[], nowMs: number): string
     'X-WR-CALNAME:Genoa Events',
     'X-WR-TIMEZONE:Europe/Rome',
     ...VTIMEZONE,
-    ...events.flatMap((event) => eventLines(event, stamp)),
+    ...events.flatMap((event) => eventLines(event, stamp, lang)),
     'END:VCALENDAR',
   ];
   return `${lines.flatMap(foldIcsLine).join('\r\n')}\r\n`;

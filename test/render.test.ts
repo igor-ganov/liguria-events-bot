@@ -66,7 +66,7 @@ describe('renderCard', () => {
     time: '21:00',
     venue: 'Porto Antico',
     categories: ['music'],
-    description: 'Electronic music by the sea.',
+    descriptions: { en: 'Electronic music by the sea.', it: 'Musica.', ru: 'Музыка.' },
     priceInfo: '€ 15,00',
     url: 'https://example.org/1',
     source: 'visitgenoa',

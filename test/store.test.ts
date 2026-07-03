@@ -22,7 +22,7 @@ const record: EventRecord = {
   startDate: '2026-07-10',
   endDate: '2026-07-12',
   categories: ['art'],
-  description: 'A test event.',
+  descriptions: { en: 'A test event.', it: 'Un evento.', ru: 'Событие.' },
   url: 'https://example.org',
   source: 'visitgenoa',
   enriched: true,
