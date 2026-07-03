@@ -5,7 +5,7 @@
  */
 import { isOperator } from './config.ts';
 import type { Env } from './config.ts';
-import { isCategory, toCompact } from './domain/event.ts';
+import { isCategory, parseLocalized, toCompact } from './domain/event.ts';
 import type { Category, CompactEvent } from './domain/event.ts';
 import { makeBot, sendLong } from './delivery/bot-api.ts';
 import type { Bot, Keyboard } from './delivery/bot-api.ts';
@@ -37,6 +37,7 @@ import {
   readEventRecords,
   readIndex,
   readRunLog,
+  writeEventRecord,
   writeIndex,
 } from './pipeline/store.ts';
 import { pickSurprise } from './pipeline/surprise.ts';
@@ -57,11 +58,14 @@ import { fetchForecast } from './weather/open-meteo.ts';
 import { buildIcs, filterEvents, filterFromQuery, langFromQuery } from './calendar/ics.ts';
 import { buildCollectDeps, chatOf } from './wire.ts';
 import { CATEGORIES } from './domain/event.ts';
-import { asNonEmptyString, asNumber, readProp } from './util/json.ts';
+import { asArray, asNonEmptyString, asNumber, readProp } from './util/json.ts';
 
 const QA_CORPUS_DAYS = 30;
 const QA_CORPUS_CAP = 120;
-const COLLECT_HOURS: readonly number[] = [5, 11, 17];
+// Crawl once a day (05:00 Europe/Rome). The hourly tick still fires digests
+// and reminders at their own hours; only collection is daily. Enrichment is
+// delta-only — known enriched events are never re-translated.
+const COLLECT_HOURS: readonly number[] = [5];
 const REMINDER_HOUR = 10;
 
 const ok = (): Response => new Response('ok');
@@ -733,6 +737,44 @@ const worker = {
       );
       await writeIndex(env.EVENTS, index);
       return new Response(JSON.stringify({ ok: true, records: records.length, index: index.length }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    // Bulk-apply externally-produced translations (title + description maps)
+    // onto stored records without the LLM pipeline. Gated by the tick secret.
+    if (url.pathname === '/apply-translations' && request.method === 'POST') {
+      if (request.headers.get('x-tick-secret') !== env.WEBHOOK_SECRET) {
+        return new Response('unauthorized', { status: 401 });
+      }
+      const body: unknown = await request.json().catch(() => undefined);
+      const items = asArray(readProp(body, 'items')) ?? [];
+      const nowMs = Date.now();
+      let applied = 0;
+      for (const item of items) {
+        const id = asNonEmptyString(readProp(item, 'id'));
+        const titles = parseLocalized(readProp(item, 'tl'));
+        const descriptions = parseLocalized(readProp(item, 'd'));
+        if (id === undefined) continue;
+        const record = await readEventRecord(env.EVENTS, id);
+        if (record === undefined) continue;
+        await writeEventRecord(
+          env.EVENTS,
+          {
+            ...record,
+            enriched: true,
+            ...(titles === undefined ? {} : { titles }),
+            ...(descriptions === undefined ? {} : { descriptions }),
+          },
+          nowMs,
+        );
+        applied += 1;
+      }
+      const rebuilt = pruneIndex(
+        (await readAllRecords(env.EVENTS)).map(toCompact),
+        romeDate(nowMs),
+      ).toSorted((a, b) => (a.s < b.s ? -1 : a.s > b.s ? 1 : a.t.localeCompare(b.t)));
+      await writeIndex(env.EVENTS, rebuilt);
+      return new Response(JSON.stringify({ ok: true, applied, index: rebuilt.length }), {
         headers: { 'content-type': 'application/json' },
       });
     }
