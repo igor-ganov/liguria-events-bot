@@ -5,7 +5,7 @@
  * timed events.
  */
 import type { Category, CompactEvent, Lang } from '../domain/event.ts';
-import { descriptionOf, isCategory, isLang, primaryCategory } from '../domain/event.ts';
+import { descriptionOf, isCategory, isLang, primaryCategory, titleOf } from '../domain/event.ts';
 import { CATEGORY_EMOJI } from '../delivery/render.ts';
 import { addDays } from '../pipeline/clock.ts';
 
@@ -142,7 +142,7 @@ const eventLines = (event: CompactEvent, stamp: string, lang: Lang): readonly st
     `UID:${event.id}@event-collecter`,
     `DTSTAMP:${stamp}`,
     ...timing,
-    `SUMMARY:${escapeIcsText(`${CATEGORY_EMOJI[primaryCategory(event.c)]} ${event.t}`)}`,
+    `SUMMARY:${escapeIcsText(`${CATEGORY_EMOJI[primaryCategory(event.c)]} ${titleOf(event, lang)}`)}`,
     ...(event.v === undefined ? [] : [`LOCATION:${escapeIcsText(event.v)}`]),
     `DESCRIPTION:${escapeIcsText(description)}`,
     `URL:${event.u}`,

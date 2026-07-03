@@ -20,6 +20,8 @@ export type PendingEnrich = Readonly<{
 
 export type Enrichment = Readonly<{
   categories: readonly Category[];
+  /** Display titles; absent → the pipeline falls back to the original. */
+  titles?: LocalizedText;
   descriptions: LocalizedText;
   unusual: boolean;
 }>;
@@ -41,17 +43,20 @@ const ENRICH_SYSTEM = [
   'For EVERY input event return 1 to 3 categories from this fixed list,',
   'most specific first (a food festival with concerts is ["food","music"]):',
   CATEGORIES.join(', '),
-  'and a fresh, neutral 1-2 sentence description IN YOUR OWN WORDS in EACH of',
+  'a fresh, neutral 1-2 sentence description IN YOUR OWN WORDS in EACH of',
   'English, Italian and Russian — summarize what it is, where, and why it is',
-  'interesting. Never copy source sentences verbatim, do not invent facts, and',
-  'do NOT translate proper nouns like event titles or venue names.',
+  'interesting. Never copy source sentences verbatim and do not invent facts.',
+  'Also give a display "titles" map with the event title in each language:',
+  'translate only the descriptive / common-noun parts and KEEP proper nouns',
+  'unchanged (festival & event names, venue names, person & brand names). If a',
+  'title is wholly a proper noun, repeat it identically in all three.',
   'Also set "unusual": true ONLY for offbeat, niche, experimental or',
   'distinctly non-touristy happenings (a neighbourhood performance, an',
   'unconventional venue, an oddball one-off, immersive/site-specific art);',
   'false for standard mainstream fare (big-name concerts, major museum',
   'exhibitions, routine guided tours). When in doubt, false.',
   'Respond with STRICT valid JSON, no markdown, no backticks:',
-  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "descriptions": { "en": "…", "it": "…", "ru": "…" }, "unusual": true|false } ] }',
+  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "titles": { "en": "…", "it": "…", "ru": "…" }, "descriptions": { "en": "…", "it": "…", "ru": "…" }, "unusual": true|false } ] }',
 ].join('\n');
 
 const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment])[] => {
@@ -61,13 +66,19 @@ const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment
     readProp(value, 'descriptions'),
     asNonEmptyString(readProp(value, 'description')),
   );
+  // Display titles are optional; the pipeline falls back to the original title.
+  const titles = parseLocalized(readProp(value, 'titles'));
   const many = (asArray(readProp(value, 'categories')) ?? []).filter(isCategory);
   const legacy = readProp(value, 'category');
   const categories = [...many, ...(isCategory(legacy) ? [legacy] : [])].slice(0, 3);
   if (id === undefined || categories.length === 0 || descriptions === undefined) return [];
-  return [
-    [id, { categories, descriptions, unusual: asBoolean(readProp(value, 'unusual')) === true }],
-  ];
+  const enrichment: Enrichment = {
+    categories,
+    descriptions,
+    unusual: asBoolean(readProp(value, 'unusual')) === true,
+    ...(titles === undefined ? {} : { titles }),
+  };
+  return [[id, enrichment]];
 };
 
 export const makeEnrichEvents =

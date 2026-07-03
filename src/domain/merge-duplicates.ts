@@ -36,6 +36,9 @@ export const mergeDuplicates = (a: EventRecord, b: EventRecord): EventRecord => 
   return {
     ...primary,
     categories: unionCategories(primary.categories, secondary.categories),
+    ...(primary.titles === undefined && secondary.titles !== undefined
+      ? { titles: secondary.titles }
+      : {}),
     ...(primary.endDate === undefined && secondary.endDate !== undefined
       ? { endDate: secondary.endDate }
       : {}),

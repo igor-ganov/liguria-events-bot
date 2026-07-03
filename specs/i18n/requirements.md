@@ -25,6 +25,17 @@ fallback whenever a translation is missing.
   fetch. Titles, venues, dates, categories, links are language-agnostic and
   stored once.
 
+## US-2b: Smart title translation (amendment 2026-07-03)
+
+- **AC-2b.1** WHEN enriching an event THE SYSTEM SHALL produce a **display
+  title** in each language: translate the descriptive / common-noun parts but
+  KEEP proper nouns in their original form (festival & event names, venue
+  names, person & brand names). A title that is wholly a proper noun stays
+  unchanged in all languages.
+- **AC-2b.2** The original source title SHALL remain the canonical `title`
+  used for dedupe/id/matching (never translated); display titles are a
+  separate localized map that falls back to the original when missing.
+
 ## US-2: Crawler translates descriptions (AC-2.6 extension)
 
 - **AC-2.1** WHEN the LLM enriches an event THE SYSTEM SHALL obtain the 1–2

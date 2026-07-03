@@ -32,7 +32,7 @@ describe('escapeHtml', () => {
 
 describe('renderEventLine', () => {
   test('links the title, shows dates, venue, free flag', () => {
-    const line = renderEventLine(compact);
+    const line = renderEventLine(compact, 'en');
     assert.ok(line.includes('<a href="https://example.org/1">'));
     assert.ok(line.includes('Concert &lt;live&gt; &amp; loud'));
     assert.ok(line.includes('04.07–05.07, 21:00'));

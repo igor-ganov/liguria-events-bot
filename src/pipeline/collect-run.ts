@@ -113,6 +113,7 @@ const toRecord = (
     ...(raw.altLinks === undefined || raw.altLinks.length === 0
       ? {}
       : { altLinks: raw.altLinks }),
+    ...(enrichment?.titles === undefined ? {} : { titles: enrichment.titles }),
     ...(enrichment?.unusual === true ? { unusual: true } : {}),
     ...(free ? { free: true } : {}),
   };
@@ -260,6 +261,7 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
             categories: enrichment.categories,
             descriptions: enrichment.descriptions,
             enriched: true,
+            ...(enrichment.titles === undefined ? {} : { titles: enrichment.titles }),
             ...(enrichment.unusual === true ? { unusual: true } : {}),
           };
     });

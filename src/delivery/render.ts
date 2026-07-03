@@ -2,7 +2,7 @@
  * Pure rendering (design §7): compact events → Telegram HTML. Splitting
  * respects entry boundaries (AC-3.7).
  */
-import { CATEGORIES, primaryCategory } from '../domain/event.ts';
+import { CATEGORIES, primaryCategory, titleOf } from '../domain/event.ts';
 import type { Category, CompactEvent, EventRecord } from '../domain/event.ts';
 import { t } from '../i18n.ts';
 import type { TranslationKey } from '../i18n.ts';
@@ -45,14 +45,14 @@ export const formatDateSpan = (event: CompactEvent): string => {
   return event.h === undefined ? span : `${span}, ${event.h}`;
 };
 
-export const renderEventLine = (event: CompactEvent): string => {
+export const renderEventLine = (event: CompactEvent, lang: Language): string => {
   const parts = [
     formatDateSpan(event),
     ...(event.v === undefined ? [] : [escapeHtml(event.v)]),
     ...(event.f === true ? ['free'] : []),
   ];
   const gem = event.x === true ? '💎 ' : '';
-  return `• ${gem}<a href="${event.u}">${escapeHtml(event.t)}</a> — ${parts.join(', ')}`;
+  return `• ${gem}<a href="${event.u}">${escapeHtml(titleOf(event, lang))}</a> — ${parts.join(', ')}`;
 };
 
 /** Category-grouped digest body (AC-3.1); category order = taxonomy order. */
@@ -63,7 +63,7 @@ export const renderGrouped = (events: readonly CompactEvent[], lang: Language): 
       ? []
       : [
           `${CATEGORY_EMOJI[category]} <b>${escapeHtml(categoryLabel(category, lang))}</b>\n` +
-            matching.map(renderEventLine).join('\n'),
+            matching.map((event) => renderEventLine(event, lang)).join('\n'),
         ];
   }).join('\n\n');
 
@@ -88,8 +88,9 @@ export const renderCard = (event: EventRecord, lang: Language): string => {
     (part): part is string => part !== undefined,
   );
   const gem = event.unusual === true ? '💎 ' : '';
+  const displayTitle = (event.titles?.[lang] || event.title) ?? event.title;
   const lines = [
-    `${gem}<b>${escapeHtml(event.title)}</b>`,
+    `${gem}<b>${escapeHtml(displayTitle)}</b>`,
     `${emoji} ${escapeHtml(
       event.categories.map((category) => categoryLabel(category, lang)).join(' · '),
     )} · ${when}`,

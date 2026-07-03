@@ -62,6 +62,9 @@ export type EventRecord = Readonly<{
   address?: string;
   /** 1–3 categories, most specific first; [0] is the primary (AC-2.1). */
   categories: readonly Category[];
+  /** Display title per language — proper nouns kept, descriptive parts
+   *  translated (AC-2b). Absent → fall back to `title`. */
+  titles?: LocalizedText;
   /** 1–2 sentence description in every language (AC-1.1). */
   descriptions: LocalizedText;
   /** Poster/cover image from the source, when the listing exposes one. */
@@ -82,11 +85,13 @@ export type EventRecord = Readonly<{
 
 export type SourceLink = Readonly<{ source: string; url: string }>;
 
-/** Index projection: t=title s=start e=end c=categories f=free v=venue
- *  h=time u=url img=image d=description l=alt links x=unusual/hidden-gem. */
+/** Index projection: t=title(original) tl=title localized s=start e=end
+ *  c=categories f=free v=venue h=time u=url img=image d=description
+ *  l=alt links x=unusual/hidden-gem. */
 export type CompactEvent = Readonly<{
   id: string;
   t: string;
+  tl?: LocalizedText;
   s: string;
   e?: string;
   c: readonly Category[];
@@ -99,6 +104,10 @@ export type CompactEvent = Readonly<{
   l?: readonly SourceLink[];
   x?: boolean;
 }>;
+
+/** Display title in a language — falls back to the original (AC-2b.2). */
+export const titleOf = (event: CompactEvent, lang: Lang): string =>
+  (event.tl?.[lang] || event.t) ?? event.t;
 
 export const primaryCategory = (categories: readonly Category[]): Category =>
   categories[0] ?? 'other';
@@ -234,6 +243,7 @@ export const mergeRaw = (first: RawEvent, second: RawEvent): RawEvent => {
 export const toCompact = (event: EventRecord): CompactEvent => ({
   id: event.id,
   t: event.title,
+  ...(event.titles === undefined ? {} : { tl: event.titles }),
   s: event.startDate,
   c: event.categories,
   u: event.url,
@@ -323,11 +333,13 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
   const unusual = asBoolean(readProp(value, 'unusual'));
   const image = asNonEmptyString(readProp(value, 'image'));
   const altLinks = parseSourceLinks(readProp(value, 'altLinks'));
+  const titles = parseLocalized(readProp(value, 'titles'));
   return {
     id,
     title,
     startDate,
     categories: parseCategories(value),
+    ...(titles === undefined ? {} : { titles }),
     descriptions,
     url,
     source,
@@ -368,11 +380,13 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
   const h = asNonEmptyString(readProp(value, 'h'));
   const img = asNonEmptyString(readProp(value, 'img'));
   const d = parseLocalized(readProp(value, 'd'), asNonEmptyString(readProp(value, 'd')));
+  const tl = parseLocalized(readProp(value, 'tl'));
   const l = parseSourceLinks(readProp(value, 'l'));
   const x = asBoolean(readProp(value, 'x'));
   return {
     id,
     t,
+    ...(tl === undefined ? {} : { tl }),
     s,
     c: compactCategories(readProp(value, 'c')),
     u,

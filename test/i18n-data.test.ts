@@ -6,9 +6,10 @@ import {
   localized,
   parseEventRecord,
   parseLocalized,
+  titleOf,
   toCompact,
 } from '../src/domain/event.ts';
-import type { EventRecord } from '../src/domain/event.ts';
+import type { CompactEvent, EventRecord } from '../src/domain/event.ts';
 import { buildIcs, langFromQuery } from '../src/calendar/ics.ts';
 
 describe('localized / descriptionOf / parseLocalized', () => {
@@ -26,6 +27,18 @@ describe('localized / descriptionOf / parseLocalized', () => {
     assert.deepEqual(parseLocalized({ en: 'E' }), { en: 'E', it: 'E', ru: 'E' });
     assert.deepEqual(parseLocalized(undefined, 'legacy'), { en: 'legacy', it: 'legacy', ru: 'legacy' });
     assert.equal(parseLocalized(undefined), undefined);
+  });
+});
+
+describe('titleOf (AC-2b.2)', () => {
+  const base: CompactEvent = { id: 'a', t: 'Sagra del pesto', s: '2026-07-04', c: ['food'], u: 'https://x' };
+  test('localized title wins, missing falls back to original', () => {
+    const withTl: CompactEvent = { ...base, tl: { en: 'Pesto festival', it: 'Sagra del pesto', ru: 'Фестиваль песто' } };
+    assert.equal(titleOf(withTl, 'ru'), 'Фестиваль песто');
+    assert.equal(titleOf(withTl, 'en'), 'Pesto festival');
+    assert.equal(titleOf(base, 'ru'), 'Sagra del pesto'); // no tl → original
+    // an empty translation falls back to the ORIGINAL title, not another lang
+    assert.equal(titleOf({ ...base, tl: { en: 'X', it: '', ru: '' } }, 'it'), 'Sagra del pesto');
   });
 });
 
