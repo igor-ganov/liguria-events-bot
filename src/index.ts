@@ -58,7 +58,7 @@ import { fetchForecast } from './weather/open-meteo.ts';
 import { buildIcs, filterEvents, filterFromQuery, langFromQuery } from './calendar/ics.ts';
 import { buildCollectDeps, chatOf } from './wire.ts';
 import { CATEGORIES } from './domain/event.ts';
-import { asArray, asNonEmptyString, asNumber, readProp } from './util/json.ts';
+import { asArray, asBoolean, asNonEmptyString, asNumber, readProp } from './util/json.ts';
 
 const QA_CORPUS_DAYS = 30;
 const QA_CORPUS_CAP = 120;
@@ -755,6 +755,7 @@ const worker = {
         const titles = parseLocalized(readProp(item, 'tl'));
         const descriptions = parseLocalized(readProp(item, 'd'));
         const categories = (asArray(readProp(item, 'c')) ?? []).filter(isCategory).slice(0, 3);
+        const unusual = asBoolean(readProp(item, 'x'));
         if (id === undefined) continue;
         const record = await readEventRecord(env.EVENTS, id);
         if (record === undefined) continue;
@@ -766,6 +767,7 @@ const worker = {
             ...(categories.length === 0 ? {} : { categories }),
             ...(titles === undefined ? {} : { titles }),
             ...(descriptions === undefined ? {} : { descriptions }),
+            ...(unusual === undefined ? {} : { unusual }),
           },
           nowMs,
         );
