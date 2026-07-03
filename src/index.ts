@@ -756,6 +756,7 @@ const worker = {
         const descriptions = parseLocalized(readProp(item, 'd'));
         const categories = (asArray(readProp(item, 'c')) ?? []).filter(isCategory).slice(0, 3);
         const unusual = asBoolean(readProp(item, 'x'));
+        const address = asNonEmptyString(readProp(item, 'a'));
         if (id === undefined) continue;
         const record = await readEventRecord(env.EVENTS, id);
         if (record === undefined) continue;
@@ -767,6 +768,7 @@ const worker = {
             ...(categories.length === 0 ? {} : { categories }),
             ...(titles === undefined ? {} : { titles }),
             ...(descriptions === undefined ? {} : { descriptions }),
+            ...(address === undefined ? {} : { address }),
             ...(unusual === undefined ? {} : { unusual }),
           },
           nowMs,

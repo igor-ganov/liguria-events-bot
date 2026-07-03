@@ -97,6 +97,7 @@ export type CompactEvent = Readonly<{
   c: readonly Category[];
   f?: boolean;
   v?: string;
+  a?: string;
   h?: string;
   u: string;
   img?: string;
@@ -250,6 +251,7 @@ export const toCompact = (event: EventRecord): CompactEvent => ({
   ...(event.endDate === undefined ? {} : { e: event.endDate }),
   ...(event.free === true ? { f: true } : {}),
   ...(event.venue === undefined ? {} : { v: event.venue }),
+  ...(event.address === undefined ? {} : { a: event.address }),
   ...(event.time === undefined ? {} : { h: event.time }),
   ...(event.image === undefined ? {} : { img: event.image }),
   ...(event.descriptions.en === '' ? {} : { d: event.descriptions }),
@@ -377,6 +379,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
   const e = asNonEmptyString(readProp(value, 'e'));
   const f = asBoolean(readProp(value, 'f'));
   const v = asNonEmptyString(readProp(value, 'v'));
+  const a = asNonEmptyString(readProp(value, 'a'));
   const h = asNonEmptyString(readProp(value, 'h'));
   const img = asNonEmptyString(readProp(value, 'img'));
   const d = parseLocalized(readProp(value, 'd'), asNonEmptyString(readProp(value, 'd')));
@@ -393,6 +396,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
     ...(e === undefined ? {} : { e }),
     ...(f === true ? { f: true } : {}),
     ...(v === undefined ? {} : { v }),
+    ...(a === undefined ? {} : { a }),
     ...(h === undefined ? {} : { h }),
     ...(img === undefined ? {} : { img }),
     ...(d === undefined ? {} : { d }),

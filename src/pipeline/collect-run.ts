@@ -92,6 +92,7 @@ const toRecord = (
 ): EventRecord => {
   const { raw } = item;
   const free = freeFromPrice(raw.priceInfo);
+  const address = raw.address ?? enrichment?.address;
   return {
     id: item.id,
     title: raw.title,
@@ -106,7 +107,7 @@ const toRecord = (
     ...(raw.endDate === undefined ? {} : { endDate: raw.endDate }),
     ...(raw.time === undefined ? {} : { time: raw.time }),
     ...(raw.venue === undefined ? {} : { venue: raw.venue }),
-    ...(raw.address === undefined ? {} : { address: raw.address }),
+    ...(address === undefined ? {} : { address }),
     ...(raw.priceInfo === undefined ? {} : { priceInfo: raw.priceInfo }),
     ...(raw.rawDescription === undefined ? {} : { rawDescription: raw.rawDescription }),
     ...(raw.image === undefined ? {} : { image: raw.image }),
@@ -125,6 +126,7 @@ const pendingOf = (item: Identified): PendingEnrich => ({
   dates:
     item.raw.startDate +
     (item.raw.endDate === undefined ? '' : `..${item.raw.endDate}`),
+  ...(item.raw.venue === undefined ? {} : { venue: item.raw.venue }),
   ...(item.raw.categoryHint === undefined ? {} : { categoryHint: item.raw.categoryHint }),
   ...(item.raw.rawDescription === undefined
     ? {}
@@ -136,6 +138,7 @@ const pendingOfRecord = (record: EventRecord): PendingEnrich => ({
   title: record.title,
   dates:
     record.startDate + (record.endDate === undefined ? '' : `..${record.endDate}`),
+  ...(record.venue === undefined ? {} : { venue: record.venue }),
   ...(record.rawDescription === undefined
     ? {}
     : { raw: record.rawDescription.slice(0, 500) }),
@@ -264,6 +267,9 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
             descriptions: enrichment.descriptions,
             enriched: true,
             ...(enrichment.titles === undefined ? {} : { titles: enrichment.titles }),
+            ...(record.address === undefined && enrichment.address !== undefined
+              ? { address: enrichment.address }
+              : {}),
             ...(enrichment.unusual === true ? { unusual: true } : {}),
           };
     });

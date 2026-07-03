@@ -14,6 +14,7 @@ export type PendingEnrich = Readonly<{
   id: string;
   title: string;
   dates: string;
+  venue?: string;
   categoryHint?: Category;
   raw?: string;
 }>;
@@ -23,6 +24,8 @@ export type Enrichment = Readonly<{
   /** Display titles; absent → the pipeline falls back to the original. */
   titles?: LocalizedText;
   descriptions: LocalizedText;
+  /** Google-geocodable location string for the map link; absent if unknown. */
+  address?: string;
   unusual: boolean;
 }>;
 
@@ -50,13 +53,17 @@ const ENRICH_SYSTEM = [
   'translate only the descriptive / common-noun parts and KEEP proper nouns',
   'unchanged (festival & event names, venue names, person & brand names). If a',
   'title is wholly a proper noun, repeat it identically in all three.',
+  'Also give "address": a concise Google-Maps-geocodable location for the',
+  'venue, e.g. "Teatro della Tosse, Piazza Renato Negri 4, Genova". Use the',
+  'input venue and your knowledge of Genoa; always end with ", Genova" (or the',
+  'correct nearby comune). Omit the field ONLY if you truly cannot place it.',
   'Also set "unusual": true ONLY for offbeat, niche, experimental or',
   'distinctly non-touristy happenings (a neighbourhood performance, an',
   'unconventional venue, an oddball one-off, immersive/site-specific art);',
   'false for standard mainstream fare (big-name concerts, major museum',
   'exhibitions, routine guided tours). When in doubt, false.',
   'Respond with STRICT valid JSON, no markdown, no backticks:',
-  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "titles": { "en": "…", "it": "…", "ru": "…" }, "descriptions": { "en": "…", "it": "…", "ru": "…" }, "unusual": true|false } ] }',
+  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "titles": { "en": "…", "it": "…", "ru": "…" }, "descriptions": { "en": "…", "it": "…", "ru": "…" }, "address": "…", "unusual": true|false } ] }',
 ].join('\n');
 
 const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment])[] => {
@@ -72,11 +79,13 @@ const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment
   const legacy = readProp(value, 'category');
   const categories = [...many, ...(isCategory(legacy) ? [legacy] : [])].slice(0, 3);
   if (id === undefined || categories.length === 0 || descriptions === undefined) return [];
+  const address = asNonEmptyString(readProp(value, 'address'));
   const enrichment: Enrichment = {
     categories,
     descriptions,
     unusual: asBoolean(readProp(value, 'unusual')) === true,
     ...(titles === undefined ? {} : { titles }),
+    ...(address === undefined ? {} : { address }),
   };
   return [[id, enrichment]];
 };
