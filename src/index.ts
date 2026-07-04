@@ -757,6 +757,7 @@ const worker = {
         const categories = (asArray(readProp(item, 'c')) ?? []).filter(isCategory).slice(0, 3);
         const unusual = asBoolean(readProp(item, 'x'));
         const address = asNonEmptyString(readProp(item, 'a'));
+        const endDate = asNonEmptyString(readProp(item, 'e'));
         if (id === undefined) continue;
         const record = await readEventRecord(env.EVENTS, id);
         if (record === undefined) continue;
@@ -769,6 +770,7 @@ const worker = {
             ...(titles === undefined ? {} : { titles }),
             ...(descriptions === undefined ? {} : { descriptions }),
             ...(address === undefined ? {} : { address }),
+            ...(endDate === undefined ? {} : { endDate }),
             ...(unusual === undefined ? {} : { unusual }),
           },
           nowMs,
