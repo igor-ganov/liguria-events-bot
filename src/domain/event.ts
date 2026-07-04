@@ -248,7 +248,18 @@ export const mergeRaw = (first: RawEvent, second: RawEvent): RawEvent => {
 
 const coordPair = (lat: number, lng: number): readonly [number, number] => [lat, lng];
 
-export const toCompact = (event: EventRecord): CompactEvent => ({
+/** Display venue: the explicit venue, else the address's leading segment
+ *  (the venue name), so "where" is never blank when an address exists. A
+ *  city-only address ("Genova, Italia") yields no venue. */
+export const venueOf = (venue: string | undefined, address: string | undefined): string | undefined => {
+  if (venue !== undefined) return venue;
+  const head = address?.split(',')[0]?.trim();
+  return head === undefined || head === '' || /^gen[oa]va$/i.test(head) ? undefined : head;
+};
+
+export const toCompact = (event: EventRecord): CompactEvent => {
+  const venue = venueOf(event.venue, event.address);
+  return {
   id: event.id,
   t: event.title,
   ...(event.titles === undefined ? {} : { tl: event.titles }),
@@ -257,7 +268,7 @@ export const toCompact = (event: EventRecord): CompactEvent => ({
   u: event.url,
   ...(event.endDate === undefined ? {} : { e: event.endDate }),
   ...(event.free === true ? { f: true } : {}),
-  ...(event.venue === undefined ? {} : { v: event.venue }),
+  ...(venue === undefined ? {} : { v: venue }),
   ...(event.address === undefined ? {} : { a: event.address }),
   ...(event.lat === undefined || event.lng === undefined
     ? {}
@@ -269,7 +280,8 @@ export const toCompact = (event: EventRecord): CompactEvent => ({
     ? {}
     : { l: event.altLinks }),
   ...(event.unusual === true ? { x: true } : {}),
-});
+  };
+};
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
