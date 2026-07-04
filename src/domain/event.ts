@@ -60,6 +60,9 @@ export type EventRecord = Readonly<{
   time?: string;
   venue?: string;
   address?: string;
+  /** Map coordinates of the venue/address, for the map view. */
+  lat?: number;
+  lng?: number;
   /** 1–3 categories, most specific first; [0] is the primary (AC-2.1). */
   categories: readonly Category[];
   /** Display title per language — proper nouns kept, descriptive parts
@@ -98,6 +101,8 @@ export type CompactEvent = Readonly<{
   f?: boolean;
   v?: string;
   a?: string;
+  /** [lat, lng] point for the map view. */
+  g?: readonly [number, number];
   h?: string;
   u: string;
   img?: string;
@@ -241,6 +246,8 @@ export const mergeRaw = (first: RawEvent, second: RawEvent): RawEvent => {
   };
 };
 
+const coordPair = (lat: number, lng: number): readonly [number, number] => [lat, lng];
+
 export const toCompact = (event: EventRecord): CompactEvent => ({
   id: event.id,
   t: event.title,
@@ -252,6 +259,9 @@ export const toCompact = (event: EventRecord): CompactEvent => ({
   ...(event.free === true ? { f: true } : {}),
   ...(event.venue === undefined ? {} : { v: event.venue }),
   ...(event.address === undefined ? {} : { a: event.address }),
+  ...(event.lat === undefined || event.lng === undefined
+    ? {}
+    : { g: coordPair(event.lat, event.lng) }),
   ...(event.time === undefined ? {} : { h: event.time }),
   ...(event.image === undefined ? {} : { img: event.image }),
   ...(event.descriptions.en === '' ? {} : { d: event.descriptions }),
@@ -329,6 +339,8 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
   const time = asNonEmptyString(readProp(value, 'time'));
   const venue = asNonEmptyString(readProp(value, 'venue'));
   const address = asNonEmptyString(readProp(value, 'address'));
+  const lat = asNumber(readProp(value, 'lat'));
+  const lng = asNumber(readProp(value, 'lng'));
   const priceInfo = asNonEmptyString(readProp(value, 'priceInfo'));
   const rawDescription = asNonEmptyString(readProp(value, 'rawDescription'));
   const free = asBoolean(readProp(value, 'free'));
@@ -351,6 +363,8 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
     ...(time === undefined ? {} : { time }),
     ...(venue === undefined ? {} : { venue }),
     ...(address === undefined ? {} : { address }),
+    ...(lat === undefined ? {} : { lat }),
+    ...(lng === undefined ? {} : { lng }),
     ...(priceInfo === undefined ? {} : { priceInfo }),
     ...(rawDescription === undefined ? {} : { rawDescription }),
     ...(free === undefined ? {} : { free }),
@@ -380,6 +394,10 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
   const f = asBoolean(readProp(value, 'f'));
   const v = asNonEmptyString(readProp(value, 'v'));
   const a = asNonEmptyString(readProp(value, 'a'));
+  const gArr = asArray(readProp(value, 'g')) ?? [];
+  const gLat = asNumber(gArr[0]);
+  const gLng = asNumber(gArr[1]);
+  const g = gLat === undefined || gLng === undefined ? undefined : coordPair(gLat, gLng);
   const h = asNonEmptyString(readProp(value, 'h'));
   const img = asNonEmptyString(readProp(value, 'img'));
   const d = parseLocalized(readProp(value, 'd'), asNonEmptyString(readProp(value, 'd')));
@@ -397,6 +415,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
     ...(f === true ? { f: true } : {}),
     ...(v === undefined ? {} : { v }),
     ...(a === undefined ? {} : { a }),
+    ...(g === undefined ? {} : { g }),
     ...(h === undefined ? {} : { h }),
     ...(img === undefined ? {} : { img }),
     ...(d === undefined ? {} : { d }),
