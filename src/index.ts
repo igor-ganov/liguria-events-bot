@@ -758,6 +758,8 @@ const worker = {
         const unusual = asBoolean(readProp(item, 'x'));
         const address = asNonEmptyString(readProp(item, 'a'));
         const endDate = asNonEmptyString(readProp(item, 'e'));
+        const lat = asNumber(readProp(item, 'lat'));
+        const lng = asNumber(readProp(item, 'lng'));
         if (id === undefined) continue;
         const record = await readEventRecord(env.EVENTS, id);
         if (record === undefined) continue;
@@ -771,6 +773,8 @@ const worker = {
             ...(descriptions === undefined ? {} : { descriptions }),
             ...(address === undefined ? {} : { address }),
             ...(endDate === undefined ? {} : { endDate }),
+            ...(lat === undefined ? {} : { lat }),
+            ...(lng === undefined ? {} : { lng }),
             ...(unusual === undefined ? {} : { unusual }),
           },
           nowMs,
