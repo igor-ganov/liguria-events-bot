@@ -56,6 +56,28 @@ describe('parseCarlofeliceHtml (fixture)', () => {
   });
 });
 
+describe('parseCarlofeliceHtml groups a production split across dated pages', () => {
+  const slide = (slug: string, date: string): string =>
+    `<a class="swiper-slide-inner" href="https://operacarlofelicegenova.it/spettacolo/${slug}/">` +
+    `<div class="swiper-slide-contents"><div class="elementor-slide-heading">PAGANINI</div>` +
+    `<div class="elementor-slide-description">${date}</div></div></a>`;
+
+  test('…paganini_1 / …paganini_2 collapse into one event spanning both dates', async () => {
+    const events = await parseCarlofeliceHtml(
+      slide('paganini_1', '22 ottobre 2026') + slide('paganini_2', '5 novembre 2026'),
+    );
+    assert.equal(events.length, 1, 'the two dated pages should merge into one show');
+    const [paganini] = events;
+    assert.ok(paganini !== undefined);
+    assert.equal(paganini.title, 'PAGANINI');
+    assert.equal(paganini.startDate, '2026-10-22');
+    assert.equal(paganini.endDate, '2026-11-05');
+    assert.deepEqual(paganini.altLinks, [
+      { source: 'carlofelice', url: 'https://operacarlofelicegenova.it/spettacolo/paganini_2/' },
+    ]);
+  });
+});
+
 describe('makeCarlofeliceCollector', () => {
   test('reports failed on errors without throwing (AC-1.3)', async () => {
     const dead = async (): Promise<Response> => new Response('x', { status: 500 });

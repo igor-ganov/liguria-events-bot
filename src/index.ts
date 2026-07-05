@@ -6,7 +6,7 @@
 import { isOperator } from './config.ts';
 import type { Env } from './config.ts';
 import { isCategory, parseLocalized, toCompact } from './domain/event.ts';
-import type { Category, CompactEvent } from './domain/event.ts';
+import type { Category, CompactEvent, SourceLink } from './domain/event.ts';
 import { makeBot, sendLong } from './delivery/bot-api.ts';
 import type { Bot, Keyboard } from './delivery/bot-api.ts';
 import {
@@ -32,6 +32,7 @@ import {
 } from './pipeline/settings.ts';
 import type { Language, Settings } from './pipeline/settings.ts';
 import {
+  eventKey,
   readAllRecords,
   readEventRecord,
   readEventRecords,
@@ -787,6 +788,65 @@ const worker = {
       ).toSorted((a, b) => (a.s < b.s ? -1 : a.s > b.s ? 1 : a.t.localeCompare(b.t)));
       await writeIndex(env.EVENTS, rebuilt);
       return new Response(JSON.stringify({ ok: true, applied, index: rebuilt.length }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    // Manual duplicate merge: keep one record, fold the others' links in, drop
+    // them, optionally clean the title / set the date span. Gated by the secret.
+    if (url.pathname === '/merge-events' && request.method === 'POST') {
+      if (request.headers.get('x-tick-secret') !== env.WEBHOOK_SECRET) {
+        return new Response('unauthorized', { status: 401 });
+      }
+      const body: unknown = await request.json().catch(() => undefined);
+      const groups = asArray(readProp(body, 'groups')) ?? [];
+      const nowMs = Date.now();
+      let merged = 0;
+      let deleted = 0;
+      for (const group of groups) {
+        const keepId = asNonEmptyString(readProp(group, 'keep'));
+        const dropIds = (asArray(readProp(group, 'drop')) ?? [])
+          .map((value) => asNonEmptyString(value))
+          .filter((value): value is string => value !== undefined);
+        const title = asNonEmptyString(readProp(group, 'title'));
+        const startDate = asNonEmptyString(readProp(group, 'startDate'));
+        const endDate = asNonEmptyString(readProp(group, 'endDate'));
+        if (keepId === undefined) continue;
+        const keep = await readEventRecord(env.EVENTS, keepId);
+        if (keep === undefined) continue;
+        const links: SourceLink[] = [...(keep.altLinks ?? [])];
+        for (const dropId of dropIds) {
+          const drop = await readEventRecord(env.EVENTS, dropId);
+          if (drop === undefined) continue;
+          links.push({ source: drop.source, url: drop.url });
+          for (const link of drop.altLinks ?? []) links.push(link);
+          await env.EVENTS.delete(eventKey(dropId));
+          deleted += 1;
+        }
+        const seenUrl = new Set<string>([keep.url]);
+        const altLinks = links.filter(
+          (link) => link.url !== '' && !seenUrl.has(link.url) && (seenUrl.add(link.url), true),
+        );
+        const cleanTitle = title ?? keep.title;
+        await writeEventRecord(
+          env.EVENTS,
+          {
+            ...keep,
+            title: cleanTitle,
+            ...(title === undefined ? {} : { titles: { en: cleanTitle, it: cleanTitle, ru: cleanTitle } }),
+            ...(startDate === undefined ? {} : { startDate }),
+            ...(endDate === undefined ? {} : { endDate }),
+            ...(altLinks.length === 0 ? {} : { altLinks }),
+          },
+          nowMs,
+        );
+        merged += 1;
+      }
+      const rebuilt = pruneIndex(
+        (await readAllRecords(env.EVENTS)).map(toCompact),
+        romeDate(nowMs),
+      ).toSorted((a, b) => (a.s < b.s ? -1 : a.s > b.s ? 1 : a.t.localeCompare(b.t)));
+      await writeIndex(env.EVENTS, rebuilt);
+      return new Response(JSON.stringify({ ok: true, merged, deleted, index: rebuilt.length }), {
         headers: { 'content-type': 'application/json' },
       });
     }

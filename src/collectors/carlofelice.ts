@@ -47,22 +47,50 @@ export const parseCarlofeliceHtml = async (html: string): Promise<readonly RawEv
     });
   await rewriter.transform(new Response(html)).arrayBuffer();
 
+  type Parsed = { href: string; title: string; startDate: string; endDate?: string };
   const seen = new Set<string>();
-  return drafts.flatMap((draft): readonly RawEvent[] => {
+  const parsed: Parsed[] = [];
+  for (const draft of drafts) {
     const range = parseSeasonDate(draft.date);
-    const title = decodeEntities(draft.title);
-    if (range === undefined || title === '' || !draft.href.includes('/spettacolo/')) return [];
-    if (seen.has(draft.href)) return []; // the slider repeats slides
+    // The theatre publishes ONE production as several dated pages (…paganini_1,
+    // …paganini_2). Strip the trailing _N so the same show groups into one.
+    const title = decodeEntities(draft.title).replace(/_\d+$/, '').trim();
+    if (range === undefined || title === '' || !draft.href.includes('/spettacolo/')) continue;
+    if (seen.has(draft.href)) continue; // the slider repeats slides
     seen.add(draft.href);
+    parsed.push({
+      href: draft.href,
+      title,
+      startDate: range.startDate,
+      ...(range.endDate === undefined ? {} : { endDate: range.endDate }),
+    });
+  }
+
+  const groups = new Map<string, Parsed[]>();
+  for (const item of parsed) {
+    const key = item.href.replace(/_\d+\/?$/, ''); // …/paganini_2/ → …/paganini
+    const bucket = groups.get(key) ?? [];
+    bucket.push(item);
+    groups.set(key, bucket);
+  }
+
+  return [...groups.values()].flatMap((items): readonly RawEvent[] => {
+    const first = items[0];
+    if (first === undefined) return [];
+    const startDate = items.map((item) => item.startDate).toSorted()[0] ?? first.startDate;
+    const endDate =
+      items.map((item) => item.endDate ?? item.startDate).toSorted().at(-1) ?? startDate;
+    const altLinks = items.slice(1).map((item) => ({ source: CARLOFELICE_SOURCE, url: item.href }));
     return [
       {
-        title,
-        startDate: range.startDate,
-        url: draft.href,
+        title: first.title,
+        startDate,
+        url: first.href,
         source: CARLOFELICE_SOURCE,
         venue: VENUE,
         categoryHint: 'music',
-        ...(range.endDate === undefined ? {} : { endDate: range.endDate }),
+        ...(endDate === startDate ? {} : { endDate }),
+        ...(altLinks.length === 0 ? {} : { altLinks }),
       },
     ];
   });
