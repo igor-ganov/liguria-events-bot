@@ -27,6 +27,8 @@ export type Enrichment = Readonly<{
   /** Google-geocodable location string for the map link; absent if unknown. */
   address?: string;
   unusual: boolean;
+  /** Content-policy violation — such events are dropped, never stored. */
+  blocked?: boolean;
 }>;
 
 // Three-language descriptions cost ~3× tokens; 4 events per call keeps the
@@ -62,8 +64,14 @@ const ENRICH_SYSTEM = [
   'unconventional venue, an oddball one-off, immersive/site-specific art);',
   'false for standard mainstream fare (big-name concerts, major museum',
   'exhibitions, routine guided tours). When in doubt, false.',
+  'Also set "blocked": true for any event that violates our content policy —',
+  'anything extremist, terrorist or violent, or hateful, discriminatory,',
+  'racist or xenophobic, or that targets or demeans people by race, ethnicity,',
+  'nationality, religion, gender, sexual orientation or disability, or is',
+  'otherwise illegal. Ordinary cultural, political, religious or community',
+  'events are NOT blocked — block only genuinely harmful content. In doubt, false.',
   'Respond with STRICT valid JSON, no markdown, no backticks:',
-  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "titles": { "en": "…", "it": "…", "ru": "…" }, "descriptions": { "en": "…", "it": "…", "ru": "…" }, "address": "…", "unusual": true|false } ] }',
+  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "titles": { "en": "…", "it": "…", "ru": "…" }, "descriptions": { "en": "…", "it": "…", "ru": "…" }, "address": "…", "unusual": true|false, "blocked": true|false } ] }',
 ].join('\n');
 
 const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment])[] => {
@@ -86,6 +94,7 @@ const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment
     unusual: asBoolean(readProp(value, 'unusual')) === true,
     ...(titles === undefined ? {} : { titles }),
     ...(address === undefined ? {} : { address }),
+    ...(asBoolean(readProp(value, 'blocked')) === true ? { blocked: true } : {}),
   };
   return [[id, enrichment]];
 };

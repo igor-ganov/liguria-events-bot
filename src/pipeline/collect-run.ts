@@ -274,7 +274,16 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
           };
     });
 
-    const toWrite = [...freshRecords, ...updatedRecords, ...retried];
+    // Content-policy gate (same rules as user submissions): the enrichment
+    // flags violations; drop them from storage AND the index, never publish.
+    const blockedIds = new Set(
+      [...enrichments].filter(([, enrichment]) => enrichment.blocked === true).map(([id]) => id),
+    );
+    await Promise.all([...blockedIds].map((id) => deps.kv.delete(eventKey(id)).catch(() => undefined)));
+
+    const toWrite = [...freshRecords, ...updatedRecords, ...retried].filter(
+      (record) => !blockedIds.has(record.id),
+    );
     const written = new Map(toWrite.map((record) => [record.id, record]));
     await Promise.all(
       [...written.values()].map((record) => writeEventRecord(deps.kv, record, startedAt)),
@@ -284,6 +293,7 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
     const compactById = new Map<string, CompactEvent>(
       index.map((event) => [event.id, event]),
     );
+    for (const id of blockedIds) compactById.delete(id);
     for (const record of written.values()) compactById.set(record.id, toCompact(record));
     const prunedIndex = pruneIndex([...compactById.values()], today);
 
