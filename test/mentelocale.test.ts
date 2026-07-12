@@ -25,7 +25,7 @@ describe('parseDateRange — Italian "al" separator', () => {
 
 describe('parseMentelocaleHtml (fixture)', () => {
   test('extracts dated events with absolute detail urls', async () => {
-    const events = await parseMentelocaleHtml(html);
+    const events = await parseMentelocaleHtml(html, 'genova');
     assert.ok(events.length >= 10, `expected ≥10 events, got ${events.length}`);
     for (const event of events) {
       assert.match(event.startDate, /^\d{4}-\d{2}-\d{2}$/);
@@ -46,7 +46,7 @@ describe('parseMentelocaleHtml (fixture)', () => {
 describe('makeMentelocaleCollector', () => {
   test('reports failed on HTTP errors without throwing (AC-1.3)', async () => {
     const dead = async (): Promise<Response> => new Response('x', { status: 500 });
-    const outcome = await makeMentelocaleCollector(dead)();
+    const outcome = await makeMentelocaleCollector(dead, 'genova')();
     assert.equal(outcome.failed, true);
     assert.deepEqual(outcome.events, []);
   });

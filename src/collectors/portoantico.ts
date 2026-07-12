@@ -57,6 +57,7 @@ export const parsePortoanticoPosts = (
         startDate: info.startDate,
         url: link,
         source: PORTOANTICO_SOURCE,
+        city: 'genova',
         rawDescription: text.slice(0, DESCRIPTION_CAP).trim(),
         ...(info.endDate === undefined ? {} : { endDate: info.endDate }),
         ...(info.time === undefined ? {} : { time: info.time }),

@@ -101,6 +101,7 @@ export const parseListingHtml = async (html: string): Promise<readonly RawEvent[
         startDate: range.startDate,
         url: new URL(draft.href, BASE_URL).toString(),
         source: VISITGENOA_SOURCE,
+        city: 'genova',
         ...(range.endDate === undefined ? {} : { endDate: range.endDate }),
         ...(hint === undefined ? {} : { categoryHint: hint }),
         ...(draft.img === '' ? {} : { image: new URL(draft.img, BASE_URL).toString() }),

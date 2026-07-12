@@ -88,6 +88,7 @@ export const parsePalazzoducaleHtml = async (html: string): Promise<readonly Raw
         startDate: info.startDate,
         url: draft.href,
         source: PALAZZODUCALE_SOURCE,
+        city: 'genova',
         ...(info.endDate === undefined ? {} : { endDate: info.endDate }),
         ...(info.time === undefined ? {} : { time: info.time }),
         ...(venue === '' ? {} : { venue }),

@@ -1,0 +1,1497 @@
+      
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Eventi in Italia | eventiesagre.it</title>
+	
+<link rel="stylesheet" href="/sito/css/eventiesagre.min.css" media="screen" />
+<!--link rel="stylesheet" href="/sito/css/stile-stampa-eventi.min.css" media="print" /-->
+<!--link rel="stylesheet" href="/sito/css/stile.css" media="screen" />
+
+<link rel="stylesheet" href="/sito/css/stile980.css" media="screen" />
+<link rel="stylesheet" href="/sito/menuhome/style.css" type="text/css" media="screen" /-->
+
+<meta property="fb:app_id" content="1793153140974385" />
+				<meta property="og:url" content="https://www.eventiesagre.it/Eventi/elenco.html" />
+				<meta property="og:type" content="article" />
+				<meta property="og:title" content="Eventi in Italia" />
+				<meta property="og:description" content="Scopri gli eventi nella tua Regione, Provincia o Città" /><meta property="og:image" content="https://www.eventiesagre.it/sito/immagini/opengraph.jpg" /><link rel="next" href="https://www.eventiesagre.it/cerca/Eventi/sez/mesi/reg/prov/cit/rilib/pag-1.htm"><link rel="canonical" href="https://www.eventiesagre.it/Eventi/elenco.html">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<meta name="description" content="Elenco Eventi : categoria Eventi | Sagre, Fiere, Feste, Festival, Mostre, Teatri, Mercatini, Enogastronomia, Tempo Libero,  concerti, spettacoli, divisi per mese , cosa fare , dove andare, oggi o nel weekend nella tua regione o città con le date, il programma, la mappa, i contatti e tutte le informazioni per partecipare alle manifestazioni | eventiesagre.it ">
+<meta name="keywords" content="ricerca Eventi, Eventi, Eventi e Sagre">
+<meta name="google-site-verification" content="_FUCkEW8h0b6mJU5HR5F1pRQzT_tfe3PSpJejXcP6vs" />
+
+<!--link rel="stylesheet" media="screen" href="/sito/css/gallery.css" /-->
+<!--link rel="stylesheet" href="/sito/css/jqcloud.css" /-->
+<link rel="stylesheet" href="/sito/fancybox/jquery.fancybox.min.css?v=2.1.5" media="screen" />
+
+<script src="https://code.jquery.com/jquery-2.2.4.js"></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+<!--script src="/sito/javascript/jqcloud-1.0.4.js"></script-->
+<!--script src="/sito/javascript/mdetect.js"></script-->
+<!-- CSS -->
+<link rel="stylesheet" href="//code.jquery.com/ui/1.11.2/themes/smoothness/jquery-ui.css">
+
+<!--link rel="stylesheet" href="/sito/kalendae/kalendae.css"-->
+<!--script src="/sito/kalendae/kalendae.standalone.js"></script-->
+	
+<script src="/sito/javascript/eventiesagre.min.js"></script>
+
+
+	
+	<!-- Google tag (gtag.js) -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-NVMF3JGS03"></script>
+	<script>
+	  window.dataLayer = window.dataLayer || [];
+	  function gtag(){dataLayer.push(arguments);}
+	  gtag('js', new Date());
+
+	  gtag('config', 'G-NVMF3JGS03');
+	</script>
+
+<!--adBlock Detect-->
+<!--script src="/sito/adblock/blockadblock.js"></script-->
+<script>
+function adBlockNotDetected() {
+	//ga('set', 'dimension1', 'AdBlock');
+	gtag('event', 'AdBlock', {'azione': 'Non Attivo'});
+}
+// Function called if AdBlock is detected
+function adBlockDetected() {
+	//ga('set', 'dimension1', 'AdBlock');
+	gtag('event', 'AdBlock', {'azione': 'Attivo'});
+}
+
+// Recommended audit because AdBlock lock the file 'blockadblock.js' 
+// If the file is not called, the variable does not exist 'blockAdBlock'
+// This means that AdBlock is present
+if(typeof blockAdBlock === 'undefined') {
+			adBlockDetected();
+		} else {
+			blockAdBlock.setOption({ debug: true, resetOnEnd: false });
+			blockAdBlock.onDetected(adBlockDetected).onNotDetected(adBlockNotDetected);
+		}
+
+</script>
+
+
+<script>
+
+			function menuApri() {
+				document.getElementById('menu-mobile-apri').style.zIndex="-2000";
+				document.getElementById('menu-mobile-chiudi').style.zIndex="2000";
+			}
+			function menuChiudi() {
+				document.getElementById('menu-mobile-apri').style.zIndex="2000";
+				document.getElementById('menu-mobile-chiudi').style.zIndex="-2000";
+			}			
+			
+$(window).on("load resize",function(e){
+  var menu = $("#Menu-Laerale-Sinistro");
+  var posizione = menu.position();
+  var altezzaMenu =  $('#Menu-Laerale-Sinistro').height();
+  var altezzaPagina = $( window ).height();
+  var altezzaDocumento = $( document ).height();
+  var altezzaPiede = $( '#piede' ).height();
+  var BloccoMenuTop = (posizione.top+altezzaMenu)-altezzaPagina;
+
+  var BannerDX = $("#google-DXeBanner");
+  var posizioneBanner = BannerDX.position();
+  var altezzaBannerDX = $('#google-DXeBanner').height();
+  var BloccoBannerDX = (posizioneBanner.top+altezzaBannerDX)-altezzaPagina;
+  
+  var BloccoBottom = altezzaPiede;
+  
+  var i = 0;
+  var o = 0;
+  
+  //debug
+  //$("#contentBox").html('window '+altezzaPagina+'<br />documento '+altezzaDocumento+'<br />menu '+altezzaMenu+'<br />banner '+altezzaBannerDX);
+               
+$(window).on("load scroll resize",function(e){
+
+  if ($('#contenuto').height()>(posizione.top+$('#Menu-Laerale-Sinistro').height())-$( window ).height()) {
+
+    if ($(window).scrollTop() >= (posizione.top+$('#Menu-Laerale-Sinistro').height())-$( window ).height()) {
+      $('.fissa').css('bottom','0');
+      menu.addClass("fissa");
+    } 
+    
+    if ($(window).scrollTop() >= $( document ).height()-$( window ).height()-$( '#piede' ).height()) {
+      i = $(window).scrollTop()-($( document ).height()-$( window ).height()-$( '#piede' ).height());
+      $('.fissa').css('bottom',i + 'px');
+    }
+    
+    if ($(window).scrollTop() <= (posizione.top+$('#Menu-Laerale-Sinistro').height())-$( window ).height()) {
+       menu.removeClass("fissa");
+    }
+    
+  }
+	  });
+  
+        $('#accedi').hover(
+        function () {
+            $('#tendina', this).stop(true, true).delay(50).slideDown(100);
+ 
+        }, 
+        function () {
+            $('#tendina', this).stop(true, true).slideUp(200);        
+        }
+    );
+	
+		$('#cercaNav').hover(
+		  function () {
+			  $('#tendinaCerca', this).stop(true, true).delay(50).slideDown(100);
+   
+		  }, 
+		  function () {
+			  $('#tendinaCerca', this).stop(true, true).delay(5000).slideUp(200);         
+		  }
+	  );
+
+  
+});
+
+</script>
+
+<script>
+$(document).ready(function() {	
+
+	$(".banner_adsense").each(function() {
+		 var banner = jQuery(this);
+		 var id = $(this).attr('id');
+		 if (MobileEsp.isMobilePhone || MobileEsp.isTierTablet) id=id+"_mobile";
+		 $.post("/adsense/jquery_load_banner.php", {id:id}, function(data){	
+			   banner.html(data);
+		 });
+	});
+	
+	if (MobileEsp.isMobilePhone || MobileEsp.isTierTablet) {
+		$(".banner_adsense_solo_mobile").each(function() {
+			 var banner = jQuery(this);
+			 var id = $(this).attr('id');
+			 $.post("/adsense/jquery_load_banner.php", {id:id}, function(data){	
+				   banner.html(data);
+			 });
+		});
+	}
+	else {
+		$(".banner_adsense_solo_desktop").each(function() {
+			 var banner = jQuery(this);
+			 var id = $(this).attr('id');
+			 $.post("/adsense/jquery_load_banner.php", {id:id}, function(data){	
+				   banner.html(data);
+			 });
+		});
+	}
+	
+});
+
+</script>
+
+<script>
+var dominio = "www.eventiesagre.it";
+/*
+//geolocalizzazione
+if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(position) {
+  
+     var latitudine = position.coords.latitude;
+     var longitudine = position.coords.longitude;
+	 
+	 $.post("/sito/ricerchejquery/jquery_set_lat_lng.php", {latitudine:latitudine, longitudine:longitudine}, function(data){
+				if (data !== "Si") {alert('La geo-localizzazione NON è possibile');} 
+        });
+ 
+    });
+  }
+  else {
+	  alert('La geo-localizzazione NON è possibile');
+  }
+
+	*/
+</script>
+	
+<script>
+$(document).ready(function() {	
+	var stato_mobile = "Italia";
+	var regione_mobile = "reg";
+	var prov_mobile = "prov";
+	var comune_mobile = "cit";
+	var mese_mobile = "mesi";
+	
+		
+	
+		$( "#comune_mobile" ).autocomplete({
+		source: '/sito/ricerchejquery/query_comune_mobile.php',
+		 minLength: 2,
+		 autoFill: true,
+		 mustMatch:true,
+		 delay: 0,//0
+		 cacheLength: 1,
+		 max:30,
+		 //focus: function( event, ui ) {
+					   //$( "#comune_mobile" ).val( ui.item.label );
+						 // return false;
+		 //},
+		 select: function( event, ui ) {
+			 $(this).val(ui.item.label);
+			 stato_mobile = ui.item.stato.replace(/ /gi, "+");
+			 regione_mobile = ui.item.regione.replace(/ /gi, "+");
+			 prov_mobile = ui.item.sigla;
+			 comune_mobile = ui.item.citta.replace(/ /gi, "+");
+		 return false;
+		 }
+		 });
+	
+		$(".toggleMenu2").one('click', function(){   
+		$.post("/sito/ricerchejquery/jquery_select_categorie_eventi.php", {idcategoria:5}, function(data){
+			$("select#cat_mobile").html(data);
+        });
+					$.post("/sito/ricerchejquery/jquery_select_sottocategorie_eventi.php", {idcategoria:5}, function(data){
+				$("select#sez_mobile").html(data);
+			});
+																		   
+		
+     });	
+		
+	$("select#cat_mobile").change(function(){
+		var id = $("select#cat_mobile option:selected").attr('value');     
+		$.post("/sito/ricerchejquery/jquery_select_sottocategorie_eventi.php", {idcategoria:id}, function(data){
+			$("select#sez_mobile").html(data);
+        });
+     });
+	
+	$("#cerca_mobile_button").on('click', function(){
+		var categoria = $("select#cat_mobile option:selected").text().replace(/ /gi, "+");
+		var sezione = $("select#sez_mobile option:selected").text().replace(/ /gi, "+");
+		if (categoria == "Categoria") categoria = "cat";
+		if (sezione == "Sezione") sezione = "sez";
+		if (sezione == "Scegli...") sezione = "sez";
+		var dal = $("input#dal_mobile").val();
+		dal = dal.replace("/", "-");
+		dal = dal.replace("/", "-");
+		var al = $("input#al_mobile").val();
+		al = al.replace("/", "-");
+		al = al.replace("/", "-");
+		var titolo = $("input#titolo_mobile").val().replace(/ /gi, "+");
+		if (titolo == "") titolo = "rilib";
+		
+		if (dal != "" || al != "") {
+			if (dal == "") dal = "dal";
+			if (al == "") al = "al";
+			mese_mobile = dal+"_"+al;
+		}
+		
+		if (stato_mobile != "Italia") pagina = "https://"+dominio+"/cerca/"+categoria+"/"+sezione+"/"+mese_mobile+"/"+stato_mobile+"-"+regione_mobile+"/"+prov_mobile+"/"+escape(comune_mobile)+"/"+escape(titolo);
+		else pagina = "https://"+dominio+"/cerca/"+categoria+"/"+sezione+"/"+mese_mobile+"/"+regione_mobile+"/"+prov_mobile+"/"+escape(comune_mobile)+"/"+escape(titolo);
+		gtag('event', 'Cerca Mobile', {'azione': categoria+"/"+sezione+"/"+mese_mobile+"/"+regione_mobile+"/"+prov_mobile+"/"+escape(comune_mobile)+"/"+escape(titolo)});
+		self.location.href = pagina;
+		
+     });
+	
+	$("#testobarra").change(function(){
+		var testobarra = $("input#testobarra").val();
+		self.location.href = "https://"+dominio+"/cerca/cat/sez/mesi/reg/prov/cit/"+escape(testobarra);
+     });
+	 
+	 $(".meteo").attr("scrolling", "no");
+	 		
+	var src;
+	if (MobileEsp.isMobilePhone) {
+					
+		$( "img" ).each(function(i) {
+  		src = $(this).attr('src').replace(/height=500&width=500/gi, "height=330&width=330");
+		$(this).attr('src', src);
+	 });
+	}
+	
+	if(window.location.hash == "#menu") {
+		  $.get("/sito/ricerchejquery/jquery_select_categorie_eventi.php", function(data){
+			$("select#cat_mobile").html(data);
+			$("select#sez_mobile").prop('selectedIndex',0);
+			$("input#dal_mobile").val("");
+			$("input#al_mobile").val("");
+			$("input#comune_mobile").val("");
+        });
+		}
+	
+});
+</script>
+	
+		<!--
+	<script src="//cdnvideo.notifyon.com/script/js/4e52c9337e01311476d7061561b49f1a.js" async></script> 
+	<script>
+		window._vpt=window._vpt||[];
+		window._vpt.push(['_currentTime',Date.now()]);
+	</script> 
+	-->
+	
+</head>
+
+<body>
+	
+		
+		
+	<div id="embed-49" data-embed-id="49" class="noty-sticky-b"></div>
+	<script>_vpt.push( [ '_embed' , { action: 'show', id: '49', type: 'sticky' , width: '360'} ] ); </script>  
+
+		
+	
+	
+<div id="fb-root" class="displayStampaNone"></div>
+<script>
+  window.fbAsyncInit = function() {
+    FB.init({
+      appId      : '1793153140974385',
+      xfbml      : true,
+      version    : 'v2.10'
+    });
+  
+    FB.AppEvents.logPageView();
+  };
+
+  (function(d, s, id){
+     var js, fjs = d.getElementsByTagName(s)[0];
+     if (d.getElementById(id)) {return;}
+     js = d.createElement(s); js.id = id;
+     js.src = "https://connect.facebook.net/it_IT/sdk.js";
+     fjs.parentNode.insertBefore(js, fjs);
+   }(document, 'script', 'facebook-jssdk'));
+</script>
+
+<script>
+			var word_list = [
+				{text: "Pasqua 2024", weight: 2},
+				{text: " Pasqua", weight: 4},
+				{text: " eventi di Pasqua", weight: 1},
+				{text: " eventi oggi Milano", weight: 0},
+				{text: " eventi Roma", weight: 3},
+				{text: " eventi Torino", weight: 1},
+				{text: " mercatini", weight: 1},
+				{text: " mercatini usato", weight: 1},
+				{text: " eventi di primavera", weight: -3},
+				{text: " cosa fare oggi", weight: 1},
+				{text: " oggi italia", weight: 2},
+				{text: " eventi e sagre", weight: 0},
+				{text: " eventi lombardia", weight: 0},
+				{text: " fiere Milano", weight: 1},
+				{text: " sagre e eventi", weight: 0},
+				{text: " eventi bologna", weight: 0},
+				{text: " eventi padova", weight: 1},
+				{text: " eventi piacenza", weight: -1},
+				{text: " eventi rimini", weight: 1},
+				{text: " feste rimini", weight: 2},
+				{text: " feste e sagre", weight: 1},
+				{text: " eventi fiera", weight: 2},
+				{text: " fiere e mostre", weight: 1},
+				{text: " eventi week end", weight: 1},
+				{text: " feste toscana", weight: 1},
+				{text: " feste lombardia", weight: 1},
+				{text: " feste lazio", weight: 3},
+				{text: " feste fvg", weight: 5},
+				{text: " feste piemonte", weight: 1},
+				{text: " feste sicilia", weight: 1},
+				{text: " feste marche", weight: 1},
+				{text: " feste emilia romagna", weight: -2},
+				{text: " fiere in emilia", weight: 1},
+				{text: " fiere abruzzo", weight: 1},
+				{text: " eventi roma oggi", weight: -1},
+				{text: " eventi milano oggi", weight: 0},
+				{text: " feste in paese ", weight: 0},
+				{text: " feste italia", weight: 2},
+				{text: " mercatini fiere oggi", weight: -1},
+				{text: " eventi Reggio Emilia", weight: -3},
+				{text: " eventi Modena", weight: 1},
+				{text: " sagre roma", weight: 1},
+				{text: " sagre reggio emilia", weight: 0},
+				{text: " sagre abruzzo", weight: 1}
+					]; 
+					$(function() {
+					$(".tag").jQCloud(word_list, {autoResize: true});
+				  });
+				  </script>
+<div id="sito">
+
+<div id="Menu-Fisso-Top" class="displayStampaNone">
+	<div id="endy"><a href="https://www.eventiesagre.it" title="Eventi e Sagre Home Page"><img src="/sito/immagini/endy.png" alt="Eventi e Sagre in Italia"/></a></div>
+	
+	<a class="toggleMenu" href="#">Menu</a>
+	<a class="toggleMenu2" href="#">Cerca</a>
+        
+	<div id="social">
+		<div id="menucerca" style="float:left;" class="NoMobile">
+        <input type="text" name="testobarra" id="testobarra" placeholder="Cerca sul sito"></div>
+        <!--
+        <div id="navCerca">
+    <div id="cercaNav">
+        <img src="/sito/immagini/cerca.png" style="float:left;" alt="accedi" />
+        <a href="#" onclick="menuChiudi()" style="float:left;" class="NoMobile">Cerca</a>
+        <div class="clear"></div>
+        <div id="tendinaCerca">
+                
+            <div class="clear"></div>
+        </div>
+        <div class="clear"></div>
+    </div>
+</div>-->
+
+        
+		<!--<a href="https://www.eventiesagre.it/elenco.html" title="cerca"><img src="/sito/immagini/cerca.png" style="float:left;" alt="cerca" /></a>    
+        
+		<img src="/sito/immagini/twitter.png" style="float:left;" alt="twitter" />
+		<a href="https://www.facebook.com/eventiesagre?fref=ts" title="facebook" target="_blank" rel="nofollow"><img src="/sito/immagini/facebook.png" style="float:left;" alt="facebook" /></a>
+		<a href="https://plus.google.com/117826157431770925593" title="google+" target="_blank" rel="nofollow"><img src="/sito/immagini/googlePlus.png" style="float:left;" alt="google+" /></a>
+		<a href="https://www.eventiesagre.it/carrello.html" title="e-commerce eventiesagre.it" rel="nofollow"><img src="/sito/immagini/icona_carrello.png" style="float:left;" alt="e-commerce eventiesagre" /></a>-->
+		<!--<a href="https://www.eventiesagre.it/rss.html" title="Crea il tuo RSS"><img src="/sito/immagini/rss.png" style="float:left;" alt="rss" /></a>
+		<img src="/sito/immagini/separatore.png" style="float:left;" alt="separatore" />-->
+        
+        <div id="nav">
+            <div id="accedi">
+               <img src="/sito/immagini/accedi.png" style="float:left;" alt="accedi" />
+                <a href="#" onclick="menuChiudi()" style="float:left;" class="NoMobile" title="menu">
+                Accedi                </a>
+                <div class="clear"></div>
+                <div id="tendina">
+                
+                	
+							<form action="https://www.eventiesagre.it/Eventi/elenco.html" method="post">
+							<div>Utente: <input type="text" name="email" value="Email"></div>
+							<div>Password: <input type="password" name="pass" value="Password"></div>
+							<div><img src="/sito/captcha.php" alt="captcha"><input type="text" name="captcha"></div>
+							<input type="hidden" value="login" name="log"/>
+							<div><input type="submit" name="accedi" value="Accedi"></div>
+							<div><a href="https://www.eventiesagre.it/registrazione.html" style="float:right;" title="registrati">Registrati</a></div>
+							</form>                
+                    <div class="clear"></div>
+                </div>
+                <div class="clear"></div>
+            </div>
+        </div>
+        
+        
+        
+	</div>
+</div>
+<div id="sfondo-endy" class="NoDesk displayStampaNone" ><img src="/sito/immagini/sfondo-endy.png" alt="sfondo endy" /></div>
+<div class="dist displayStampaNone"></div>
+<div id="header-rot">
+
+<img src="/datiamministrazione/imgtestata/07-TOP_LUGLIO_x_MOBILE.jpg" alt="Luglio 2026"/>	<div id="eventiesagre"><img src="/sito/immagini/eventiesagre.png" alt="eventiesagre.it" title="eventiesagre.it" /></div>
+    <div id="eventiesagrelabel" class="NoMobile"><span>Luglio 2026</span></div>
+    <!--<div id="sottoTop"></div>-->
+    <h1 class ="titoloh1">Eventi in Italia</h1>    <div id="bussola" class="displayStampaNone"></div>
+</div>
+
+<div id="corpo">
+	
+	<ul class="nav" style="display: none;">
+                    
+        	</ul>
+	<div class="nav2" style="display: none">
+				</div>
+	
+	
+    <div id="Menu-Laerale-Sinistro" class="NoMobile displayStampaNone">
+        <ul>
+        
+        <li class="cat"><a href="https://www.eventiesagre.it/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Cerca Eventi'});"  title="Cerca Eventi"><div><b>Cerca Eventi</b></div></a></li><li class="evi"><a href="https://www.eventiesagre.it/Eventi_Sagre/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Sagre'});"  title="Sagre"><div><b>Sagre</b></div></a></li><li class="cat"><a href="https://www.eventiesagre.it/Eventi/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi'});"  title="Eventi"><div><b>Eventi</b></div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Sagre/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Sagre'});"  title="Sagre"><div>Sagre</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Feste/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Feste'});"  title="Feste"><div>Feste</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Folklore/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Folklore'});"  title="Folklore"><div>Folklore</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Enogastronomici/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Enogastronomici'});"  title="Enogastronomici"><div>Enogastronomici</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_EnoMusicali/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - EnoMusicali'});"  title="EnoMusicali"><div>EnoMusicali</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Festival/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Festival'});"  title="Festival"><div>Festival</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Fiere/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Fiere'});"  title="Fiere"><div>Fiere</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Storici/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Storici'});"  title="Storici"><div>Storici</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Halloween/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Halloween'});"  title="Halloween"><div>Halloween</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Raduni/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Raduni'});"  title="Raduni"><div>Raduni</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Culturali/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Culturali'});"  title="Culturali"><div>Culturali</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Musicali/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Musicali'});"  title="Musicali"><div>Musicali</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Spettacolo/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Spettacolo'});"  title="Spettacolo"><div>Spettacolo</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Cinema/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Cinema'});"  title="Cinema"><div>Cinema</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Cena+Spettacolo/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Cena Spettacolo'});"  title="Cena Spettacolo"><div>Cena Spettacolo</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Mostre/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Mostre'});"  title="Mostre"><div>Mostre</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_San+Valentino/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - San Valentino'});"  title="San Valentino"><div>San Valentino</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_8+Marzo/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - 8 Marzo'});"  title="8 Marzo"><div>8 Marzo</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Corsi/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Corsi'});"  title="Corsi"><div>Corsi</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Mostra+Mercato/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Mostra Mercato'});"  title="Mostra Mercato"><div>Mostra Mercato</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Sportivi/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Sportivi'});"  title="Sportivi"><div>Sportivi</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Religiosi/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Religiosi'});"  title="Religiosi"><div>Religiosi</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Beneficenza/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Beneficenza'});"  title="Beneficenza"><div>Beneficenza</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Annunci/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Annunci'});"  title="Annunci"><div>Annunci</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Vari/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Vari'});"  title="Vari"><div>Vari</div></a></li><li class="sez"><a href="https://www.eventiesagre.it/Eventi_Fantasy/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi - Fantasy'});"  title="Fantasy"><div>Fantasy</div></a></li><li class="evi"><a href="https://www.eventiesagre.it/cerca/cat/sez/mese_Oggi/reg/prov/cit/rilib" onclick="gtag('event', 'Menu Verticale', {'azione':  'Eventi Oggi'});" title="Eventi Oggi"><div><b>Eventi Oggi</b></div></a></li><li class="cat"><a href="https://www.eventiesagre.it/Mercatini/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Mercatini'});"  title="Mercatini"><div><b>Mercatini</b></div></a></li><li class="cat"><a href="https://www.eventiesagre.it/Fiere/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Fiere'});"  title="Fiere"><div><b>Fiere</b></div></a></li><li class="cat"><a href="https://www.eventiesagre.it/Da+Visitare/elenco.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Da Visitare'});"  title="Da Visitare"><div><b>Da Visitare</b></div></a></li><li class="evi2"><a href="https://www.eventiesagre.it/carrello.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Pubblicità Eventi'});" title="Pubblicità Eventi"><div><b>Pubblicità Eventi</b></div></a></li><li class="cat"><a href="https://www.eventiesagre.it/citta_Comuni/Informazioni+su+citta+Italiane.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Comuni Italiani'});" title="Comuni Italiani"><div><b>Comuni Italiani</b></div></a></li><li class="cat titolo"><div><b>Utility</b></div></li><li class="evi2"><a href="https://www.eventiesagre.it/pubblica.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Pubblica Gratis'});" title="Pubblica Gratis"><div><b>Pubblica Gratis</b></div></a></li>     
+        </ul>
+        
+        <div class="link120x90"><!--<div class="banner_adsense_solo_desktop" id="Link120x90Gen"></div>--></div>
+        <!--
+        <div id="videoSx">
+            <div class="videoSx"><img src="img/video/video-sx-1.png" alt="video-sx-1"/></div>
+            <div class="videoSx"><img src="img/video/video-sx-2.png" alt="video-sx-2"/></div>
+            <div class="videoSx"><img src="img/video/video-sx-3.png" alt="video-sx-3"/></div>
+        </div>
+        -->
+        <!--<div class="tag" style="width: 120px; height: 300px;">
+        
+        </div>-->
+        <div id="RSS-SX">
+			<!--
+        	<div class="RSS-SX"><a href="https://www.eventiesagre.it/registrazione.html" onclick="ga('send', 'event', 'Menu Verticale', 'Registrati');" title="Registrati"><img src="/sito/immagini/REGISTRATI_120x92.jpg" alt="Registrati"/></a></div> -->
+            <div class="RSS-SX"><a href="https://www.eventiesagre.it/newsletter.html" onclick="gtag('event', 'Menu Verticale', {'azione':  'Iscriviti alla newsletter'});" title="Iscriviti alla newsletter"><img src="/sito/immagini/icona_newsletter.jpg" alt="Iscriviti alla newsletter"/></a></div>
+			<!--
+            <div class="RSS-SX"><a href="https://www.eventiesagre.it/carrello.html" onclick="ga('send', 'event', 'Menu Verticale', 'ecommerce');" title="e-commerce eventiesagre.it"><img src="/sito/immagini/icona_servizi.png" alt="e-commerce eventiesagre.it"/></a></div>-->
+            <!--<div class="RSS-SX"><a href="https://www.eventiesagre.it/rss.html" title="Crea il tuo RSS"><img src="/sito/immagini/icona_rss.jpg" alt="Crea il tuo RSS"/></a></div>-->
+        </div>
+        
+        <div id="SocialSX">            
+            <div class="SocialSX"><div class="fb-like" data-href="https://www.facebook.com/eventiesagre?fref=ts" data-layout="box_count" data-action="like" data-show-faces="true" data-share="false"></div></div>
+        </div>
+                
+        
+    </div>
+	
+<style>
+	.risultatoEvento .titolo {
+		font-size: 15px;
+	}
+	.risultatoEvento .testo {
+		font-size: 12px;
+	}
+	#header-rot {
+	height: 155px;
+	}
+	
+</style><script type="text/javascript" src="/sito/fancybox/jquery.fancybox.js?v=2.1.5"></script>
+<script>
+
+$.fn.is_on_screen = function(){
+    var win = $(window);
+    var viewport = {
+        top : win.scrollTop(),
+        left : win.scrollLeft()
+    };
+    viewport.right = viewport.left + win.width();
+    viewport.bottom = viewport.top + win.height();
+ 
+    var bounds = this.offset();
+    bounds.right = bounds.left + this.outerWidth();
+    bounds.bottom = bounds.top + this.outerHeight();
+ 
+    return (!(viewport.right < bounds.left || viewport.left > bounds.right || viewport.bottom < bounds.top || viewport.top > bounds.bottom));
+};
+var counter1 = 0;
+var counter2 = 0;
+var counter3 = 0;
+$(window).scroll(function(){
+		if( $('.scroll1').is_on_screen() && counter1 == 0 ) {
+			gtag('event', 'Elenco Scroll 1', {'azione': 'Impression'});
+			counter1++;
+		}
+		
+		if( $('.scroll2').is_on_screen() && counter2 == 0 ) {
+			gtag('event', 'Elenco Scroll 2', {'azione': 'Impression'});
+			counter2++;
+		}
+		
+		if( $('.scroll3').is_on_screen() && counter3 == 0 ) {
+			gtag('event', 'Elenco Scroll 3', {'azione': 'Impression'});
+			counter3++;
+		} 
+});
+
+$(document).ready(function() {
+	
+	function ricarica() {
+		var pagina;
+		var categoria = $("select#categoria option:selected").attr('value').replace(/ /gi, "+");
+		var sezione = $("select#sezione option:selected").attr('value').replace(/ /gi, "+");
+		var stato = $("select#stato option:selected").attr('value').replace(/ /gi, "+");
+		var regione = $("select#regione option:selected").attr('value').replace(/ /gi, "+");
+		var provincia = $("select#provincia option:selected").attr('value');
+		var comune = $("select#comune option:selected").attr('value').replace(/ /gi, "+");
+		var mese = $("select#mese option:selected").attr('value');
+		var dal = $("input#dal").val();
+		dal = dal.replace("/", "-");
+		dal = dal.replace("/", "-");
+		var al = $("input#al").val();
+		al = al.replace("/", "-");
+		al = al.replace("/", "-");
+		var ricerca = $("input#ricerca").val().replace(/ /gi, "+");
+		if (ricerca == "") ricerca = "rilib";
+		if ($("input#oggi").is(':checked')) mese = "mese_Oggi";
+		if ($("input#domani").is(':checked')) mese = "domani";
+		
+		if (dal != "" || al != "") {
+			if (dal == "") dal = "dal";
+			if (al == "") al = "al";
+			mese = dal+"_"+al;
+		}
+		if (stato != "Italia") pagina = "https://"+dominio+"/cerca/"+categoria+"/"+sezione+"/"+mese+"/"+stato+"-"+regione+"/"+provincia+"/"+comune+"/"+escape(ricerca);
+		else pagina = "https://"+dominio+"/cerca/"+categoria+"/"+sezione+"/"+mese+"/"+regione+"/"+provincia+"/"+comune+"/"+escape(ricerca);
+		gtag('event', 'Cerca', {'azione': categoria+' - '+sezione});
+		self.location.href = pagina;
+	}
+	
+	function ricarica2(numpage) {
+		var pagina;
+		var categoria = $("select#categoria option:selected").attr('value').replace(/ /gi, "+");
+		var sezione = $("select#sezione option:selected").attr('value').replace(/ /gi, "+");
+		var stato = $("select#stato option:selected").attr('value').replace(/ /gi, "+");
+		var regione = $("select#regione option:selected").attr('value').replace(/ /gi, "+");
+		var provincia = $("select#provincia option:selected").attr('value');
+		var comune = $("select#comune option:selected").attr('value').replace(/ /gi, "+");
+		var mese = $("select#mese option:selected").attr('value');
+		var dal = $("input#dal").val();
+		dal = dal.replace("/", "-");
+		dal = dal.replace("/", "-");
+		var al = $("input#al").val();
+		al = al.replace("/", "-");
+		al = al.replace("/", "-");
+		var ricerca = $("input#ricerca").val().replace(/ /gi, "+");
+		if (ricerca == "") ricerca = "rilib";
+		if ($("input#oggi").is(':checked')) mese = "mese_Oggi";
+		if ($("input#domani").is(':checked')) mese = "domani";
+		
+		if (dal != "" || al != "") {
+			if (dal == "") dal = "dal";
+			if (al == "") al = "al";
+			mese = dal+"_"+al;
+		}
+		if (stato != "Italia") pagina = "https://"+dominio+"/cerca/"+categoria+"/"+sezione+"/"+mese+"/"+stato+"-"+regione+"/"+provincia+"/"+escape(comune)+"/"+escape(ricerca)+"/pag-"+numpage+".htm";
+		else pagina = "https://"+dominio+"/cerca/"+categoria+"/"+sezione+"/"+mese+"/"+regione+"/"+provincia+"/"+escape(comune)+"/"+escape(ricerca)+"/pag-"+numpage+".htm";
+		gtag('event', 'Cerca', {'azione': categoria+' - '+sezione});
+		self.location.href = pagina;
+	}
+	
+	$("select#categoria").change(function(){
+		$("select#sezione").prop('selectedIndex',0);
+		//$( "#form_cerca" ).submit();
+		ricarica();
+     });
+	 
+	 $("select#sezione").change(function(){
+		//$( "#form_cerca" ).submit();
+		ricarica();
+     });
+	 
+	 $("select#stato").change(function(){
+		 $("select#regione").prop('selectedIndex',0);
+		 $("select#provincia").prop('selectedIndex',0);
+		 $("select#comune").prop('selectedIndex',0);
+		//$( "#form_cerca" ).submit();
+		ricarica();
+     });
+	 
+	 $("select#regione").change(function(){
+		 $("select#provincia").prop('selectedIndex',0);
+		 $("select#comune").prop('selectedIndex',0);
+		//$( "#form_cerca" ).submit();
+		ricarica();
+     });
+	 
+	 $("select#provincia").change(function(){
+		 $("select#comune").prop('selectedIndex',0);
+		//$( "#form_cerca" ).submit();
+		ricarica();
+     });
+	 
+	 $("select#comune").change(function(){
+		//$( "#form_cerca" ).submit();
+		ricarica();
+     });
+	
+	$("#oggi").on('click', function(){
+		$("input#dal").attr("value","");
+		$("input#al").attr("value","");
+		$("#domani").removeAttr('checked');
+		$("select#mese").prop('selectedIndex',0);
+		//$( "#form_cerca" ).submit();
+		ricarica();
+     });
+	
+	$("#domani").on('click', function(){
+		$("input#dal").attr("value","");
+		$("input#al").attr("value","");
+		$("#oggi").removeAttr('checked');
+		$("select#mese").prop('selectedIndex',0);
+		//$( "#form_cerca" ).submit();
+		ricarica();
+     });
+	 
+	 $("select#mese").change(function(){
+		$("input#dal").attr("value","");
+		$("input#al").attr("value","");
+		$("#oggi").removeAttr('checked');
+		$("#domani").removeAttr('checked');
+		//$( "#form_cerca" ).submit();
+		ricarica();
+     });
+	 
+	 $("#dal").change(function(){
+		 $("#oggi").removeAttr('checked');
+		 $("#domani").removeAttr('checked');
+		 $("select#mese").prop('selectedIndex',0);
+		//$( "#form_cerca" ).submit();
+		ricarica();
+     });
+	 
+	 $("#al").change(function(){
+		 $("#oggi").removeAttr('checked');
+		 $("#domani").removeAttr('checked');
+		 $("select#mese").prop('selectedIndex',0);
+		//$( "#form_cerca" ).submit();
+		ricarica();
+     });
+	 
+	 $("#ricerca").change(function(){
+		//$( "#form_cerca" ).submit();
+		ricarica();
+     });
+	 
+	 $("#reset1").on('click', function(){
+		 $("select#categoria").prop('selectedIndex',0);
+		 $("select#sezione").prop('selectedIndex',0);
+		 $("select#stato").prop('selectedIndex',0);
+		 $("select#regione").prop('selectedIndex',0);
+		 $("select#provincia").prop('selectedIndex',0);
+		 $("select#comune").prop('selectedIndex',0);
+		 $("input#dal").attr("value","");
+		$("input#al").attr("value","");
+		$("select#mese").prop('selectedIndex',0);
+		$("#oggi").removeAttr('checked');
+		$("input#ricerca").val("");
+		ricarica();
+	 });
+	 
+	 $("#cerca1").on('click', function(){
+		 ricarica();
+	 });
+	 
+	 $(".paginaAvanti").on('click', function(){
+		 var stringa1 =  $(this).attr("data-id").split("-");
+		ricarica2(stringa1[0], stringa1[2], stringa1[1], stringa1[3]);
+	 });
+	 
+	 $( ".altri_comuni" ).each(function(i) {
+  		var id = $(this).attr('id');
+		var url = $(this).html();
+		$.post("/sito/ricerchejquery/jquery_mostra_comuni_elenco.php", {id:id, url:url}, function(data){
+				var dati = jQuery.parseJSON(data);
+				$('span[data-span="span-'+id+'"]').html(dati.collegamento);
+				$('#'+id).html(dati.output);
+        });
+	 });
+	 
+	 $(".altri_comuni_link").fancybox();
+	 
+});
+
+
+// chiude ready.function
+</script>
+
+<div id="contenitoreDestro">
+  <div id="banner-336x280">
+      <!-- parte da sostiutire con codice AdSense -->
+       <!--div class="banner_adsense" id="Cerca_Top_SX_336x280"-->
+       <div>
+       <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7203102911977931"
+     crossorigin="anonymous"></script>
+<!-- 336x280_Cerca_Top_SX -->
+<ins class="adsbygoogle"
+     style="display:block"
+     data-ad-client="ca-pub-7203102911977931"
+     data-ad-slot="6631124401"
+     data-ad-format="auto"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>        <!--<div class="banner_adsense" id="336x280_valica_cerca"></div>-->
+       </div>
+      <!-- fine parte da sostiutire con codice AdSense -->
+  </div>
+  <div id="cerca" class="NoMobile">
+  	<div id="cercaSX">
+
+	
+	<div style="float:left;height:37px;">Categoria</div>
+	<div><select name="cat" id="categoria" style="float:right;">
+	  <option value="cat">Categoria</option><option value="Eventi" selected="selected">Eventi</option><option value="Fiere">Fiere</option><option value="Teatro">Teatro</option><option value="Mercatini">Mercatini</option><option value="Natale">Natale</option><option value="Presepi">Presepi</option><option value="Capodanno">Capodanno</option><option value="Carnevale">Carnevale</option><option value="Pasqua">Pasqua</option><option value="Itinerari">Itinerari</option><option value="Da Visitare">Da Visitare</option><option value="Ricette">Ricette</option><option value="Artisti">Artisti</option><option value="Promo e Sconti">Promo e Sconti</option><option value="Viaggi e Vacanze">Viaggi e Vacanze</option><option value="Siti Utili">Siti Utili</option></select></div><div class="clear"></div><div style="float:left;height:37px;">Sezione</div>
+  	<div><select name="sez" id="sezione" style="float:right;">
+		<option value="sez">Sezione</option><option value="Sagre">Sagre</option><option value="Feste">Feste</option><option value="Folklore">Folklore</option><option value="Enogastronomici">Enogastronomici</option><option value="EnoMusicali">EnoMusicali</option><option value="Festival">Festival</option><option value="Fiere">Fiere</option><option value="Storici">Storici</option><option value="Halloween">Halloween</option><option value="Raduni">Raduni</option><option value="Culturali">Culturali</option><option value="Musicali">Musicali</option><option value="Spettacolo">Spettacolo</option><option value="Cinema">Cinema</option><option value="Cena Spettacolo">Cena Spettacolo</option><option value="Mostre">Mostre</option><option value="San Valentino">San Valentino</option><option value="8 Marzo">8 Marzo</option><option value="Corsi">Corsi</option><option value="Mostra Mercato">Mostra Mercato</option><option value="Sportivi">Sportivi</option><option value="Religiosi">Religiosi</option><option value="Beneficenza">Beneficenza</option><option value="Annunci">Annunci</option><option value="Vari">Vari</option><option value="Fantasy">Fantasy</option></select></div><div class="clear"></div>
+	<div style="float:left;height:37px;">Nazione</div>
+	<div><select name="stato" id="stato" style="float:right;"><option value="Italia" selected="selected">Italia</option><option value="Repubblica Di San Marino">Repubblica Di San Marino</option><option value="Spagna">Spagna</option></select></div><div class="clear"></div>
+	<div style="float:left;height:37px;">Regione</div>
+	<div><select name="regione" id="regione" style="float:right;">
+		<option value="reg">Regione</option><option value="Abruzzo">Abruzzo</option><option value="Basilicata">Basilicata</option><option value="Calabria">Calabria</option><option value="Campania">Campania</option><option value="Emilia Romagna">Emilia Romagna</option><option value="Friuli Venezia Giulia">Friuli Venezia Giulia</option><option value="Lazio">Lazio</option><option value="Liguria">Liguria</option><option value="Lombardia">Lombardia</option><option value="Marche">Marche</option><option value="Molise">Molise</option><option value="Piemonte">Piemonte</option><option value="Puglia">Puglia</option><option value="Sardegna">Sardegna</option><option value="Sicilia">Sicilia</option><option value="Toscana">Toscana</option><option value="Trentino Alto Adige">Trentino Alto Adige</option><option value="Umbria">Umbria</option><option value="Valle D'aosta">Valle D'aosta</option><option value="Veneto">Veneto</option></select></div><div class="clear"></div>
+	<div style="float:left;height:37px;">Provincia</div>
+	<div><select name="provincia" id="provincia" style="float:right;">
+		<option value="prov">Provincia</option></select></div><div class="clear"></div>
+	<div style="float:left;height:37px;">Comune</div>
+	<div><select name="comune" id="comune" style="float:right;">
+		<option value="cit">Citt&agrave;</option></select></div><div class="clear"></div>        <hr style="width:100%;margin-top:7px;" />
+        <!--div>
+        <form action="https://www.eventiesagre.it/cerca_sul_web.html">
+            <input type="hidden" name="cx" value="partner-pub-7203102911977931:3486123607" />
+            <input type="hidden" name="cof" value="FORID:10" />
+            <input type="hidden" name="ie" value="UTF-8" />
+            <input type="text" name="q" class="campoLungo" placeholder="Cerca su eventiesagre con GOOGLE">
+        </form>
+        </div-->
+    </div>
+	<div id="cercaDX">
+    
+<div style="float:left;width:100px;height:37px;"><input type="checkbox" class="checkbox" name="oggi" id="oggi" value="Si"/> Oggi</div>
+	<div style="float:left;width:100px;height:37px;"><input type="checkbox" class="checkbox" name="domani" id="domani" value="Si"/> Domani</div><div class="clear"></div><div style="float:left;height:37px;">Mese</div>
+	 <div><select name="mese" id="mese" style="float:right;">
+		<option value="mesi">Mese</option><option value="Gennaio">Gennaio</option><option value="Febbraio">Febbraio</option><option value="Marzo">Marzo</option><option value="Aprile">Aprile</option><option value="Maggio">Maggio</option><option value="Giugno">Giugno</option><option value="Luglio">Luglio</option><option value="Agosto">Agosto</option><option value="Settembre">Settembre</option><option value="Ottobre">Ottobre</option><option value="Novembre">Novembre</option><option value="Dicembre">Dicembre</option></select></div><div class="clear"></div><div style="float:left;width:116px;height:37px;">Dal <input type="text" class="data" id="dal" name="dal" value="" readonly></div>
+		 <script type="text/javascript">
+			var k3 = new Kalendae.Input('dal', {
+			months:2,
+			mode:'single',
+			format: 'DD/MM/YYYY'
+			});
+		 </script><div style="float:left;width:94px;">Al <input type="text" class="data" id="al" name="al" value="" readonly></div>
+		 <script type="text/javascript">
+			var k3 = new Kalendae.Input('al', {
+			months:2,
+			mode:'single',
+			format: 'DD/MM/YYYY'
+			});
+		 </script><div class="clear"></div>
+	<div style="float:left;height:37px;">&nbsp;</div>
+	<div>&nbsp;</div>
+	<div class="clear"></div>
+	<div style="float:left;height:37px;">Ricerca</div>
+	<div><input type="text" style="float:right;" id="ricerca" name="ricerca" value=""></div><div class="clear"></div><div class="cercaTasti"><a href="javascript:void(0);" id="cerca1" style="float:right;">Cerca</a></div>
+<div class="cercaTasti"><a href="javascript:void(0);" id="reset1" style="float:right;margin-right:10px;">Reset</a></div>
+<div class="clear"></div>
+          <hr style="width:100%;margin-top:10px;" />
+          <!--<div><input type="text" name="cercaAltro" class="campoLungo"  placeholder="Cerca localit&aacute;, enti o artisti"></div>-->
+      </div>
+      <div class="clear"></div>
+	</div>
+	<div class="clear"></div>
+<div id="contenuto" style="width:724px;" >
+	<div class="eventiSponsor">
+    	<div class="titolo sfondoGiallo spacer5 rientro25">Eventi in Evidenza</div>
+        	
+<div class="risultatoEvento">
+			<a href="https://www.eventiesagre.it/Eventi_Enogastronomici/21100653_Borgo+diVino+in+tour+a+Lovere.html" title="Borgo diVino in tour a Lovere, Vino, Cibo E Musica Si Incontrano Nei Borghi Più Belli - Lovere (BG)">
+				<div class="SX" style="width:12%"><img src="/eventi/21100653/thumb/lovere_eventi_e_sagre.png" alt="Borgo diVino in tour a Lovere, Vino, Cibo E Musica Si Incontrano Nei Borghi Più Belli - Lovere (BG)" class="immagineArticolo"></div>
+				<div class="DX" style="width:74%">
+						<div class="testo">
+							
+							<h3 class="titolo">Borgo diVino in tour a Lovere</h3>
+							<h3 class="grassetto corsivo testo">Vino, Cibo E Musica Si Incontrano Nei Borghi Più Belli</h3><div><b>Dal</b> 24/07/2026 <b>Al</b> 26/07/2026</div><span class="grassetto">Lombardia</span>
+									<span class="corsivo">Lovere (BG)</span><span class="grassetto" data-span="span-21100653"></span>
+							<div class="altri_comuni" id="21100653" style="width:300px; display:none;">https://www.eventiesagre.it/Eventi_Enogastronomici/21100653_Borgo+diVino+in+tour+a+Lovere.html</div><br />
+								&nbsp;Borgo diVino in tour a Lovere (BG): 24, 25 e 26 luglio 2026. Vino, cibo e musica si incontrano nei Borghi pi&ugrave; belli d&rsquo;Italia
+
+Il fine settimana del 24, 25 e 26 luglio Lovere ospit...<span class="grassetto" style="color:#3871c2; font-size:14px">[segue]</span>	
+						</div>
+				</div>
+			</a>
+		</div>  
+		<div class="spacer5"></div><div class="risultatoEvento">
+			<a href="https://www.eventiesagre.it/Eventi_Sagre/21023557_Sagra+Del+Maialino+alla+Brace+Treia.html" title="Sagra Del Maialino alla Brace - Treia, 38ima Edizione - 2026 - Treia (MC)">
+				<div class="SX" style="width:12%"><img src="/eventi/21023557/thumb/Sagra_Del_Maialino_alla_Brace_-_Treia.jpg" alt="Sagra Del Maialino alla Brace - Treia, 38ima Edizione - 2026 - Treia (MC)" class="immagineArticolo"></div>
+				<div class="DX" style="width:74%">
+						<div class="testo">
+							
+							<h3 class="titolo">Sagra Del Maialino alla Brace - Treia</h3>
+							<h3 class="grassetto corsivo testo">38ima Edizione - 2026</h3><div><b>Dal</b> 16/07/2026 <b>Al</b> 19/07/2026</div><span class="grassetto">Marche</span>
+									<span class="corsivo">Treia (MC)</span><span class="grassetto" data-span="span-21023557"></span>
+							<div class="altri_comuni" id="21023557" style="width:300px; display:none;">https://www.eventiesagre.it/Eventi_Sagre/21023557_Sagra+Del+Maialino+alla+Brace+Treia.html</div><br />
+								Camporota in Festa con il Maialino alla Brace.
+
+Dal 16&nbsp;AL 19 LUGLIO 2026, UN RICCO PROGRAMMA DI EVENTI RELIGIOSI E CIVILI
+
+A Camporota di Treia si rinnovano le tradizioni della nostra terra, ...<span class="grassetto" style="color:#3871c2; font-size:14px">[segue]</span>	
+						</div>
+				</div>
+			</a>
+		</div>  
+		<div class="spacer5"></div><div class="risultatoEvento">
+			<a href="https://www.eventiesagre.it/Eventi_Vari/21147586_Calendario+Mensile+Eventi+E+Sagre+Per+Regioni+Italiane.html" title="Calendario Mensile Eventi E Sagre Per Regioni Italiane, Tutti Gli Eventi In Italia Durante Il Corrente Anno -  ()">
+				<div class="SX" style="width:12%"><img src="/eventi/21147586/thumb/CERCA_Eventi_x_Regione_22.jpg" alt="Calendario Mensile Eventi E Sagre Per Regioni Italiane, Tutti Gli Eventi In Italia Durante Il Corrente Anno -  ()" class="immagineArticolo"></div>
+				<div class="DX" style="width:74%">
+						<div class="testo">
+							
+							<h3 class="titolo">Calendario Mensile Eventi E Sagre Per Regioni Italiane</h3>
+							<h3 class="grassetto corsivo testo">Tutti Gli Eventi In Italia Durante Il Corrente Anno</h3><div><b>Dal</b> 01/01/2026 <b>Al</b> 31/12/2026</div><span class="grassetto" data-span="span-21147586"></span>
+							<div class="altri_comuni" id="21147586" style="width:300px; display:none;">https://www.eventiesagre.it/Eventi_Vari/21147586_Calendario+Mensile+Eventi+E+Sagre+Per+Regioni+Italiane.html</div><br />
+								Calendario Eventi e Sagre Regioni d&#39;Italia&nbsp;mese per mese:
+
+Cosa fare oggi, questa sera o questo weekend nelle Regioni Italiane, date e programmi di tutti gli Eventi dell&#39;anno in corso....<span class="grassetto" style="color:#3871c2; font-size:14px">[segue]</span>	
+						</div>
+				</div>
+			</a>
+		</div>  
+		<div class="spacer5"></div><div class="risultatoEvento">
+			<a href="https://www.eventiesagre.it/Eventi_Sagre/21104872_Sagra+Del+Cinghiale+E+Del+Tortello+a+Ronta+di+Borgo+San+Lorenzo.html" title="Sagra Del Cinghiale E Del Tortello a Ronta di Borgo San Lorenzo, Specialita' Carne Alla Brace  - Borgo San Lorenzo (FI)">
+				<div class="SX" style="width:12%"><img src="/eventi/21104872/thumb/ronta728215903_1326360629699980_8222983627430168524_n.jpg" alt="Sagra Del Cinghiale E Del Tortello a Ronta di Borgo San Lorenzo, Specialita' Carne Alla Brace  - Borgo San Lorenzo (FI)" class="immagineArticolo"></div>
+				<div class="DX" style="width:74%">
+						<div class="testo">
+							
+							<h3 class="titolo">Sagra Del Cinghiale E Del Tortello a Ronta di Borgo San Lorenzo</h3>
+							<h3 class="grassetto corsivo testo">Specialita' Carne Alla Brace </h3><div><b>Dal</b> 10/07/2026 <b>Al</b> 12/07/2026</div><span class="grassetto">Toscana</span>
+									<span class="corsivo">Borgo San Lorenzo (FI)</span><span class="grassetto" data-span="span-21104872"></span>
+							<div class="altri_comuni" id="21104872" style="width:300px; display:none;">https://www.eventiesagre.it/Eventi_Sagre/21104872_Sagra+Del+Cinghiale+E+Del+Tortello+a+Ronta+di+Borgo+San+Lorenzo.html</div><br />
+								&nbsp;la Sagra del Cinghiale e del Tortello&nbsp;&nbsp;torna a&nbsp;Borgo San Lorenzo (FI)
+
+A luglio il Campo Sportivo di Ronta si accende con una delle sagre pi&ugrave; attese: tortelli mugellani, ...<span class="grassetto" style="color:#3871c2; font-size:14px">[segue]</span>	
+						</div>
+				</div>
+			</a>
+		</div>  
+		<div class="spacer5"></div>     
+		<div class="titolo sfondoGiallo spacer5 allineaDestra testo10">per inserire il tuo evento in questo spazio <a href="/carrello.html">clicca qui</a></div>
+            <div class="clear spacer10"></div>
+      <!--</div>
+      <div class="eventiSponsor">
+      	<div class="titolo sfondoBlu spacer5 rientro25 testoBianco">Top Promo</div> -->  
+		
+                       
+      <!--      <div class="titolo sfondoBlu spacer5 allineaDestra testo10 testoBianco scroll1">per inserire il tuo evento in questo spazio <a href="/carrello.html">clicca qui</a></div>
+            <div class="spacer5"></div> -->
+
+<div class="barraNavRisultati">
+			<div class="colonne center spacer20"></div>
+			 <div class="colonne center spacer20"></div>
+			 <h2 class="colonne colonnacentrale center spacer10">Elenco Eventi da 1 a 10 di 56897</h2>
+			 <div class="colonne center spacer20"><a href="https://www.eventiesagre.it/cerca/Eventi/sez/mesi/reg/prov/cit/rilib/pag-1.htm">Avanti</a></div>
+			 <div class="colonne center spacer20"><a href="https://www.eventiesagre.it/cerca/Eventi/sez/mesi/reg/prov/cit/rilib/pag-5689.htm">Ultima pagina</a></div>
+			 <div class="clear"></div>
+		 </div>
+		<div class="spacer5"></div>
+		<div class="clear"></div>
+		<div class="spacer5"></div><script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": "Festival Como Città Della Musica ",
+  "startDate" : "2026-06-30T00:00:00+0100",
+  "endDate" : "2026-07-12T23:59:59+0100",
+  "description": "Torna per la sua 19&ordf; edizione, il Festival Como Citt&agrave; della Musica con un programma ricco di spettacoli di grande rilievo, inspirati al te",
+  "url" : "https://www.eventiesagre.it/Eventi_Festival/21020515_Festival+Como+Citta+Della+Musica.html",
+  "image": ["https://www.eventiesagre.it/eventi/21161147/img/Immagine.jpg"],
+  "location" : {
+                    "@type" : "Place",
+                    "name" : "Como",
+                    "address": {
+                                "@type": "PostalAddress",
+                                "addressLocality": "Como",
+                                "addressRegion": "Lombardia",
+                                "addressCountry": ""
+                        }
+        }
+        }
+        </script><div class="risultatoEvento"><a href="https://www.eventiesagre.it/Eventi_Festival/21020515_Festival+Como+Citta+Della+Musica.html" title="Festival Como Città Della Musica , La Luce Langue - Como (CO)">
+            <div class="SX" style="width:12%"><img src="/eventi/21020515/thumb/FCCDM_CALENDARIO_DEF.jpg" alt="Festival Como Città Della Musica , La Luce Langue - Como (CO)" class="immagineArticolo"></div>
+            <div class="DX" style="width:74%">
+                    <div class="testo">
+						
+
+                        <h3 class="titolo">Festival Como Città Della Musica </h3>
+                        <div><b>Dal</b> 30/06/2026 <b>Al</b> 12/07/2026</div><span class="grassetto">Lombardia</span>
+                                    <span class="corsivo">Como (CO)</span><span class="grassetto" data-span="span-21020515"></span>
+                        <div class="altri_comuni" id="21020515" style="width:300px; display:none;">https://www.eventiesagre.it/Eventi_Musicali/21020515_Festival+Como+Citta+Della+Musica.html</div><br />
+                        	Torna per la sua 19&ordf; edizione, il Festival Como Citt&agrave; della Musica con un programma ricco di spettacoli di grande rilievo, inspirati al tema La luce langue, tratto dall&#39;Opera Macbeth d...<span class="grassetto" style="color:#3871c2; font-size:14px">[segue]</span>	
+                    </div>
+            </div>
+        </a>
+    </div>  
+    <div class="spacer5"></div><div class="banner_adsense_solo_mobile" id="Pagina_Cerca_300x600_mobile"></div><div class="spacer5"></div><script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": "Revel Festival a Treviglio",
+  "startDate" : "2026-07-02T00:00:00+0100",
+  "endDate" : "2026-07-12T23:59:59+0100",
+  "description": "&nbsp;Revel Festival Treviglio e Revel Treviglio
+
+
+𝗦𝗧𝗜𝗔𝗠𝗢 𝗧𝗢𝗥𝗡𝗔𝗡𝗗𝗢
+&nbsp;dal 2&nbsp;&nbsp;al 12&nbsp; Lu",
+  "url" : "https://www.eventiesagre.it/Eventi_Mostre/21052035_Revel+Festival+a+Treviglio.html",
+  "image": ["https://www.eventiesagre.it/eventi/21161147/img/Immagine.jpg"],
+  "location" : {
+                    "@type" : "Place",
+                    "name" : "Treviglio",
+                    "address": {
+                                "@type": "PostalAddress",
+                                "addressLocality": "Treviglio",
+                                "addressRegion": "Lombardia",
+                                "addressCountry": ""
+                        }
+        }
+        }
+        </script><div class="risultatoEvento"><a href="https://www.eventiesagre.it/Eventi_Mostre/21052035_Revel+Festival+a+Treviglio.html" title="Revel Festival a Treviglio, Edizione 2026 - Treviglio (BG)">
+            <div class="SX" style="width:12%"><img src="/eventi/21052035/thumb/725474732_18054747329775569_6065602329219661737_n.jpg" alt="Revel Festival a Treviglio, Edizione 2026 - Treviglio (BG)" class="immagineArticolo"></div>
+            <div class="DX" style="width:74%">
+                    <div class="testo">
+						
+
+                        <h3 class="titolo">Revel Festival a Treviglio</h3>
+                        <div><b>Dal</b> 02/07/2026 <b>Al</b> 12/07/2026</div><span class="grassetto">Lombardia</span>
+                                    <span class="corsivo">Treviglio (BG)</span><span class="grassetto" data-span="span-21052035"></span>
+                        <div class="altri_comuni" id="21052035" style="width:300px; display:none;">https://www.eventiesagre.it/Eventi_Enogastronomici/21052035_Revel+Festival+a+Treviglio.html</div><br />
+                        	&nbsp;Revel Festival Treviglio e Revel Treviglio
+
+
+𝗦𝗧𝗜𝗔𝗠𝗢 𝗧𝗢𝗥𝗡𝗔𝗡𝗗𝗢
+&nbsp;dal 2&nbsp;&nbsp;al 12&nbsp; Luglio 2026
+&nbsp;presso: Area Fiera di Treviglio (...<span class="grassetto" style="color:#3871c2; font-size:14px">[segue]</span>	
+                    </div>
+            </div>
+        </a>
+    </div>  
+    <div class="spacer5"></div><div class="banner_adsense_solo_desktop" id="Pagina_Elenco_728x90"></div><div class="spacer5"></div><script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": "Sagra dei Gnocchi",
+  "startDate" : "2026-07-10T00:00:00+0100",
+  "endDate" : "2026-07-12T23:59:59+0100",
+  "description": "Sagra dei Gnocchi
+
+38 anni di storia, tradizione e... gnocchi da urlo!
+
+Dal 1988 a oggi, il sapore non &egrave; mai cambiato, ma da quest&#39;anno",
+  "url" : "https://www.eventiesagre.it/Eventi_Sagre/8595_Sagra+dei+Gnocchi.html",
+  "image": ["https://www.eventiesagre.it/eventi/21161147/img/Immagine.jpg"],
+  "location" : {
+                    "@type" : "Place",
+                    "name" : "Cimitile",
+                    "address": {
+                                "@type": "PostalAddress",
+                                "addressLocality": "Cimitile",
+                                "addressRegion": "Campania",
+                                "addressCountry": ""
+                        }
+        }
+        }
+        </script><div class="risultatoEvento"><a href="https://www.eventiesagre.it/Eventi_Sagre/8595_Sagra+dei+Gnocchi.html" title="Sagra dei Gnocchi, 38ª Edizione - Cimitile (NA)">
+            <div class="SX" style="width:12%"><img src="/eventi/8595/thumb/sagra_gnocchi_cimitile.jpg" alt="Sagra dei Gnocchi, 38ª Edizione - Cimitile (NA)" class="immagineArticolo"></div>
+            <div class="DX" style="width:74%">
+                    <div class="testo">
+						
+
+                        <h3 class="titolo">Sagra dei Gnocchi</h3>
+                        <div><b>Dal</b> 10/07/2026 <b>Al</b> 12/07/2026</div><span class="grassetto">Campania</span>
+                                    <span class="corsivo">Cimitile (NA)</span><span class="grassetto" data-span="span-8595"></span>
+                        <div class="altri_comuni" id="8595" style="width:300px; display:none;">https://www.eventiesagre.it/Eventi_Sagre/8595_Sagra+dei+Gnocchi.html</div><br />
+                        	Sagra dei Gnocchi
+
+38 anni di storia, tradizione e... gnocchi da urlo!
+
+Dal 1988 a oggi, il sapore non &egrave; mai cambiato, ma da quest&#39;anno siamo ancora pi&ugrave; fieri: la nostra &egrave;...<span class="grassetto" style="color:#3871c2; font-size:14px">[segue]</span>	
+                    </div>
+            </div>
+        </a>
+    </div>  
+    <div class="spacer5"></div><script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": "Lo Street Food Festival a Pavullo",
+  "startDate" : "2026-07-10T00:00:00+0100",
+  "endDate" : "2026-07-12T23:59:59+0100",
+  "description": "Lo Street Food Festival a Pavullo,&nbsp;9&deg; Pac-Vullo
+Da Venerd&igrave; 10 a Domenica 12 Luglio 2026
+
+in Piazza Arturo Toscanini troverete tanti",
+  "url" : "https://www.eventiesagre.it/Eventi_Enogastronomici/21019814_Lo+Street+Food+Festival+a+Pavullo.html",
+  "image": ["https://www.eventiesagre.it/eventi/21161147/img/Immagine.jpg"],
+  "location" : {
+                    "@type" : "Place",
+                    "name" : "Pavullo Nel Frignano",
+                    "address": {
+                                "@type": "PostalAddress",
+                                "addressLocality": "Pavullo Nel Frignano",
+                                "addressRegion": "Emilia Romagna",
+                                "addressCountry": ""
+                        }
+        }
+        }
+        </script><div class="risultatoEvento"><a href="https://www.eventiesagre.it/Eventi_Enogastronomici/21019814_Lo+Street+Food+Festival+a+Pavullo.html" title="Lo Street Food Festival a Pavullo, Pac - Vullo 2026 - Pavullo Nel Frignano (MO)">
+            <div class="SX" style="width:12%"><img src="/eventi/21019814/thumb/pac_vullo.jpg" alt="Lo Street Food Festival a Pavullo, Pac - Vullo 2026 - Pavullo Nel Frignano (MO)" class="immagineArticolo"></div>
+            <div class="DX" style="width:74%">
+                    <div class="testo">
+						
+
+                        <h3 class="titolo">Lo Street Food Festival a Pavullo</h3>
+                        <div><b>Dal</b> 10/07/2026 <b>Al</b> 12/07/2026</div><span class="grassetto">Emilia Romagna</span>
+                                    <span class="corsivo">Pavullo Nel Frignano (MO)</span><span class="grassetto" data-span="span-21019814"></span>
+                        <div class="altri_comuni" id="21019814" style="width:300px; display:none;">https://www.eventiesagre.it/Eventi_Enogastronomici/21019814_Lo+Street+Food+Festival+a+Pavullo.html</div><br />
+                        	Lo Street Food Festival a Pavullo,&nbsp;9&deg; Pac-Vullo
+Da Venerd&igrave; 10 a Domenica 12 Luglio 2026
+
+in Piazza Arturo Toscanini troverete tantissimo Street Food e molti&nbsp; tipi di birre arti...<span class="grassetto" style="color:#3871c2; font-size:14px">[segue]</span>	
+                    </div>
+            </div>
+        </a>
+    </div>  
+    <div class="spacer5"></div><script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": "Festa Del Fungo Porcino",
+  "startDate" : "2026-07-03T00:00:00+0100",
+  "endDate" : "2026-07-12T23:59:59+0100",
+  "description": "
+
+
+
+
+
+
+
+La Societ&agrave; &ldquo;DBR SERVICE SRL&rdquo;, organizza dal 3 al 5 luglio 2026 e dal 10 luglio al 12 luglio 2026 c/o il Parco del S",
+  "url" : "https://www.eventiesagre.it/Eventi_Feste/21022998_Festa+Del+Fungo+Porcino.html",
+  "image": ["https://www.eventiesagre.it/eventi/21161147/img/Immagine.jpg"],
+  "location" : {
+                    "@type" : "Place",
+                    "name" : "Montoro",
+                    "address": {
+                                "@type": "PostalAddress",
+                                "addressLocality": "Montoro",
+                                "addressRegion": "Campania",
+                                "addressCountry": ""
+                        }
+        }
+        }
+        </script><div class="risultatoEvento"><a href="https://www.eventiesagre.it/Eventi_Feste/21022998_Festa+Del+Fungo+Porcino.html" title="Festa Del Fungo Porcino, Edizione 2026 - Montoro (AV)">
+            <div class="SX" style="width:12%"><img src="/eventi/21022998/thumb/Festa_Del_Fungo_Porcino(2).jpg" alt="Festa Del Fungo Porcino, Edizione 2026 - Montoro (AV)" class="immagineArticolo"></div>
+            <div class="DX" style="width:74%">
+                    <div class="testo">
+						
+
+                        <h3 class="titolo">Festa Del Fungo Porcino</h3>
+                        <div><b>Dal</b> 03/07/2026 <b>Al</b> 12/07/2026</div><span class="grassetto">Campania</span>
+                                    <span class="corsivo">Montoro (AV)</span><span class="grassetto" data-span="span-21022998"></span>
+                        <div class="altri_comuni" id="21022998" style="width:300px; display:none;">https://www.eventiesagre.it/Eventi_Feste/21022998_Festa+Del+Fungo+Porcino.html</div><br />
+                        	
+
+
+
+
+
+
+
+La Societ&agrave; &ldquo;DBR SERVICE SRL&rdquo;, organizza dal 3 al 5 luglio 2026 e dal 10 luglio al 12 luglio 2026 c/o il Parco del Sole alla Fraz. San Eustachio di Montoro (AV) la ma...<span class="grassetto" style="color:#3871c2; font-size:14px">[segue]</span>	
+                    </div>
+            </div>
+        </a>
+    </div>  
+    <div class="spacer5"></div><script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": "La Fiera di Luglio Morfasso In Festa",
+  "startDate" : "2026-07-10T00:00:00+0100",
+  "endDate" : "2026-07-12T23:59:59+0100",
+  "description": "La Fiera di Luglo - Morfasso In Festa 10-11-12 Luglio 2026
+
+Stand Gastronomici aperti dallore 19:00 con i piatti della tradizione
+
+Torna la fiera ",
+  "url" : "https://www.eventiesagre.it/Eventi_Feste/21039904_La+Fiera+di+Luglio+Morfasso+In+Festa.html",
+  "image": ["https://www.eventiesagre.it/eventi/21161147/img/Immagine.jpg"],
+  "location" : {
+                    "@type" : "Place",
+                    "name" : "Morfasso",
+                    "address": {
+                                "@type": "PostalAddress",
+                                "addressLocality": "Morfasso",
+                                "addressRegion": "Emilia Romagna",
+                                "addressCountry": ""
+                        }
+        }
+        }
+        </script><div class="risultatoEvento scroll2"><a href="https://www.eventiesagre.it/Eventi_Feste/21039904_La+Fiera+di+Luglio+Morfasso+In+Festa.html" title="La Fiera di Luglio Morfasso In Festa, Edizione 2026 - Morfasso (PC)">
+            <div class="SX" style="width:12%"><img src="/eventi/21039904/thumb/eventiesagre_il_portale_.jpg" alt="La Fiera di Luglio Morfasso In Festa, Edizione 2026 - Morfasso (PC)" class="immagineArticolo"></div>
+            <div class="DX" style="width:74%">
+                    <div class="testo">
+						
+
+                        <h3 class="titolo">La Fiera di Luglio Morfasso In Festa</h3>
+                        <div><b>Dal</b> 10/07/2026 <b>Al</b> 12/07/2026</div><span class="grassetto">Emilia Romagna</span>
+                                    <span class="corsivo">Morfasso (PC)</span><span class="grassetto" data-span="span-21039904"></span>
+                        <div class="altri_comuni" id="21039904" style="width:300px; display:none;">https://www.eventiesagre.it/Eventi_Feste/21039904_La+Fiera+di+Luglio+Morfasso+In+Festa.html</div><br />
+                        	La Fiera di Luglo - Morfasso In Festa 10-11-12 Luglio 2026
+
+Stand Gastronomici aperti dallore 19:00 con i piatti della tradizione
+
+Torna la fiera di luglio con i sapori genuini che sanno di buono,...<span class="grassetto" style="color:#3871c2; font-size:14px">[segue]</span>	
+                    </div>
+            </div>
+        </a>
+    </div>  
+    <div class="spacer5"></div><script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": "Feste Rinascimentali a Castel Del Rio",
+  "startDate" : "2026-07-12T00:00:00+0100",
+  "endDate" : "2026-07-12T23:59:59+0100",
+  "description": "
+Feste Rinascimentali a Castel del Rio
+12luglio&nbsp;2026
+
+Le Feste Rinascimentali&nbsp;nascono nel 1981 grazie alla passione per la storia e per ",
+  "url" : "https://www.eventiesagre.it/Eventi_Feste/1208_Feste+Rinascimentali+a+Castel+Del+Rio.html",
+  "image": ["https://www.eventiesagre.it/eventi/21161147/img/Immagine.jpg"],
+  "location" : {
+                    "@type" : "Place",
+                    "name" : "Castel Del Rio",
+                    "address": {
+                                "@type": "PostalAddress",
+                                "addressLocality": "Castel Del Rio",
+                                "addressRegion": "Emilia Romagna",
+                                "addressCountry": ""
+                        }
+        }
+        }
+        </script><div class="risultatoEvento"><a href="https://www.eventiesagre.it/Eventi_Feste/1208_Feste+Rinascimentali+a+Castel+Del+Rio.html" title="Feste Rinascimentali a Castel Del Rio, Edizione 2026 - Castel Del Rio (BO)">
+            <div class="SX" style="width:12%"><img src="/eventi/1208/thumb/feste_rinasimentali.jpg" alt="Feste Rinascimentali a Castel Del Rio, Edizione 2026 - Castel Del Rio (BO)" class="immagineArticolo"></div>
+            <div class="DX" style="width:74%">
+                    <div class="testo">
+						
+
+                        <h3 class="titolo">Feste Rinascimentali a Castel Del Rio</h3>
+                        <div>Il 12/07/2026</div><span class="grassetto">Emilia Romagna</span>
+                                    <span class="corsivo">Castel Del Rio (BO)</span><span class="grassetto" data-span="span-1208"></span>
+                        <div class="altri_comuni" id="1208" style="width:300px; display:none;">https://www.eventiesagre.it/Eventi_Feste/1208_Feste+Rinascimentali+a+Castel+Del+Rio.html</div><br />
+                        	
+Feste Rinascimentali a Castel del Rio
+12luglio&nbsp;2026
+
+Le Feste Rinascimentali&nbsp;nascono nel 1981 grazie alla passione per la storia e per le tradizioni del comune alidosiano da parte di Br...<span class="grassetto" style="color:#3871c2; font-size:14px">[segue]</span>	
+                    </div>
+            </div>
+        </a>
+    </div>  
+    <div class="spacer5"></div><script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": "Festa Dell'unicorno A Vinci",
+  "startDate" : "2026-07-10T00:00:00+0100",
+  "endDate" : "2026-07-12T23:59:59+0100",
+  "description": "La 17a edizione della Festa dell&rsquo;Unicorno si terr&agrave; a Vinci nei giorni10, 11, 12&nbsp; Luglio 2026
+
+Vinci si anima di elfi, hobbit e cre",
+  "url" : "https://www.eventiesagre.it/Eventi_Storici/7892_Festa+Dell+unicorno+A+Vinci.html",
+  "image": ["https://www.eventiesagre.it/eventi/21161147/img/Immagine.jpg"],
+  "location" : {
+                    "@type" : "Place",
+                    "name" : "Vinci",
+                    "address": {
+                                "@type": "PostalAddress",
+                                "addressLocality": "Vinci",
+                                "addressRegion": "Toscana",
+                                "addressCountry": ""
+                        }
+        }
+        }
+        </script><div class="risultatoEvento"><a href="https://www.eventiesagre.it/Eventi_Storici/7892_Festa+Dell+unicorno+A+Vinci.html" title="Festa Dell'unicorno A Vinci, 120ima Manifestazione Fantasy Più Grande D’italia - Vinci (FI)">
+            <div class="SX" style="width:12%"><img src="/eventi/7892/thumb/594977636_1378743940373973_1003702534915696409_n.png" alt="Festa Dell'unicorno A Vinci, 120ima Manifestazione Fantasy Più Grande D’italia - Vinci (FI)" class="immagineArticolo"></div>
+            <div class="DX" style="width:74%">
+                    <div class="testo">
+						
+
+                        <h3 class="titolo">Festa Dell'unicorno A Vinci</h3>
+                        <div><b>Dal</b> 10/07/2026 <b>Al</b> 12/07/2026</div><span class="grassetto">Toscana</span>
+                                    <span class="corsivo">Vinci (FI)</span><span class="grassetto" data-span="span-7892"></span>
+                        <div class="altri_comuni" id="7892" style="width:300px; display:none;">https://www.eventiesagre.it/Eventi_Feste/7892_Festa+Dell+unicorno+A+Vinci.html</div><br />
+                        	La 17a edizione della Festa dell&rsquo;Unicorno si terr&agrave; a Vinci nei giorni10, 11, 12&nbsp; Luglio 2026
+
+Vinci si anima di elfi, hobbit e creature fantastiche, el borgo toscano ritorna, dal 1...<span class="grassetto" style="color:#3871c2; font-size:14px">[segue]</span>	
+                    </div>
+            </div>
+        </a>
+    </div>  
+    <div class="spacer5"></div><script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": "Palio Del Ciuccio",
+  "startDate" : "2026-07-12T00:00:00+0100",
+  "endDate" : "2026-07-12T23:59:59+0100",
+  "description": "Torna il Palio del Ciuccio!
+
+
+Durante il &quot;Luglio Sammaritano&quot; a Santa Maria la Carit&agrave;, le cinque contrade cittadine, Aquila, Delfi",
+  "url" : "https://www.eventiesagre.it/Eventi_Feste/21102636_Palio+Del+Ciuccio.html",
+  "image": ["https://www.eventiesagre.it/eventi/21161147/img/Immagine.jpg"],
+  "location" : {
+                    "@type" : "Place",
+                    "name" : "Santa Maria La Carità",
+                    "address": {
+                                "@type": "PostalAddress",
+                                "addressLocality": "Santa Maria La Carità",
+                                "addressRegion": "Campania",
+                                "addressCountry": ""
+                        }
+        }
+        }
+        </script><div class="risultatoEvento"><a href="https://www.eventiesagre.it/Eventi_Feste/21102636_Palio+Del+Ciuccio.html" title="Palio Del Ciuccio, Gare E Corteo Storico A Santa Maria La Carità  - Santa Maria La Carità (NA)">
+            <div class="SX" style="width:12%"><img src="/eventi/21102636/thumb/720603329_1327251219595963_8804719026475276911_n.jpg" alt="Palio Del Ciuccio, Gare E Corteo Storico A Santa Maria La Carità  - Santa Maria La Carità (NA)" class="immagineArticolo"></div>
+            <div class="DX" style="width:74%">
+                    <div class="testo">
+						
+
+                        <h3 class="titolo">Palio Del Ciuccio</h3>
+                        <div>Il 12/07/2026</div><span class="grassetto">Campania</span>
+                                    <span class="corsivo">Santa Maria La Carità (NA)</span><span class="grassetto" data-span="span-21102636"></span>
+                        <div class="altri_comuni" id="21102636" style="width:300px; display:none;">https://www.eventiesagre.it/Eventi_Feste/21102636_Palio+Del+Ciuccio.html</div><br />
+                        	Torna il Palio del Ciuccio!
+
+
+Durante il &quot;Luglio Sammaritano&quot; a Santa Maria la Carit&agrave;, le cinque contrade cittadine, Aquila, Delfino, Farfalla, Ippocampo e Leone, si contenderanno ...<span class="grassetto" style="color:#3871c2; font-size:14px">[segue]</span>	
+                    </div>
+            </div>
+        </a>
+    </div>  
+    <div class="spacer5"></div><script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": "Sagra Del Bisat",
+  "startDate" : "2026-06-26T00:00:00+0100",
+  "endDate" : "2026-07-12T23:59:59+0100",
+  "description": "Sagra del Bisat&nbsp;
+dal 26 Giugno al 12 Luiglio 2026
+Loc. Cintello. Teglio Veneto (VE)
+
+L&#39;Associazione Sagra del Bisat &egrave; nata negli a",
+  "url" : "https://www.eventiesagre.it/Eventi_Sagre/21077673_Sagra+Del+Bisat.html",
+  "image": ["https://www.eventiesagre.it/eventi/21161147/img/Immagine.jpg"],
+  "location" : {
+                    "@type" : "Place",
+                    "name" : "Teglio Veneto",
+                    "address": {
+                                "@type": "PostalAddress",
+                                "addressLocality": "Teglio Veneto",
+                                "addressRegion": "Veneto",
+                                "addressCountry": ""
+                        }
+        }
+        }
+        </script><div class="risultatoEvento"><a href="https://www.eventiesagre.it/Eventi_Sagre/21077673_Sagra+Del+Bisat.html" title="Sagra Del Bisat, Evento Enogastronomico Con Specialità Bisat (anguilla) - Teglio Veneto (VE)">
+            <div class="SX" style="width:12%"><img src="/eventi/21077673/thumb/Sagra_Del_Bisat.jpg" alt="Sagra Del Bisat, Evento Enogastronomico Con Specialità Bisat (anguilla) - Teglio Veneto (VE)" class="immagineArticolo"></div>
+            <div class="DX" style="width:74%">
+                    <div class="testo">
+						
+
+                        <h3 class="titolo">Sagra Del Bisat</h3>
+                        <div><b>Dal</b> 26/06/2026 <b>Al</b> 12/07/2026</div><span class="grassetto">Veneto</span>
+                                    <span class="corsivo">Teglio Veneto (VE)</span><span class="grassetto" data-span="span-21077673"></span>
+                        <div class="altri_comuni" id="21077673" style="width:300px; display:none;">https://www.eventiesagre.it/Eventi_Sagre/21077673_Sagra+Del+Bisat.html</div><br />
+                        	Sagra del Bisat&nbsp;
+dal 26 Giugno al 12 Luiglio 2026
+Loc. Cintello. Teglio Veneto (VE)
+
+L&#39;Associazione Sagra del Bisat &egrave; nata negli anni &#39;80 a Cintello (Teglio Veneto) da un grupp...<span class="grassetto" style="color:#3871c2; font-size:14px">[segue]</span>	
+                    </div>
+            </div>
+        </a>
+    </div>  
+    <div class="spacer5"></div><div class="barraNavRisultati">
+		<div class="colonne center spacer20"></div>
+         <div class="colonne center spacer20"></div>
+		 <div class="colonne colonnacentrale center spacer10">Elenco Eventi da 1 a 10 di 56897</div>
+		 <div class="colonne center spacer20"><a href="https://www.eventiesagre.it/cerca/Eventi/sez/mesi/reg/prov/cit/rilib/pag-1.htm">Avanti</a></div>
+         <div class="colonne center spacer20"><a href="https://www.eventiesagre.it/cerca/Eventi/sez/mesi/reg/prov/cit/rilib/pag-5689.htm">Ultima pagina</a></div>
+         <div class="clear"></div>
+     </div>
+	<div class="spacer5"></div>
+		<div class="clear spacer5"></div>
+   </div>
+   
+   <div class="spacer10"><div class="banner_adsense" id="Link_Bottom_Cerca_468x15"></div></div>
+     
+   <div class="spacer10">
+   	   	
+   </div> 
+     
+      <div id="serviziComune">     
+              
+      </div>
+      <div id="vetrine">
+      
+         
+ 	<!--  
+      <div id="ElencoVetrine">
+  <span id="provinciaVetrine" style="display:none;"></span>
+  <div id="Vetrina1" style="max-height:105px; overflow:hidden;">
+    <div style="min-width:110px;min-height:110px;float: left;">
+      <a class="linkVetrina1" rel="nofollow" href='' target="_blank"><img id="imageVetrina1" src="" alt=" " title=" " style="max-width: 100px; max-height: 100px; border-width: 0px; border-style: solid; margin:5px;" class="photo" /></a>
+    </div>
+    <div>
+      <a class="linkVetrina1" rel="nofollow" href='' target="_blank"><span id="denominazioneVetrina1"></span></a>
+    </div>
+    <div>
+      <span id="regioneVetrina1" style="font-weight:bold;"></span>&nbsp;
+      <span id="comuneVetrina1" style="font-style:italic;"></span>&nbsp;
+      <span  style="font-style:italic;">(</span>
+      <span id="provinciaVetrina1"  style="font-style:italic;"></span>
+      <span  style="font-style:italic;">)</span>
+    </div>
+    <div id="testoVetrina1" class="" style="text-align:justify;"></div>
+  </div>
+</div>
+-->
+
+			<div class="spacer10"></div>
+                      <div class="ContenitoreNewsHome">                              
+                              <hr/>
+              </div>
+              <div class="clear"></div>
+</div>
+
+<div class="clear scroll3">
+ </div>
+      
+</div>
+
+<div id="google-DXeBanner" style="width:160px;">
+	<div class="banner_adsense_solo_desktop" id="Pagina_Cerca_300x600"></div>	
+	<div style="margin-top:5px; margin-bottom:5px;">
+</div>
+</div>
+
+</div>
+				<div class="clear"></div>
+				
+			<!-- parte da sostiutire con codice AdSense -->
+			<div class="spostaDiv">
+				<div id="google_728x90">
+                    
+                    
+                </div>
+			</div>
+			<!-- fine parte da sostiutire con codice AdSense -->  
+</div>
+<div id="piede" class="displayStampaNone">
+    <div id="footer">
+        <div id="footerSX">
+        <p><strong>Eventiesagre.i</strong>t (D) &eacute; un marchio depositato ogni suo utilizzo non<br />
+autorizzato non &eacute; ammesso</p>
+
+<p>Responsabile Sito: Web Up Italia Srl C.S. &euro;108.500 i.v<br />
+Sede Legale e Amministrativa: Via Magenta, 8 - 60121 Ancona (AN)<br />
+C.F./P.Iva: IT03251181206 - Numeo REA AN - 202474</p>
+
+<p>mail: commercio(at)webupitalia.it</p>
+
+<p><a href="http://www.iubenda.com/privacy-policy/316839" target="_blank"><span style="color:#0000FF">Privacy Policy</span></a>&nbsp;&nbsp; -&nbsp;&nbsp; <span style="color:#0000FF"><a href="http://www.iubenda.com/privacy-policy/316839/cookie-policy" target="_blank">Cookie Policy</a>&nbsp; - <a href="https://www.eventiesagre.it/CONDIZIONI_GENERALI_SERVIZIO.pdf">Condizioni di Utilizzo</a></span></p>
+           <a href="#" class="iubenda-cs-preferences-link">Aggiorna le impostazioni di tracciamento della pubblicità</a>
+        </div>
+        <div id="footerDX">
+        <p><a href="https://www.eventiesagre.it/Eventi/elenco.html" target="_blank"><span style="color:#0000FF">Eventi </span></a>-<span style="color:#0000FF">&nbsp;&nbsp;<a href="https://www.eventiesagre.it/ultimi_eventi.html" target="_blank"> Ultimi Inseriti</a>&nbsp; - Fiere</span> - <span style="color:#0000FF">Mercatini</span> - <span style="color:#0000FF">Sagre</span> - <span style="color:#0000FF">Mostre</span> - <span style="color:#0000FF">Folklore</span> -<span style="color:#0000FF"> </span><span style="color:#0000FF">Teatri </span><br />
+e Ricette tipiche in Italia!<br />
+Email: info(at)eventiesagre.it</p>
+
+<form action="https://www.eventiesagre.it/cerca_sul_web.html" id="cse-search-box"><input name="cx" type="hidden" value="partner-pub-7203102911977931:3486123607" /> <input name="cof" type="hidden" value="FORID:10" /> <input name="ie" type="hidden" value="UTF-8" /> Cerca sul sito:&nbsp;<input name="q" size="20" type="text" /> <input name="sa" type="submit" value="Cerca" />&nbsp;</form>
+
+<p>E&#39; vietata la riproduzione anche parziale - Web Up Italia Srl non &egrave; responsabile dei siti collegati<br />
+&nbsp;</p>
+		
+        </div>
+        <div class="clear"></div>
+    </div>
+    <div id="copyright">
+    <p>(c) copyright 2014/2024&nbsp;eventiesagre.it</p>
+    </div>
+</div>
+</div>
+<!--
+<script src="//stat.valica.it/analytics.js" data-pid="paHjhL7BtE" data-mtg="KPCJF9"></script> 
+<script src="//ads.valica.it/vads.js" async></script>-->
+<script src="/sito/menuhome/script.js"></script>
+
+
+<!--
+<script>var append=function(a,b,c){b=document.createElement(b);b.style.display="none";"src"==c&&(a=a.replace("https://",location.protocol+"//"));b[c]=a;document.getElementsByTagName("body")[0].appendChild(b)},makeid=function(){return(new Date).getTime()+"_"+Math.floor(1E5*Math.random())},ae_pe=makeid(),queryParams="&m=42dpmPrmWneJlqNBsYH6lH&c=eventiesagre.it&format=jsonp&callback=window.ae.serveProxyCallback",protocol=location.protocol;try{append(protocol+"//trace.events/h.gif?"+queryParams+"&p="+ae_pe+"&s=loaded","img","src"),window.ae="undefined"==typeof window.ae?{}:window.ae,window.ae.serveProxyCallback=function(a){append(protocol+"//trace.events/h.gif?"+queryParams+"&p="+ae_pe+"&s=response&h="+a.pHost,"img","src");try{window.ae.pHost=(a.pHost||window.ae.pHost).replace("https://",protocol+"//"),window.ae.hHost=(a.hHost||window.ae.hHost).replace("https://",protocol+"//"),append(a.content,"script",a.type)}catch(b){append(protocol+"//trace.events/h.gif?"+queryParams+"&p="+ae_pe+"&s=error&et=callbackExp&e="+encodeURIComponent(JSON.stringify(b)),"img","src")}},append("https://olisade.de?"+queryParams,"script","src")}catch(e$$13){append(protocol+"//trace.events/h.gif?"+queryParams+"&p="+ae_pe+"&s=error&et=h_caughtError&e="+encodeURIComponent(JSON.stringify(e$$13)),"img","src")};</script>
+-->
+</body>
+</html>

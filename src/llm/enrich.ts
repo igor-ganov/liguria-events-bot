@@ -15,6 +15,8 @@ export type PendingEnrich = Readonly<{
   title: string;
   dates: string;
   venue?: string;
+  /** City the event is filed under — the model must not assume Genoa. */
+  city?: string;
   categoryHint?: Category;
   raw?: string;
 }>;
@@ -44,7 +46,9 @@ export const chunk = <T>(items: readonly T[], size: number): readonly (readonly 
       );
 
 const ENRICH_SYSTEM = [
-  'You are a data curator for a Genoa (Italy) events guide.',
+  'You are a data curator for an Italian events guide covering the whole',
+  'country. Each input event carries a "city" — the Italian city it belongs',
+  'to. Never assume Genoa; use the city each event names.',
   'For EVERY input event return 1 to 3 categories from this fixed list,',
   'most specific first (a food festival with concerts is ["food","music"]):',
   CATEGORIES.join(', '),
@@ -57,8 +61,9 @@ const ENRICH_SYSTEM = [
   'title is wholly a proper noun, repeat it identically in all three.',
   'Also give "address": a concise Google-Maps-geocodable location for the',
   'venue, e.g. "Teatro della Tosse, Piazza Renato Negri 4, Genova". Use the',
-  'input venue and your knowledge of Genoa; always end with ", Genova" (or the',
-  'correct nearby comune). Omit the field ONLY if you truly cannot place it.',
+  'input venue and the comune the event names; always end with the comune and',
+  'the province, never with a city the event is not in. Omit the field ONLY if',
+  'you truly cannot place it.',
   'Also set "unusual": true ONLY for offbeat, niche, experimental or',
   'distinctly non-touristy happenings (a neighbourhood performance, an',
   'unconventional venue, an oddball one-off, immersive/site-specific art);',

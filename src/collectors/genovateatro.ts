@@ -81,6 +81,7 @@ export const parseGenovateatroHtml = async (html: string): Promise<readonly RawE
         startDate: range.startDate,
         url: new URL(draft.href, BASE_URL).toString(),
         source: GENOVATEATRO_SOURCE,
+        city: 'genova',
         categoryHint: 'theatre',
         ...(range.endDate === undefined ? {} : { endDate: range.endDate }),
         ...(abstract === '' ? {} : { rawDescription: abstract }),

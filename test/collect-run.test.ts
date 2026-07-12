@@ -43,6 +43,7 @@ const makeDeps = (
   details: async (events) => events,
   judgeSameEvent: async () => [],
   fetchFn: async () => new Response('', { status: 404 }),
+  geocode: async () => undefined,
   now: () => NOW_MS,
 });
 

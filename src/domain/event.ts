@@ -81,6 +81,8 @@ export type EventRecord = Readonly<{
   unusual?: boolean;
   url: string;
   source: string;
+  /** City the event is filed under (province capital slug); see domain/city. */
+  city?: string;
   /** false → enrichment failed, retry next run (AC-2.3). */
   enriched: boolean;
   addedAt: number;
@@ -103,6 +105,8 @@ export type CompactEvent = Readonly<{
   a?: string;
   /** [lat, lng] point for the map view. */
   g?: readonly [number, number];
+  /** City slug the event is filed under — the site scopes its pages by it. */
+  ct?: string;
   h?: string;
   u: string;
   img?: string;
@@ -130,6 +134,8 @@ export type RawEvent = Readonly<{
   rawDescription?: string;
   url: string;
   source: string;
+  /** City the event is filed under (province capital slug); see domain/city. */
+  city?: string;
   categoryHint?: Category;
   image?: string;
   /** Links of other sources that saw this event in the same run (AC-1.8). */
@@ -203,10 +209,15 @@ export const mergeEvent = (
     ...(existing.image === undefined && incoming.image !== undefined
       ? { image: incoming.image }
       : {}),
+    // Backfill: events stored before the city dimension existed carry none.
+    ...(existing.city === undefined && incoming.city !== undefined
+      ? { city: incoming.city }
+      : {}),
     // Other sources resighted this event → keep every link (AC-1.8).
     ...mergedAltLinks(existing, incoming),
   };
   const changed =
+    event.city !== existing.city ||
     event.endDate !== existing.endDate ||
     event.time !== existing.time ||
     event.venue !== existing.venue ||
@@ -274,6 +285,7 @@ export const toCompact = (event: EventRecord): CompactEvent => {
     ? {}
     : { g: coordPair(event.lat, event.lng) }),
   ...(event.time === undefined ? {} : { h: event.time }),
+  ...(event.city === undefined ? {} : { ct: event.city }),
   ...(event.image === undefined ? {} : { img: event.image }),
   ...(event.descriptions.en === '' ? {} : { d: event.descriptions }),
   ...(event.altLinks === undefined || event.altLinks.length === 0
@@ -358,6 +370,7 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
   const free = asBoolean(readProp(value, 'free'));
   const unusual = asBoolean(readProp(value, 'unusual'));
   const image = asNonEmptyString(readProp(value, 'image'));
+  const city = asNonEmptyString(readProp(value, 'city'));
   const altLinks = parseSourceLinks(readProp(value, 'altLinks'));
   const titles = parseLocalized(readProp(value, 'titles'));
   return {
@@ -382,6 +395,7 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
     ...(free === undefined ? {} : { free }),
     ...(unusual === undefined ? {} : { unusual }),
     ...(image === undefined ? {} : { image }),
+    ...(city === undefined ? {} : { city }),
     ...(altLinks.length === 0 ? {} : { altLinks }),
   };
 };
@@ -411,6 +425,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
   const gLng = asNumber(gArr[1]);
   const g = gLat === undefined || gLng === undefined ? undefined : coordPair(gLat, gLng);
   const h = asNonEmptyString(readProp(value, 'h'));
+  const ct = asNonEmptyString(readProp(value, 'ct'));
   const img = asNonEmptyString(readProp(value, 'img'));
   const d = parseLocalized(readProp(value, 'd'), asNonEmptyString(readProp(value, 'd')));
   const tl = parseLocalized(readProp(value, 'tl'));
@@ -429,6 +444,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
     ...(a === undefined ? {} : { a }),
     ...(g === undefined ? {} : { g }),
     ...(h === undefined ? {} : { h }),
+    ...(ct === undefined ? {} : { ct }),
     ...(img === undefined ? {} : { img }),
     ...(d === undefined ? {} : { d }),
     ...(l.length === 0 ? {} : { l }),

@@ -4,7 +4,8 @@
  * pure and unit-testable (AC-8.4).
  */
 import { makeVisitgenoaCollector, makeDetailFetcher } from './collectors/visitgenoa.ts';
-import { makeMentelocaleCollector } from './collectors/mentelocale.ts';
+import { makeMentelocaleCollector, MENTELOCALE_CITIES } from './collectors/mentelocale.ts';
+import { makeEventiesagreCollector, REGIONS } from './collectors/eventiesagre.ts';
 import { makeGenovateatroCollector } from './collectors/genovateatro.ts';
 import { makePalazzoducaleCollector } from './collectors/palazzoducale.ts';
 import { makePortoanticoCollector } from './collectors/portoantico.ts';
@@ -15,6 +16,7 @@ import type { ChatFn } from './llm/client.ts';
 import { makeEnrichEvents, makeExtractFromPosts } from './llm/enrich.ts';
 import { makeJudgeSameEvent } from './llm/same-event.ts';
 import type { CollectDeps } from './pipeline/collect-run.ts';
+import { makeGeocoder } from './pipeline/geocode.ts';
 import { sourcePagesOf, tgChannelsOf } from './config.ts';
 import type { Env } from './config.ts';
 
@@ -31,7 +33,10 @@ export const buildCollectDeps = (env: Env): CollectDeps => {
     kv: env.EVENTS,
     collectors: [
       makeVisitgenoaCollector(fetch, sourcePagesOf(env)),
-      makeMentelocaleCollector(fetch),
+      // Genoa keeps its dedicated sources; the rest of Italy arrives through
+      // mentelocale's other two agendas and the national aggregator.
+      ...MENTELOCALE_CITIES.map((city) => makeMentelocaleCollector(fetch, city)),
+      ...REGIONS.map((region) => makeEventiesagreCollector(fetch, region)),
       makeGenovateatroCollector(fetch),
       makePalazzoducaleCollector(fetch),
       makePortoanticoCollector(fetch),
@@ -43,6 +48,7 @@ export const buildCollectDeps = (env: Env): CollectDeps => {
     details: makeDetailFetcher(fetch),
     judgeSameEvent: makeJudgeSameEvent(chat),
     fetchFn: fetch,
+    geocode: makeGeocoder(env.EVENTS, fetch),
     now,
   };
 };

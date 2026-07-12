@@ -17,12 +17,19 @@ import type { CollectOutcome, Collector, FetchFn } from './types.ts';
 
 export const MENTELOCALE_SOURCE = 'mentelocale';
 const BASE_URL = 'https://www.mentelocale.it';
-const LISTING_URL = `${BASE_URL}/genova/eventi/`;
+/** The only three cities mentelocale actually publishes an agenda for — every
+ *  other Italian city redirects away. National coverage comes from
+ *  eventiesagre instead. */
+export const MENTELOCALE_CITIES: readonly string[] = ['genova', 'milano', 'torino'];
+const listingUrl = (city: string): string => `${BASE_URL}/${city}/eventi/`;
 const USER_AGENT = 'Mozilla/5.0 (compatible; event-collecter/0.0)';
 
 type Draft = { href: string; title: string; date: string; img: string };
 
-export const parseMentelocaleHtml = async (html: string): Promise<readonly RawEvent[]> => {
+export const parseMentelocaleHtml = async (
+  html: string,
+  city: string,
+): Promise<readonly RawEvent[]> => {
   const drafts: Draft[] = [];
   const current = (): Draft | undefined => drafts.at(-1);
   const rewriter = new HTMLRewriter()
@@ -73,6 +80,7 @@ export const parseMentelocaleHtml = async (html: string): Promise<readonly RawEv
         startDate: range.startDate,
         url: new URL(draft.href, BASE_URL).toString(),
         source: MENTELOCALE_SOURCE,
+        city,
         ...(range.endDate === undefined ? {} : { endDate: range.endDate }),
         ...(draft.img === '' ? {} : { image: new URL(draft.img, BASE_URL).toString() }),
       },
@@ -92,14 +100,14 @@ export const mentelocalePageCount = (html: string): number => {
   return Math.min(Number.isFinite(total) && total > 0 ? total : 1, MAX_PAGES);
 };
 
-const pageUrl = (page: number): string =>
-  page === 1 ? LISTING_URL : `${LISTING_URL}${page}/`;
+const pageUrl = (city: string, page: number): string =>
+  page === 1 ? listingUrl(city) : `${listingUrl(city)}${page}/`;
 
 export const makeMentelocaleCollector =
-  (fetchFn: FetchFn): Collector =>
+  (fetchFn: FetchFn, city: string): Collector =>
   async (): Promise<CollectOutcome> => {
     try {
-      const first = await fetchFn(LISTING_URL, { headers: { 'user-agent': USER_AGENT } });
+      const first = await fetchFn(listingUrl(city), { headers: { 'user-agent': USER_AGENT } });
       if (!first.ok) {
         return { source: MENTELOCALE_SOURCE, events: [], posts: [], failed: true };
       }
@@ -108,13 +116,15 @@ export const makeMentelocaleCollector =
 
       const rest = await Promise.all(
         Array.from({ length: pages - 1 }, (_, index) => index + 2).map(async (page) => {
-          const response = await fetchFn(pageUrl(page), { headers: { 'user-agent': USER_AGENT } });
+          const response = await fetchFn(pageUrl(city, page), {
+            headers: { 'user-agent': USER_AGENT },
+          });
           if (!response.ok) return [];
-          return parseMentelocaleHtml(await response.text());
+          return parseMentelocaleHtml(await response.text(), city);
         }),
       );
 
-      const events = [...(await parseMentelocaleHtml(firstHtml)), ...rest.flat()];
+      const events = [...(await parseMentelocaleHtml(firstHtml, city)), ...rest.flat()];
       return { source: MENTELOCALE_SOURCE, events, posts: [], failed: false };
     } catch {
       return { source: MENTELOCALE_SOURCE, events: [], posts: [], failed: true };

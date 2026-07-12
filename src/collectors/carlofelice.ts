@@ -87,6 +87,7 @@ export const parseCarlofeliceHtml = async (html: string): Promise<readonly RawEv
         startDate,
         url: first.href,
         source: CARLOFELICE_SOURCE,
+        city: 'genova',
         venue: VENUE,
         categoryHint: 'music',
         ...(endDate === startDate ? {} : { endDate }),

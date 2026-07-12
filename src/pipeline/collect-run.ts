@@ -17,6 +17,8 @@ import type { Collector, FetchFn, RawPost } from '../collectors/types.ts';
 import type { Enrichment, PendingEnrich } from '../llm/enrich.ts';
 import { dedupeCandidates, urlDuplicates } from './dedupe-candidates.ts';
 import { dropSharedArtwork } from './shared-artwork.ts';
+import { geocodeMissing } from './geocode.ts';
+import type { GeocodeFn } from './geocode.ts';
 import type { CandidatePair } from './dedupe-candidates.ts';
 import {
   acquireLock,
@@ -65,6 +67,8 @@ export type CollectDeps = Readonly<{
   judgeSameEvent: (pairs: readonly CandidatePair[]) => Promise<readonly CandidatePair[]>;
   /** HEAD-only fetch, used to spot one poster reused across several events. */
   fetchFn: FetchFn;
+  /** Address → coordinates, so an event outside Genoa still gets a map pin. */
+  geocode: GeocodeFn;
   now: () => number;
 }>;
 
@@ -105,6 +109,7 @@ const toRecord = (
     descriptions: enrichment?.descriptions ?? localized(raw.rawDescription ?? raw.title),
     url: raw.url,
     source: raw.source,
+    ...(raw.city === undefined ? {} : { city: raw.city }),
     enriched: enrichment !== undefined,
     addedAt: nowSeconds,
     ...(raw.endDate === undefined ? {} : { endDate: raw.endDate }),
@@ -130,6 +135,7 @@ const pendingOf = (item: Identified): PendingEnrich => ({
     item.raw.startDate +
     (item.raw.endDate === undefined ? '' : `..${item.raw.endDate}`),
   ...(item.raw.venue === undefined ? {} : { venue: item.raw.venue }),
+  ...(item.raw.city === undefined ? {} : { city: item.raw.city }),
   ...(item.raw.categoryHint === undefined ? {} : { categoryHint: item.raw.categoryHint }),
   ...(item.raw.rawDescription === undefined
     ? {}
@@ -142,6 +148,7 @@ const pendingOfRecord = (record: EventRecord): PendingEnrich => ({
   dates:
     record.startDate + (record.endDate === undefined ? '' : `..${record.endDate}`),
   ...(record.venue === undefined ? {} : { venue: record.venue }),
+  ...(record.city === undefined ? {} : { city: record.city }),
   ...(record.rawDescription === undefined
     ? {}
     : { raw: record.rawDescription.slice(0, 500) }),
@@ -308,8 +315,27 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       .filter((event) => !fuzzyMerged.droppedIds.has(event.id))
       .map((event) => fuzzyMerged.replacements.get(event.id) ?? event)
       .toSorted((a, b) => (a.s < b.s ? -1 : a.s > b.s ? 1 : a.t.localeCompare(b.t)));
+    // Coordinates for whatever still lacks them — a bounded slice per run.
+    const points = await geocodeMissing(
+      deps.geocode,
+      merged.map((event) => ({
+        id: event.id,
+        ...(event.a === undefined ? {} : { address: event.a }),
+        ...(event.g === undefined ? {} : { lat: event.g[0], lng: event.g[1] }),
+      })),
+    );
+    for (const [id, point] of points) {
+      const record = await readEventRecord(deps.kv, id);
+      if (record === undefined) continue;
+      await writeEventRecord(deps.kv, { ...record, lat: point.lat, lng: point.lng }, startedAt);
+    }
+    const located = merged.map((event) => {
+      const point = points.get(event.id);
+      return point === undefined ? event : { ...event, g: [point.lat, point.lng] as const };
+    });
+
     // Distinct events sharing one poster look like duplicates on a map pin.
-    const nextIndex = await dropSharedArtwork(deps.fetchFn, merged);
+    const nextIndex = await dropSharedArtwork(deps.fetchFn, located);
     await writeIndex(deps.kv, nextIndex);
 
     const freshIds = new Set(freshItems.map((item) => item.id));
