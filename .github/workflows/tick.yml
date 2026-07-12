@@ -25,6 +25,6 @@ jobs:
             URL="${URL}?force=${{ inputs.force }}"
           fi
           echo "POST $URL"
-          curl -s --max-time 150 -X POST "$URL" \
+          curl -s --max-time 290 -X POST "$URL" \
             -H "x-tick-secret: ${{ secrets.TICK_SECRET }}" \
             -w '\nHTTP_STATUS=%{http_code}\n'

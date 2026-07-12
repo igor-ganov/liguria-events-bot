@@ -42,6 +42,7 @@ export const buildCollectDeps = (env: Env): CollectDeps => {
     enrich: makeEnrichEvents(chat),
     details: makeDetailFetcher(fetch),
     judgeSameEvent: makeJudgeSameEvent(chat),
+    fetchFn: fetch,
     now,
   };
 };

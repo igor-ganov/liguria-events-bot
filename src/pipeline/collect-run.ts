@@ -13,9 +13,10 @@ import {
 } from '../domain/event.ts';
 import type { CompactEvent, EventRecord, RawEvent } from '../domain/event.ts';
 import { mergeDuplicates, orderByAge } from '../domain/merge-duplicates.ts';
-import type { Collector, RawPost } from '../collectors/types.ts';
+import type { Collector, FetchFn, RawPost } from '../collectors/types.ts';
 import type { Enrichment, PendingEnrich } from '../llm/enrich.ts';
 import { dedupeCandidates, urlDuplicates } from './dedupe-candidates.ts';
+import { dropSharedArtwork } from './shared-artwork.ts';
 import type { CandidatePair } from './dedupe-candidates.ts';
 import {
   acquireLock,
@@ -62,6 +63,8 @@ export type CollectDeps = Readonly<{
   details: (events: readonly RawEvent[]) => Promise<readonly RawEvent[]>;
   /** LLM judge: which candidate pairs are the same real event (AC-1.9). */
   judgeSameEvent: (pairs: readonly CandidatePair[]) => Promise<readonly CandidatePair[]>;
+  /** HEAD-only fetch, used to spot one poster reused across several events. */
+  fetchFn: FetchFn;
   now: () => number;
 }>;
 
@@ -301,10 +304,12 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
     // differently, so the exact-id dedupe misses them. Cheap candidate
     // pre-filter → LLM judge → merge, drop the newer record.
     const fuzzyMerged = await mergeFuzzyDuplicates(deps, prunedIndex, startedAt);
-    const nextIndex = prunedIndex
+    const merged = prunedIndex
       .filter((event) => !fuzzyMerged.droppedIds.has(event.id))
       .map((event) => fuzzyMerged.replacements.get(event.id) ?? event)
       .toSorted((a, b) => (a.s < b.s ? -1 : a.s > b.s ? 1 : a.t.localeCompare(b.t)));
+    // Distinct events sharing one poster look like duplicates on a map pin.
+    const nextIndex = await dropSharedArtwork(deps.fetchFn, merged);
     await writeIndex(deps.kv, nextIndex);
 
     const freshIds = new Set(freshItems.map((item) => item.id));
