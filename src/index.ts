@@ -880,10 +880,17 @@ const worker = {
         return new Response('unauthorized', { status: 401 });
       }
       // `?force=collect` runs a crawl now instead of waiting for the collect
-      // hour — used after changing a collector to verify it immediately.
+      // hour, and returns the run summary so a failing crawl is visible.
       if (url.searchParams.get('force') === 'collect') {
-        ctx.waitUntil(runCollect(buildCollectDeps(env)).then(() => undefined).catch(() => undefined));
-        return ok();
+        try {
+          const summary = await runCollect(buildCollectDeps(env));
+          return Response.json(summary);
+        } catch (error) {
+          return Response.json(
+            { error: String(error), stack: (error as Error)?.stack?.slice(0, 500) },
+            { status: 500 },
+          );
+        }
       }
       ctx.waitUntil(runScheduled(env, Date.now()).catch(() => undefined));
       return ok();
