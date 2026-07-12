@@ -7,6 +7,14 @@ import { makeVisitgenoaCollector, makeDetailFetcher } from './collectors/visitge
 import { makeMentelocaleCollector, MENTELOCALE_CITIES } from './collectors/mentelocale.ts';
 import { makeEventiesagreCollector } from './collectors/eventiesagre.ts';
 import { makeTicketmasterCollector } from './collectors/ticketmaster.ts';
+import { makeJsonLdCollector } from './collectors/jsonld.ts';
+import type { JsonLdSite } from './collectors/jsonld.ts';
+
+/** Sites that publish their events as schema.org data rather than markup — one
+ *  parser serves them all, and adding a site costs a line. */
+const JSONLD_SITES: readonly JsonLdSite[] = [
+  { source: 'visitlazio', url: 'https://www.visitlazio.com/eventi', fallbackCity: 'roma' },
+];
 import { makeGenovateatroCollector } from './collectors/genovateatro.ts';
 import { makePalazzoducaleCollector } from './collectors/palazzoducale.ts';
 import { makePortoanticoCollector } from './collectors/portoantico.ts';
@@ -51,12 +59,13 @@ export const buildCollectDeps = (env: Env): CollectDeps => {
       // Genoa keeps its dedicated sources; the rest of Italy arrives through
       // mentelocale's other two agendas and the national aggregator.
       ...MENTELOCALE_CITIES.map((city) => makeMentelocaleCollector(fetch, city)),
-      makeEventiesagreCollector(fetch),
+      makeEventiesagreCollector(fetch, now),
       // The only source that answers in JSON, with coordinates — no scraping and
       // no geocoding. Sits out entirely when no key is configured.
       ...(env.TICKETMASTER_KEY === undefined
         ? []
         : [makeTicketmasterCollector(fetch, env.TICKETMASTER_KEY, () => romeDate(now()))]),
+      ...JSONLD_SITES.map((site) => makeJsonLdCollector(fetch, site)),
       makeGenovateatroCollector(fetch),
       makePalazzoducaleCollector(fetch),
       makePortoanticoCollector(fetch),

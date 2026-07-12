@@ -197,11 +197,19 @@ export const mergeEvent = (
   existing: EventRecord,
   incoming: RawEvent,
 ): Readonly<{ event: EventRecord; changed: boolean }> => {
+  // A source can learn that an event runs longer than it first said — a listing
+  // that publishes one entry per day of a run tells us its span only once we
+  // have seen every day. So the range widens, never narrows.
+  const startDate =
+    incoming.startDate < existing.startDate ? incoming.startDate : existing.startDate;
+  const existingEnd = existing.endDate ?? existing.startDate;
+  const incomingEnd = incoming.endDate ?? incoming.startDate;
+  const endDate = existingEnd > incomingEnd ? existingEnd : incomingEnd;
+
   const event: EventRecord = {
     ...existing,
-    ...(existing.endDate === undefined && incoming.endDate !== undefined
-      ? { endDate: incoming.endDate }
-      : {}),
+    startDate,
+    ...(endDate === startDate ? {} : { endDate }),
     ...(existing.time === undefined && incoming.time !== undefined
       ? { time: incoming.time }
       : {}),
@@ -229,6 +237,7 @@ export const mergeEvent = (
   };
   const changed =
     event.city !== existing.city ||
+    event.startDate !== existing.startDate ||
     event.endDate !== existing.endDate ||
     event.time !== existing.time ||
     event.venue !== existing.venue ||

@@ -14,12 +14,13 @@
  *       <span class="grassetto">Toscana</span>
  *       <span class="corsivo">Borgo San Lorenzo (FI)</span>
  *
- * The search has no pagination — it answers with a dozen cards and nothing
- * more. But it has a SECTION axis, and each section answers with a different
- * dozen: Toscana yields 13 events unfiltered and 157 across its sections. So the
- * crawl walks region x section rather than region alone.
+ * The search answers with a dozen cards and has no pagination. It has a SECTION
+ * axis, and sweeping it does surface many more events — but they are the
+ * ARCHIVE: 19 sections x 3 date windows over Toscana returned 27 upcoming
+ * events, where the sections alone returned 157, nearly all of them past. So we
+ * walk the axis that pays: region x date window.
  *
- *   /cerca/Eventi/<sezione>/mesi/<Regione>/prov/cit/rilib
+ *   /cerca/Eventi/sez/<dd-mm-yyyy>_<dd-mm-yyyy>/<Regione>/prov/cit/rilib
  */
 import type { RawEvent } from '../domain/event.ts';
 import { cityOfProvince } from '../domain/city.ts';
@@ -37,22 +38,29 @@ export const REGIONS: readonly string[] = [
   'Umbria', "Valle d'Aosta", 'Veneto',
 ];
 
-/** 'sez' is their own placeholder for "any section" — it answers with a dozen
- *  events that the named sections do not fully contain, so it earns its slot.
- *  Seasonal sections (Natale, Carnevale, Halloween…) are left out: out of season
- *  they cost a request and return nothing. */
-const SECTIONS: readonly string[] = [
-  'sez', 'Sagre', 'Feste', 'Folklore', 'Enogastronomici', 'EnoMusicali', 'Festival',
-  'Fiere', 'Storici', 'Raduni', 'Culturali', 'Musicali', 'Spettacolo', 'Cinema',
-  'Mostre', 'Mostra Mercato', 'Sportivi', 'Religiosi', 'Vari',
-];
+/** Politeness, and self-preservation: firing every query at once at one small
+ *  site is abuse and would get us blocked. */
+const CONCURRENCY = 6;
 
-/** Politeness, and self-preservation: 380 concurrent requests at one small site
- *  is abuse and would get us blocked. */
-const CONCURRENCY = 8;
+/** How far ahead to look, in windows. Each query answers with about a dozen
+ *  events, so the horizon is cut into chunks rather than asked for at once. */
+const WINDOW_DAYS = 30;
+const WINDOWS = 4;
 
-const searchUrl = (region: string, section: string): string =>
-  `${BASE_URL}/cerca/Eventi/${encodeURIComponent(section)}/mesi/${encodeURIComponent(region)}/prov/cit/rilib`;
+const itDate = (date: Date): string =>
+  [date.getUTCDate(), date.getUTCMonth() + 1, date.getUTCFullYear()]
+    .map((part, index) => (index === 2 ? String(part) : String(part).padStart(2, '0')))
+    .join('-');
+
+const windowsFrom = (todayMs: number): readonly string[] =>
+  Array.from({ length: WINDOWS }, (_, index) => {
+    const from = new Date(todayMs + index * WINDOW_DAYS * 86_400_000);
+    const to = new Date(todayMs + ((index + 1) * WINDOW_DAYS - 1) * 86_400_000);
+    return `${itDate(from)}_${itDate(to)}`;
+  });
+
+const searchUrl = (region: string, window: string): string =>
+  `${BASE_URL}/cerca/Eventi/sez/${window}/${encodeURIComponent(region)}/prov/cit/rilib`;
 
 /** "10/07/2026" → "2026-07-10". */
 const isoDate = (value: string): string | undefined => {
@@ -136,10 +144,10 @@ export const parseEventiesagreHtml = async (html: string): Promise<readonly RawE
 const fetchSearch = async (
   fetchFn: FetchFn,
   region: string,
-  section: string,
+  window: string,
 ): Promise<readonly RawEvent[]> => {
   try {
-    const response = await fetchFn(searchUrl(region, section), {
+    const response = await fetchFn(searchUrl(region, window), {
       headers: { 'user-agent': USER_AGENT },
     });
     return response.ok ? await parseEventiesagreHtml(await response.text()) : [];
@@ -148,21 +156,19 @@ const fetchSearch = async (
   }
 };
 
-/** One collector for the whole country: region x section, eight at a time. The
- *  pipeline dedupes by id, so the heavy overlap between sections costs nothing
- *  but the requests. */
+/** One collector for the whole country: region x date window, six at a time. */
 export const makeEventiesagreCollector =
-  (fetchFn: FetchFn): Collector =>
+  (fetchFn: FetchFn, now: () => number): Collector =>
   async (): Promise<CollectOutcome> => {
     const queries = REGIONS.flatMap((region) =>
-      SECTIONS.map((section) => ({ region, section })),
+      windowsFrom(now()).map((window) => ({ region, window })),
     );
     const events: RawEvent[] = [];
     for (let i = 0; i < queries.length; i += CONCURRENCY) {
       const batch = await Promise.all(
         queries
           .slice(i, i + CONCURRENCY)
-          .map(({ region, section }) => fetchSearch(fetchFn, region, section)),
+          .map(({ region, window }) => fetchSearch(fetchFn, region, window)),
       );
       events.push(...batch.flat());
     }
