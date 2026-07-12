@@ -80,17 +80,41 @@ export const parseMentelocaleHtml = async (html: string): Promise<readonly RawEv
   });
 };
 
+// The agenda is paginated 15-per-page ("Pagina 1 di 6"); reading only the first
+// page dropped ~70 events — every sagra and out-of-town happening (Sori,
+// Lavagna…) lives on the later pages.
+const MAX_PAGES = 10;
+
+/** Total pages from the "Pagina X di N" control, clamped. */
+export const mentelocalePageCount = (html: string): number => {
+  const match = html.match(/Pagina\s+\d+\s+di\s+(\d+)/i);
+  const total = Number(match?.[1] ?? '1');
+  return Math.min(Number.isFinite(total) && total > 0 ? total : 1, MAX_PAGES);
+};
+
+const pageUrl = (page: number): string =>
+  page === 1 ? LISTING_URL : `${LISTING_URL}${page}/`;
+
 export const makeMentelocaleCollector =
   (fetchFn: FetchFn): Collector =>
   async (): Promise<CollectOutcome> => {
     try {
-      const response = await fetchFn(LISTING_URL, {
-        headers: { 'user-agent': USER_AGENT },
-      });
-      if (!response.ok) {
+      const first = await fetchFn(LISTING_URL, { headers: { 'user-agent': USER_AGENT } });
+      if (!first.ok) {
         return { source: MENTELOCALE_SOURCE, events: [], posts: [], failed: true };
       }
-      const events = await parseMentelocaleHtml(await response.text());
+      const firstHtml = await first.text();
+      const pages = mentelocalePageCount(firstHtml);
+
+      const rest = await Promise.all(
+        Array.from({ length: pages - 1 }, (_, index) => index + 2).map(async (page) => {
+          const response = await fetchFn(pageUrl(page), { headers: { 'user-agent': USER_AGENT } });
+          if (!response.ok) return [];
+          return parseMentelocaleHtml(await response.text());
+        }),
+      );
+
+      const events = [...(await parseMentelocaleHtml(firstHtml)), ...rest.flat()];
       return { source: MENTELOCALE_SOURCE, events, posts: [], failed: false };
     } catch {
       return { source: MENTELOCALE_SOURCE, events: [], posts: [], failed: true };

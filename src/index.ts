@@ -879,6 +879,12 @@ const worker = {
       if (request.headers.get('x-tick-secret') !== env.WEBHOOK_SECRET) {
         return new Response('unauthorized', { status: 401 });
       }
+      // `?force=collect` runs a crawl now instead of waiting for the collect
+      // hour — used after changing a collector to verify it immediately.
+      if (url.searchParams.get('force') === 'collect') {
+        ctx.waitUntil(runCollect(buildCollectDeps(env)).then(() => undefined).catch(() => undefined));
+        return ok();
+      }
       ctx.waitUntil(runScheduled(env, Date.now()).catch(() => undefined));
       return ok();
     }
