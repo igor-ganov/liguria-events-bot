@@ -911,6 +911,18 @@ const worker = {
       }
       // `?force=collect` runs a crawl now instead of waiting for the collect
       // hour, and returns the run summary so a failing crawl is visible.
+      // Reproject every stored record into the index. The index is otherwise
+      // carried forward untouched for events that did not change, so a new
+      // projected field (the region) would never reach the events already in it.
+      if (url.searchParams.get('force') === 'rebuild') {
+        const records = await readAllRecords(env.EVENTS);
+        const today = romeDate(Date.now());
+        const index = pruneIndex(records.map(toCompact), today).toSorted((a, b) =>
+          a.s < b.s ? -1 : a.s > b.s ? 1 : a.t.localeCompare(b.t),
+        );
+        await writeIndex(env.EVENTS, index);
+        return Response.json({ rebuilt: index.length, records: records.length });
+      }
       if (url.searchParams.get('force') === 'geocode') {
         try {
           return Response.json(await runGeocode(buildGeocodeDeps(env)));

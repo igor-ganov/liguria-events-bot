@@ -11,6 +11,11 @@ import {
   parseJson,
   readProp,
 } from '../util/json.ts';
+import { regionOfCity } from './region.ts';
+
+/** Region slug for a city, or nothing when the city is unknown. */
+const regionOf = (city: string | undefined): string | undefined =>
+  city === undefined ? undefined : regionOfCity(city)?.slug;
 
 export const CATEGORIES = [
   'music',
@@ -105,8 +110,10 @@ export type CompactEvent = Readonly<{
   a?: string;
   /** [lat, lng] point for the map view. */
   g?: readonly [number, number];
-  /** City slug the event is filed under — the site scopes its pages by it. */
+  /** City slug (province capital) — the geocoder's anchor. */
   ct?: string;
+  /** Region slug — what the site scopes its pages by; derived from the city. */
+  rg?: string;
   h?: string;
   u: string;
   img?: string;
@@ -270,6 +277,7 @@ export const venueOf = (venue: string | undefined, address: string | undefined):
 
 export const toCompact = (event: EventRecord): CompactEvent => {
   const venue = venueOf(event.venue, event.address);
+  const region = regionOf(event.city);
   return {
   id: event.id,
   t: event.title,
@@ -286,6 +294,7 @@ export const toCompact = (event: EventRecord): CompactEvent => {
     : { g: coordPair(event.lat, event.lng) }),
   ...(event.time === undefined ? {} : { h: event.time }),
   ...(event.city === undefined ? {} : { ct: event.city }),
+  ...(region === undefined ? {} : { rg: region }),
   ...(event.image === undefined ? {} : { img: event.image }),
   ...(event.descriptions.en === '' ? {} : { d: event.descriptions }),
   ...(event.altLinks === undefined || event.altLinks.length === 0
@@ -426,6 +435,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
   const g = gLat === undefined || gLng === undefined ? undefined : coordPair(gLat, gLng);
   const h = asNonEmptyString(readProp(value, 'h'));
   const ct = asNonEmptyString(readProp(value, 'ct'));
+  const rg = asNonEmptyString(readProp(value, 'rg'));
   const img = asNonEmptyString(readProp(value, 'img'));
   const d = parseLocalized(readProp(value, 'd'), asNonEmptyString(readProp(value, 'd')));
   const tl = parseLocalized(readProp(value, 'tl'));
@@ -445,6 +455,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
     ...(g === undefined ? {} : { g }),
     ...(h === undefined ? {} : { h }),
     ...(ct === undefined ? {} : { ct }),
+    ...(rg === undefined ? {} : { rg }),
     ...(img === undefined ? {} : { img }),
     ...(d === undefined ? {} : { d }),
     ...(l.length === 0 ? {} : { l }),
