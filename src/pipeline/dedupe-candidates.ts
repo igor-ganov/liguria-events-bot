@@ -7,7 +7,13 @@
 import { normalizeTitle } from '../domain/event.ts';
 import type { CompactEvent } from '../domain/event.ts';
 
-/** Generic words that make Italian event titles look alike. */
+/**
+ * Words that make Italian event titles look alike without saying anything
+ * about WHICH event this is. Two village sagre share "sagra", "festa" and
+ * "musica" and nothing else; a venue name shared through the title ("porto
+ * antico", "palazzo ducale") is the venue talking, not the event. Both used
+ * to pass for title similarity.
+ */
 const STOPWORDS = new Set([
   'festival',
   'genova',
@@ -16,12 +22,43 @@ const STOPWORDS = new Set([
   'estate',
   'edizione',
   'stagione',
+  'estiva',
+  'estivo',
   'evento',
   'eventi',
   'internazionale',
   'della',
   'dello',
   'delle',
+  // generic event vocabulary
+  'sagra',
+  'festa',
+  'feste',
+  'musica',
+  'concerto',
+  'concerti',
+  'spettacolo',
+  'spettacoli',
+  'gastronomia',
+  'gastronomici',
+  'gastronomico',
+  'degustazione',
+  'cinema',
+  'aperto',
+  'rassegna',
+  'appuntamento',
+  'programma',
+  'biglietti',
+  'notte',
+  'danza',
+  // venue words that travel inside titles
+  'porto',
+  'antico',
+  'palazzo',
+  'ducale',
+  'piazza',
+  'centro',
+  'storico',
 ]);
 
 export const significantTokens = (title: string): ReadonlySet<string> =>
@@ -65,6 +102,17 @@ export const pairScore = (a: CompactEvent, b: CompactEvent): number =>
 
 const THRESHOLD = 2;
 
+/**
+ * A venue plus a date is NOT evidence: an opera house runs a different opera
+ * every night and a museum runs six exhibitions at once, so venue+date alone
+ * used to manufacture ~90 bogus pairs per run. They outranked the real
+ * cross-source duplicates, ate the whole cap, and the real ones were never
+ * judged. Two listings of one happening always share at least one significant
+ * word, so demand that before anything else counts.
+ */
+const sharesTitleToken = (a: ReadonlySet<string>, b: ReadonlySet<string>): boolean =>
+  [...a].some((token) => b.has(token));
+
 export type CandidatePair = Readonly<{ a: CompactEvent; b: CompactEvent; score: number }>;
 
 /**
@@ -82,15 +130,19 @@ export const urlDuplicates = (index: readonly CompactEvent[]): readonly Candidat
 
 export const dedupeCandidates = (
   index: readonly CompactEvent[],
-  cap = 20,
-): readonly CandidatePair[] =>
-  index
+  cap = 60,
+): readonly CandidatePair[] => {
+  const tokens = new Map(index.map((event) => [event.id, significantTokens(event.t)]));
+  const shares = (a: CompactEvent, b: CompactEvent): boolean =>
+    sharesTitleToken(tokens.get(a.id) ?? new Set(), tokens.get(b.id) ?? new Set());
+  return index
     .flatMap((a, i) =>
       index
         .slice(i + 1)
-        .filter((b) => overlaps(a, b) && !alreadyLinked(a, b))
+        .filter((b) => overlaps(a, b) && shares(a, b) && !alreadyLinked(a, b))
         .map((b) => ({ a, b, score: pairScore(a, b) })),
     )
     .filter((pair) => pair.score >= THRESHOLD)
     .toSorted((x, y) => y.score - x.score)
     .slice(0, cap);
+};

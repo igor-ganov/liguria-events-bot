@@ -36,8 +36,11 @@ describe('significantTokens', () => {
   test('drops stopwords, short words and numbers', () => {
     assert.deepEqual(
       [...significantTokens('FuoriFormato 26. Festival internazionale di danza')].sort(),
-      ['danza', 'fuoriformato'],
+      ['fuoriformato'],
     );
+  });
+  test('drops the generic event vocabulary two unrelated sagre share', () => {
+    assert.deepEqual([...significantTokens('Sagra del raviolo con musica')].sort(), ['raviolo']);
   });
 });
 
@@ -60,11 +63,17 @@ describe('dedupeCandidates', () => {
     assert.equal(pairs[0]?.b.id, 'b');
     assert.deepEqual(urlDuplicates([fuoriA, unrelated]), []);
   });
-  test('pairs same-venue events even without shared tokens; caps output', () => {
-    const v1 = compact({ id: 'v1', t: 'Alpha', s: '2026-07-05', u: 'https://x/1', v: 'Teatro Ivo Chiesa' });
-    const v2 = compact({ id: 'v2', t: 'Beta', s: '2026-07-05', u: 'https://y/2', v: 'Teatro Ivo Chiesa' });
-    assert.equal(dedupeCandidates([v1, v2]).length, 1);
-    assert.equal(dedupeCandidates([v1, v2], 0).length, 0);
+  // A venue plus a date is not evidence: an opera house runs a different
+  // opera every night. Pairing on that alone flooded the cap with false
+  // positives and starved the real cross-source duplicates of a judge call.
+  test('does not pair same-venue same-date events with nothing in the titles', () => {
+    const v1 = compact({ id: 'v1', t: 'Rigoletto', s: '2026-07-05', u: 'https://x/1', v: 'Teatro Carlo Felice' });
+    const v2 = compact({ id: 'v2', t: 'Tosca', s: '2026-07-05', u: 'https://y/2', v: 'Teatro Carlo Felice' });
+    assert.deepEqual(dedupeCandidates([v1, v2]), []);
+  });
+  test('caps the output', () => {
+    assert.equal(dedupeCandidates([fuoriA, fuoriB], 0).length, 0);
+    assert.equal(dedupeCandidates([fuoriA, fuoriB]).length, 1);
   });
 });
 

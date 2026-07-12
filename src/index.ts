@@ -32,6 +32,7 @@ import {
 } from './pipeline/settings.ts';
 import type { Language, Settings } from './pipeline/settings.ts';
 import {
+  appendRunLog,
   eventKey,
   readAllRecords,
   readEventRecord,
@@ -63,10 +64,12 @@ import { asArray, asBoolean, asNonEmptyString, asNumber, readProp } from './util
 
 const QA_CORPUS_DAYS = 30;
 const QA_CORPUS_CAP = 120;
-// Crawl once a day (05:00 Europe/Rome). The hourly tick still fires digests
-// and reminders at their own hours; only collection is daily. Enrichment is
-// delta-only — known enriched events are never re-translated.
-const COLLECT_HOURS: readonly number[] = [5];
+// The crawl is due on elapsed time, never on a clock hour. The pulse arrives
+// from a GitHub cron that routinely drifts 15-40 minutes, so an exact-hour
+// gate skips the window entirely and the next attempt is a day away — that is
+// how the crawl went silent between 02 and 12 July. Enrichment stays
+// delta-only: known enriched events are never re-translated.
+const COLLECT_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const REMINDER_HOUR = 10;
 
 const ok = (): Response => new Response('ok');
@@ -692,13 +695,33 @@ const pushReminders = async (
   );
 };
 
-const runScheduled = async (env: Env, nowMs: number): Promise<void> => {
+/** Newest successful crawl, in ms. Failures are logged with an `error` field
+ *  and do not count, so a broken crawl is retried on the next pulse. */
+const lastCollectMs = (log: readonly unknown[]): number => {
+  const entry = log.find((item) => readProp(item, 'error') === undefined);
+  return (asNumber(readProp(entry, 'at')) ?? 0) * 1000;
+};
+
+const collectIfDue = async (env: Env, nowMs: number): Promise<unknown> => {
+  const log = await readRunLog(env.EVENTS);
+  const age = nowMs - lastCollectMs(log);
+  if (age < COLLECT_INTERVAL_MS) return { kind: 'fresh', ageMs: age };
+  try {
+    return await runCollect(buildCollectDeps(env));
+  } catch (error) {
+    // A crash used to vanish into `.catch(() => undefined)`; log it so a dead
+    // crawl shows up in /status instead of looking like "no new events".
+    const entry = { at: Math.floor(nowMs / 1000), error: String(error) };
+    await appendRunLog(env.EVENTS, entry).catch(() => undefined);
+    return entry;
+  }
+};
+
+const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
   const hour = romeHour(nowMs);
   const today = romeDate(nowMs);
 
-  if (COLLECT_HOURS.includes(hour)) {
-    await runCollect(buildCollectDeps(env)).catch(() => undefined);
-  }
+  const collect = await collectIfDue(env, nowMs);
 
   const index = await readIndex(env.EVENTS);
   const userIds = await listUserIds(env.EVENTS);
@@ -708,6 +731,7 @@ const runScheduled = async (env: Env, nowMs: number): Promise<void> => {
       await pushReminders(env, userId, index, today).catch(() => undefined);
     }
   }
+  return collect;
 };
 
 // ─────────────────────────────────────────────────────────────── export ──
@@ -892,8 +916,13 @@ const worker = {
           );
         }
       }
-      ctx.waitUntil(runScheduled(env, Date.now()).catch(() => undefined));
-      return ok();
+      // Awaited, not `waitUntil`-ed: the caller's exit code and body are the
+      // only place a crawl failure can surface.
+      try {
+        return Response.json(await runScheduled(env, Date.now()));
+      } catch (error) {
+        return Response.json({ error: String(error) }, { status: 500 });
+      }
     }
     if (url.pathname !== '/webhook' || request.method !== 'POST') {
       return new Response('not found', { status: 404 });
