@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: 'Set to "collect" to crawl now instead of waiting for the collect hour'
+        description: 'Set to "collect" to crawl now, or "geocode" to run the geocoding pass'
         required: false
         default: ''
 

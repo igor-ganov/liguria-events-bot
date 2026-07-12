@@ -58,7 +58,8 @@ import {
 } from './pipeline/windows.ts';
 import { fetchForecast } from './weather/open-meteo.ts';
 import { buildIcs, filterEvents, filterFromQuery, langFromQuery } from './calendar/ics.ts';
-import { buildCollectDeps, chatOf } from './wire.ts';
+import { buildCollectDeps, buildGeocodeDeps, chatOf } from './wire.ts';
+import { runGeocode } from './pipeline/geocode.ts';
 import { CATEGORIES } from './domain/event.ts';
 import { asArray, asBoolean, asNonEmptyString, asNumber, readProp } from './util/json.ts';
 
@@ -722,6 +723,11 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
   const today = romeDate(nowMs);
 
   const collect = await collectIfDue(env, nowMs);
+  // Geocoding is its own pass, after the index is committed: a slow or unhappy
+  // Nominatim can cost us pins, never a crawl.
+  const geocode = await runGeocode(buildGeocodeDeps(env)).catch((error: unknown) => ({
+    error: String(error),
+  }));
 
   const index = await readIndex(env.EVENTS);
   const userIds = await listUserIds(env.EVENTS);
@@ -731,7 +737,7 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
       await pushReminders(env, userId, index, today).catch(() => undefined);
     }
   }
-  return collect;
+  return { collect, geocode };
 };
 
 // ─────────────────────────────────────────────────────────────── export ──
@@ -905,6 +911,13 @@ const worker = {
       }
       // `?force=collect` runs a crawl now instead of waiting for the collect
       // hour, and returns the run summary so a failing crawl is visible.
+      if (url.searchParams.get('force') === 'geocode') {
+        try {
+          return Response.json(await runGeocode(buildGeocodeDeps(env)));
+        } catch (error) {
+          return Response.json({ error: String(error) }, { status: 500 });
+        }
+      }
       if (url.searchParams.get('force') === 'collect') {
         try {
           const summary = await runCollect(buildCollectDeps(env));

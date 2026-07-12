@@ -16,7 +16,11 @@ import type { ChatFn } from './llm/client.ts';
 import { makeEnrichEvents, makeExtractFromPosts } from './llm/enrich.ts';
 import { makeJudgeSameEvent } from './llm/same-event.ts';
 import type { CollectDeps } from './pipeline/collect-run.ts';
-import { makeGeocoder } from './pipeline/geocode.ts';
+import type { GeocodeDeps } from './pipeline/geocode.ts';
+
+/** One minute of lookups a run: ~55 addresses at Nominatim's one-per-second.
+ *  The backlog drains over a few runs and then only new venues cost anything. */
+const GEOCODE_BUDGET_MS = 60_000;
 import { sourcePagesOf, tgChannelsOf } from './config.ts';
 import type { Env } from './config.ts';
 
@@ -25,6 +29,15 @@ export const chatOf = (env: Env): ChatFn =>
     ai: env.AI,
     ...(env.GEMINI_API_KEY === undefined ? {} : { geminiApiKey: env.GEMINI_API_KEY }),
   });
+
+/** The geocoding pass — deliberately separate from collecting, so a slow or
+ *  unhappy Nominatim can never cost us a crawl. */
+export const buildGeocodeDeps = (env: Env): GeocodeDeps => ({
+  kv: env.EVENTS,
+  fetchFn: fetch,
+  now: () => Date.now(),
+  budgetMs: GEOCODE_BUDGET_MS,
+});
 
 export const buildCollectDeps = (env: Env): CollectDeps => {
   const chat = chatOf(env);
@@ -48,7 +61,6 @@ export const buildCollectDeps = (env: Env): CollectDeps => {
     details: makeDetailFetcher(fetch),
     judgeSameEvent: makeJudgeSameEvent(chat),
     fetchFn: fetch,
-    geocode: makeGeocoder(env.EVENTS, fetch),
     now,
   };
 };

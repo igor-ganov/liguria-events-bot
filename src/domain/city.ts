@@ -51,5 +51,9 @@ export const ALL_CITIES: readonly City[] = Object.values(CAPITALS)
   .map((name) => ({ slug: citySlug(name), name }))
   .toSorted((a, b) => a.name.localeCompare(b.name));
 
+/** Display name of a city slug — 'reggio-calabria' → 'Reggio Calabria'. */
+export const cityNameOf = (slug: string): string | undefined =>
+  ALL_CITIES.find((city) => city.slug === slug)?.name;
+
 /** The city a visitor lands on when the URL names none. */
 export const DEFAULT_CITY = 'genova';
