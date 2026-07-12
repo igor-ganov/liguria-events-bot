@@ -14,8 +14,12 @@
  *       <span class="grassetto">Toscana</span>
  *       <span class="corsivo">Borgo San Lorenzo (FI)</span>
  *
- * The region search takes one page at a time:
- *   /cerca/Eventi/sez/mesi/<Regione>/prov/cit/rilib
+ * The search has no pagination — it answers with a dozen cards and nothing
+ * more. But it has a SECTION axis, and each section answers with a different
+ * dozen: Toscana yields 13 events unfiltered and 157 across its sections. So the
+ * crawl walks region x section rather than region alone.
+ *
+ *   /cerca/Eventi/<sezione>/mesi/<Regione>/prov/cit/rilib
  */
 import type { RawEvent } from '../domain/event.ts';
 import { cityOfProvince } from '../domain/city.ts';
@@ -33,8 +37,22 @@ export const REGIONS: readonly string[] = [
   'Umbria', "Valle d'Aosta", 'Veneto',
 ];
 
-const regionUrl = (region: string): string =>
-  `${BASE_URL}/cerca/Eventi/sez/mesi/${encodeURIComponent(region)}/prov/cit/rilib`;
+/** 'sez' is their own placeholder for "any section" — it answers with a dozen
+ *  events that the named sections do not fully contain, so it earns its slot.
+ *  Seasonal sections (Natale, Carnevale, Halloween…) are left out: out of season
+ *  they cost a request and return nothing. */
+const SECTIONS: readonly string[] = [
+  'sez', 'Sagre', 'Feste', 'Folklore', 'Enogastronomici', 'EnoMusicali', 'Festival',
+  'Fiere', 'Storici', 'Raduni', 'Culturali', 'Musicali', 'Spettacolo', 'Cinema',
+  'Mostre', 'Mostra Mercato', 'Sportivi', 'Religiosi', 'Vari',
+];
+
+/** Politeness, and self-preservation: 380 concurrent requests at one small site
+ *  is abuse and would get us blocked. */
+const CONCURRENCY = 8;
+
+const searchUrl = (region: string, section: string): string =>
+  `${BASE_URL}/cerca/Eventi/${encodeURIComponent(section)}/mesi/${encodeURIComponent(region)}/prov/cit/rilib`;
 
 /** "10/07/2026" → "2026-07-10". */
 const isoDate = (value: string): string | undefined => {
@@ -115,18 +133,43 @@ export const parseEventiesagreHtml = async (html: string): Promise<readonly RawE
   });
 };
 
-/** One collector per region — they run concurrently with every other source. */
+const fetchSearch = async (
+  fetchFn: FetchFn,
+  region: string,
+  section: string,
+): Promise<readonly RawEvent[]> => {
+  try {
+    const response = await fetchFn(searchUrl(region, section), {
+      headers: { 'user-agent': USER_AGENT },
+    });
+    return response.ok ? await parseEventiesagreHtml(await response.text()) : [];
+  } catch {
+    return [];
+  }
+};
+
+/** One collector for the whole country: region x section, eight at a time. The
+ *  pipeline dedupes by id, so the heavy overlap between sections costs nothing
+ *  but the requests. */
 export const makeEventiesagreCollector =
-  (fetchFn: FetchFn, region: string): Collector =>
+  (fetchFn: FetchFn): Collector =>
   async (): Promise<CollectOutcome> => {
-    try {
-      const response = await fetchFn(regionUrl(region), { headers: { 'user-agent': USER_AGENT } });
-      if (!response.ok) {
-        return { source: EVENTIESAGRE_SOURCE, events: [], posts: [], failed: true };
-      }
-      const events = await parseEventiesagreHtml(await response.text());
-      return { source: EVENTIESAGRE_SOURCE, events, posts: [], failed: false };
-    } catch {
-      return { source: EVENTIESAGRE_SOURCE, events: [], posts: [], failed: true };
+    const queries = REGIONS.flatMap((region) =>
+      SECTIONS.map((section) => ({ region, section })),
+    );
+    const events: RawEvent[] = [];
+    for (let i = 0; i < queries.length; i += CONCURRENCY) {
+      const batch = await Promise.all(
+        queries
+          .slice(i, i + CONCURRENCY)
+          .map(({ region, section }) => fetchSearch(fetchFn, region, section)),
+      );
+      events.push(...batch.flat());
     }
+    return {
+      source: EVENTIESAGRE_SOURCE,
+      events,
+      posts: [],
+      failed: events.length === 0,
+    };
   };

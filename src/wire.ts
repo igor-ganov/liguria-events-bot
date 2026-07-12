@@ -5,7 +5,7 @@
  */
 import { makeVisitgenoaCollector, makeDetailFetcher } from './collectors/visitgenoa.ts';
 import { makeMentelocaleCollector, MENTELOCALE_CITIES } from './collectors/mentelocale.ts';
-import { makeEventiesagreCollector, REGIONS } from './collectors/eventiesagre.ts';
+import { makeEventiesagreCollector } from './collectors/eventiesagre.ts';
 import { makeTicketmasterCollector } from './collectors/ticketmaster.ts';
 import { makeGenovateatroCollector } from './collectors/genovateatro.ts';
 import { makePalazzoducaleCollector } from './collectors/palazzoducale.ts';
@@ -51,7 +51,7 @@ export const buildCollectDeps = (env: Env): CollectDeps => {
       // Genoa keeps its dedicated sources; the rest of Italy arrives through
       // mentelocale's other two agendas and the national aggregator.
       ...MENTELOCALE_CITIES.map((city) => makeMentelocaleCollector(fetch, city)),
-      ...REGIONS.map((region) => makeEventiesagreCollector(fetch, region)),
+      makeEventiesagreCollector(fetch),
       // The only source that answers in JSON, with coordinates — no scraping and
       // no geocoding. Sits out entirely when no key is configured.
       ...(env.TICKETMASTER_KEY === undefined
