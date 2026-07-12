@@ -143,6 +143,10 @@ export type RawEvent = Readonly<{
   source: string;
   /** City the event is filed under (province capital slug); see domain/city. */
   city?: string;
+  /** Some sources (Ticketmaster) hand us the venue's coordinates outright —
+   *  those events never need a geocoding lookup at all. */
+  lat?: number;
+  lng?: number;
   categoryHint?: Category;
   image?: string;
   /** Links of other sources that saw this event in the same run (AC-1.8). */

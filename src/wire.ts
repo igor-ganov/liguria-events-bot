@@ -6,6 +6,7 @@
 import { makeVisitgenoaCollector, makeDetailFetcher } from './collectors/visitgenoa.ts';
 import { makeMentelocaleCollector, MENTELOCALE_CITIES } from './collectors/mentelocale.ts';
 import { makeEventiesagreCollector, REGIONS } from './collectors/eventiesagre.ts';
+import { makeTicketmasterCollector } from './collectors/ticketmaster.ts';
 import { makeGenovateatroCollector } from './collectors/genovateatro.ts';
 import { makePalazzoducaleCollector } from './collectors/palazzoducale.ts';
 import { makePortoanticoCollector } from './collectors/portoantico.ts';
@@ -21,6 +22,7 @@ import type { GeocodeDeps } from './pipeline/geocode.ts';
 /** One minute of lookups a run: ~55 addresses at Nominatim's one-per-second.
  *  The backlog drains over a few runs and then only new venues cost anything. */
 const GEOCODE_BUDGET_MS = 60_000;
+import { romeDate } from './pipeline/clock.ts';
 import { sourcePagesOf, tgChannelsOf } from './config.ts';
 import type { Env } from './config.ts';
 
@@ -50,6 +52,11 @@ export const buildCollectDeps = (env: Env): CollectDeps => {
       // mentelocale's other two agendas and the national aggregator.
       ...MENTELOCALE_CITIES.map((city) => makeMentelocaleCollector(fetch, city)),
       ...REGIONS.map((region) => makeEventiesagreCollector(fetch, region)),
+      // The only source that answers in JSON, with coordinates — no scraping and
+      // no geocoding. Sits out entirely when no key is configured.
+      ...(env.TICKETMASTER_KEY === undefined
+        ? []
+        : [makeTicketmasterCollector(fetch, env.TICKETMASTER_KEY, () => romeDate(now()))]),
       makeGenovateatroCollector(fetch),
       makePalazzoducaleCollector(fetch),
       makePortoanticoCollector(fetch),

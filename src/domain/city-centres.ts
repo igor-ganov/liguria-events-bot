@@ -122,3 +122,19 @@ export const CITY_CENTRES: Readonly<Record<string, readonly [number, number]>> =
 
 export const centreOfCity = (city: string): readonly [number, number] | undefined =>
   CITY_CENTRES[city];
+
+/** The city a point belongs to, by nearest province capital. Sources that hand
+ *  us coordinates but no province (Ticketmaster names the comune — "Assago" —
+ *  and nothing else) still need filing under a city, and the nearest capital is
+ *  its province in all but a handful of border cases; the region it rolls up to
+ *  is right regardless. */
+export const nearestCity = (lat: number, lng: number): string | undefined => {
+  const scored = Object.entries(CITY_CENTRES).map(([slug, [cLat, cLng]]) => {
+    // Longitude degrees shrink with latitude; at 43°N a degree of longitude is
+    // about 0.73 of a degree of latitude. Enough for "which is closest".
+    const dLat = lat - cLat;
+    const dLng = (lng - cLng) * 0.73;
+    return { slug, d2: dLat * dLat + dLng * dLng };
+  });
+  return scored.toSorted((a, b) => a.d2 - b.d2)[0]?.slug;
+};

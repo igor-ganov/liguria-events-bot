@@ -12,6 +12,8 @@ export type Env = Readonly<{
   WEBHOOK_SECRET: string;
   OWNER_CHAT_ID: string;
   GEMINI_API_KEY?: string;
+  /** Ticketmaster Discovery consumer key — absent means the collector sits out. */
+  TICKETMASTER_KEY?: string;
   TG_CHANNELS?: string;
   SOURCE_PAGES?: string;
 }>;

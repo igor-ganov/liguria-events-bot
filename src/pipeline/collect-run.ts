@@ -75,6 +75,22 @@ const identify = async (events: readonly RawEvent[]): Promise<readonly Identifie
     events.map(async (raw) => ({ id: await eventIdOf(raw.title, raw.startDate), raw })),
   );
 
+/** Bounded-concurrency map. KV reads are network round trips: doing 1300 of
+ *  them one after another cost minutes and blew the run's HTTP budget, while
+ *  firing all 1300 at once risks tripping KV's rate limits. */
+const CONCURRENCY = 32;
+
+const mapBounded = async <T, R>(
+  items: readonly T[],
+  fn: (item: T) => Promise<R>,
+): Promise<readonly R[]> => {
+  const out: R[] = [];
+  for (let i = 0; i < items.length; i += CONCURRENCY) {
+    out.push(...(await Promise.all(items.slice(i, i + CONCURRENCY).map(fn))));
+  }
+  return out;
+};
+
 /** Collapse same-id sightings within one run: first wins, gaps fill (AC-1.2). */
 const dedupeWithinRun = (identified: readonly Identified[]): readonly Identified[] => {
   const byId = new Map<string, Identified>();
@@ -106,6 +122,7 @@ const toRecord = (
     url: raw.url,
     source: raw.source,
     ...(raw.city === undefined ? {} : { city: raw.city }),
+    ...(raw.lat === undefined || raw.lng === undefined ? {} : { lat: raw.lat, lng: raw.lng }),
     enriched: enrichment !== undefined,
     addedAt: nowSeconds,
     ...(raw.endDate === undefined ? {} : { endDate: raw.endDate }),
@@ -227,10 +244,13 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
     const mergedIds = new Set<string>();
     const retryRecords: EventRecord[] = [];
     const updatedRecords: EventRecord[] = [];
-    for (const item of knownItems) {
-      const stored = await readEventRecord(deps.kv, item.id);
-      if (stored === undefined) continue;
-      const { event, changed } = mergeEvent(stored, item.raw);
+    const stored = await mapBounded(knownItems, async (item) => ({
+      item,
+      record: await readEventRecord(deps.kv, item.id),
+    }));
+    for (const { item, record } of stored) {
+      if (record === undefined) continue;
+      const { event, changed } = mergeEvent(record, item.raw);
       if (changed) {
         mergedIds.add(item.id);
         updatedRecords.push(event);
@@ -291,8 +311,8 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       (record) => !blockedIds.has(record.id),
     );
     const written = new Map(toWrite.map((record) => [record.id, record]));
-    await Promise.all(
-      [...written.values()].map((record) => writeEventRecord(deps.kv, record, startedAt)),
+    await mapBounded([...written.values()], (record) =>
+      writeEventRecord(deps.kv, record, startedAt),
     );
 
     // Rebuild the index: untouched entries survive, touched ones re-project.
