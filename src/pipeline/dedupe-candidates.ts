@@ -89,16 +89,31 @@ const knownUrls = (event: CompactEvent): readonly string[] => [
 const alreadyLinked = (a: CompactEvent, b: CompactEvent): boolean =>
   knownUrls(a).some((url) => knownUrls(b).includes(url));
 
+// One title's significant words being a subset of the other's — "Gothica" ⊂
+// "Gothica, the immersive show at Parco X". Jaccard alone punishes this (the
+// longer title dilutes the overlap), yet it is a strong same-event signal, so
+// the pair must not fall below the cap and skip the judge.
+const contained = (a: ReadonlySet<string>, b: ReadonlySet<string>): boolean => {
+  const [small, big] = a.size <= b.size ? [a, b] : [b, a];
+  return small.size > 0 && [...small].every((token) => big.has(token));
+};
+
 /**
  * Likelihood ranking: title similarity dominates, identical dates and a
  * shared venue reinforce. Long-running events overlap everything by date, so
  * date terms alone can never reach the threshold.
  */
-export const pairScore = (a: CompactEvent, b: CompactEvent): number =>
-  jaccard(significantTokens(a.t), significantTokens(b.t)) * 4 +
-  Number(a.s === b.s) * 2 +
-  Number((a.e ?? a.s) === (b.e ?? b.s)) +
-  Number(sameVenue(a, b));
+export const pairScore = (a: CompactEvent, b: CompactEvent): number => {
+  const ta = significantTokens(a.t);
+  const tb = significantTokens(b.t);
+  return (
+    jaccard(ta, tb) * 4 +
+    Number(a.s === b.s) * 2 +
+    Number((a.e ?? a.s) === (b.e ?? b.s)) +
+    Number(sameVenue(a, b)) +
+    Number(contained(ta, tb)) * 2
+  );
+};
 
 const THRESHOLD = 2;
 
