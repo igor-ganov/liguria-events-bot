@@ -223,7 +223,13 @@ const mergedAltLinks = (
     incoming.altLinks,
     [linkOf(incoming)],
   );
-  const changed = next.length !== (existing.altLinks ?? []).length;
+  const before = existing.altLinks ?? [];
+  // Changed when a link was added OR an existing link gained/changed its image
+  // (a re-sighting filling a photo keeps the same length) — a length-only check
+  // would drop the backfilled gallery images.
+  const changed =
+    next.length !== before.length ||
+    next.some((link, i) => link.url !== before[i]?.url || link.image !== before[i]?.image);
   return changed && next.length > 0 ? { altLinks: next } : {};
 };
 

@@ -78,6 +78,18 @@ describe('mergeEvent', () => {
     assert.equal(event.venue, 'Teatro');
     assert.equal(changed, false);
   });
+  test('a re-sighting fills a photo onto an existing image-less link', () => {
+    const withLink: EventRecord = {
+      ...record,
+      altLinks: [{ source: 'tg:genova', url: 'https://example.org' }],
+    };
+    const withImage: RawEvent = { ...incoming, image: 'https://img/new.jpg' };
+    const { event, changed } = mergeEvent(withLink, withImage);
+    assert.equal(changed, true); // the added photo must count as a change, or it is dropped
+    assert.deepEqual(event.altLinks, [
+      { source: 'tg:genova', url: 'https://example.org', image: 'https://img/new.jpg' },
+    ]);
+  });
 });
 
 describe('mergeRaw', () => {
