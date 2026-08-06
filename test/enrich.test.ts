@@ -31,7 +31,7 @@ describe('makeEnrichEvents', () => {
       dates: '2026-07-10',
     }));
     const enriched = await makeEnrichEvents(chat)(events);
-    assert.equal(calls.length, 2); // 7 events → two batches of ≤6
+    assert.equal(calls.length, 4); // 7 events → four batches of ≤2 (ENRICH_BATCH)
     assert.deepEqual(enriched.get('one'), { categories: ['music'], descriptions: { en: 'A concert.', it: 'Concerto.', ru: 'Концерт.' }, unusual: false });
     assert.equal(enriched.has('two'), false);
   });

@@ -90,10 +90,25 @@ export type EventRecord = Readonly<{
   city?: string;
   /** false → enrichment failed, retry next run (AC-2.3). */
   enriched: boolean;
+  /** Prompt version the descriptions were produced at; older → re-enriched so
+   *  the corpus converges when the prompt changes (undefined = pre-versioning). */
+  enrichVersion?: number;
   addedAt: number;
 }>;
 
-export type SourceLink = Readonly<{ source: string; url: string }>;
+/** A source that sighted this event: its page URL and, when the listing
+ *  exposed one, that source's own cover image — the raw material for the
+ *  multi-source gallery (every source keeps its photo, with attribution). */
+export type SourceLink = Readonly<{ source: string; url: string; image?: string }>;
+
+/** A source link that carries that source's own cover image when it has one,
+ *  so a merged-away source still contributes its photo to the gallery. */
+export const linkOf = (
+  event: Readonly<{ source: string; url: string; image?: string }>,
+): SourceLink =>
+  event.image === undefined
+    ? { source: event.source, url: event.url }
+    : { source: event.source, url: event.url, image: event.image };
 
 /** Index projection: t=title(original) tl=title localized s=start e=end
  *  c=categories f=free v=venue h=time u=url img=image d=description
@@ -183,7 +198,7 @@ const mergedAltLinks = (
     existing.url,
     existing.altLinks,
     incoming.altLinks,
-    [{ source: incoming.source, url: incoming.url }],
+    [linkOf(incoming)],
   );
   const changed = next.length !== (existing.altLinks ?? []).length;
   return changed && next.length > 0 ? { altLinks: next } : {};
@@ -267,9 +282,7 @@ const unionLinks = (
 /** Merge two raw sightings of the same event within one run: first wins,
  *  gaps fill, and the second source's link is preserved (AC-1.8). */
 export const mergeRaw = (first: RawEvent, second: RawEvent): RawEvent => {
-  const altLinks = unionLinks(first.url, first.altLinks, second.altLinks, [
-    { source: second.source, url: second.url },
-  ]);
+  const altLinks = unionLinks(first.url, first.altLinks, second.altLinks, [linkOf(second)]);
   return {
     ...second,
     ...first,

@@ -129,8 +129,10 @@ describe('mergeDuplicates', () => {
     assert.equal(merged.venue, 'Teatro della Tosse');
     assert.equal(merged.image, 'https://img/x.jpg');
     assert.deepEqual(merged.categories, ['theatre', 'music']);
+    // The merged-away source keeps its cover image on its link, so it can still
+    // contribute a photo to the multi-source gallery.
     assert.deepEqual(merged.altLinks, [
-      { source: 'genovateatro', url: 'https://www.genovateatro.it/x.htm' },
+      { source: 'genovateatro', url: 'https://www.genovateatro.it/x.htm', image: 'https://img/x.jpg' },
     ]);
   });
 });

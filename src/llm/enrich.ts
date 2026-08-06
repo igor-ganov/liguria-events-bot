@@ -33,9 +33,15 @@ export type Enrichment = Readonly<{
   blocked?: boolean;
 }>;
 
-// Three-language descriptions cost ~3× tokens; 4 events per call keeps the
-// completion under the 4096 cap (the truncated-JSON failure we hit before).
-const ENRICH_BATCH = 4;
+// Three-language descriptions cost ~3× tokens, and the richer 3-5 sentence
+// bodies below roughly doubled the per-event output — 2 events per call keeps
+// the completion under the 4096 cap (the truncated-JSON failure we hit before).
+const ENRICH_BATCH = 2;
+
+// Bump when the enrichment prompt changes materially: records enriched at an
+// older version are re-run so the whole corpus converges on the new output.
+// v2 = the richer 3-5 sentence descriptions (was 1-2 sentences at v1/undefined).
+export const ENRICH_VERSION = 2;
 const EXTRACT_BATCH = 20;
 
 export const chunk = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
@@ -52,9 +58,14 @@ const ENRICH_SYSTEM = [
   'For EVERY input event return 1 to 3 categories from this fixed list,',
   'most specific first (a food festival with concerts is ["food","music"]):',
   CATEGORIES.join(', '),
-  'a fresh, neutral 1-2 sentence description IN YOUR OWN WORDS in EACH of',
-  'English, Italian and Russian — summarize what it is, where, and why it is',
-  'interesting. Never copy source sentences verbatim and do not invent facts.',
+  'a fresh, neutral 3-5 sentence description IN YOUR OWN WORDS in EACH of',
+  'English, Italian and Russian. Cover, drawing ONLY on what the input supports:',
+  '(1) what the event actually is; (2) what makes it distinctive or worth',
+  'attending; (3) concrete practical detail the source gives — the venue, the',
+  'dates or times, whether it is free or ticketed. Be specific and informative,',
+  'not generic filler. Never copy source sentences verbatim, and NEVER invent',
+  'facts: if the source does not state something, simply leave it out rather',
+  'than guessing.',
   'Also give a display "titles" map with the event title in each language:',
   'translate only the descriptive / common-noun parts and KEEP proper nouns',
   'unchanged (festival & event names, venue names, person & brand names). If a',

@@ -14,6 +14,7 @@ import {
 import type { CompactEvent, EventRecord, RawEvent } from '../domain/event.ts';
 import { mergeDuplicates, orderByAge } from '../domain/merge-duplicates.ts';
 import type { Collector, FetchFn, RawPost } from '../collectors/types.ts';
+import { ENRICH_VERSION } from '../llm/enrich.ts';
 import type { Enrichment, PendingEnrich } from '../llm/enrich.ts';
 import { dedupeCandidates, urlDuplicates } from './dedupe-candidates.ts';
 import { dropSharedArtwork } from './shared-artwork.ts';
@@ -124,6 +125,7 @@ const toRecord = (
     ...(raw.city === undefined ? {} : { city: raw.city }),
     ...(raw.lat === undefined || raw.lng === undefined ? {} : { lat: raw.lat, lng: raw.lng }),
     enriched: enrichment !== undefined,
+    ...(enrichment === undefined ? {} : { enrichVersion: ENRICH_VERSION }),
     addedAt: nowSeconds,
     ...(raw.endDate === undefined ? {} : { endDate: raw.endDate }),
     ...(raw.time === undefined ? {} : { time: raw.time }),
@@ -152,7 +154,7 @@ const pendingOf = (item: Identified): PendingEnrich => ({
   ...(item.raw.categoryHint === undefined ? {} : { categoryHint: item.raw.categoryHint }),
   ...(item.raw.rawDescription === undefined
     ? {}
-    : { raw: item.raw.rawDescription.slice(0, 500) }),
+    : { raw: item.raw.rawDescription.slice(0, 1400) }),
 });
 
 const pendingOfRecord = (record: EventRecord): PendingEnrich => ({
@@ -164,7 +166,7 @@ const pendingOfRecord = (record: EventRecord): PendingEnrich => ({
   ...(record.city === undefined ? {} : { city: record.city }),
   ...(record.rawDescription === undefined
     ? {}
-    : { raw: record.rawDescription.slice(0, 500) }),
+    : { raw: record.rawDescription.slice(0, 1400) }),
 });
 
 type FuzzyOutcome = Readonly<{
@@ -255,7 +257,9 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
         mergedIds.add(item.id);
         updatedRecords.push(event);
       }
-      if (!event.enriched) retryRecords.push(event);
+      // Re-enrich when it never succeeded OR was written by an older prompt
+      // version — that backfills the richer descriptions across the corpus.
+      if (!event.enriched || (event.enrichVersion ?? 0) < ENRICH_VERSION) retryRecords.push(event);
     }
 
     const detailed = await deps.details(freshItems.map((item) => item.raw));
@@ -292,6 +296,7 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
             categories: enrichment.categories,
             descriptions: enrichment.descriptions,
             enriched: true,
+            enrichVersion: ENRICH_VERSION,
             ...(enrichment.titles === undefined ? {} : { titles: enrichment.titles }),
             ...(record.address === undefined && enrichment.address !== undefined
               ? { address: enrichment.address }

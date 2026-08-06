@@ -3,6 +3,7 @@
  * earlier-collected record stays primary (its id/links are already out in
  * chats and calendars); the newer one fills gaps and donates its links.
  */
+import { linkOf } from './event.ts';
 import type { Category, EventRecord, SourceLink } from './event.ts';
 
 const unionCategories = (
@@ -13,7 +14,7 @@ const unionCategories = (
 const unionLinks = (primary: EventRecord, secondary: EventRecord): readonly SourceLink[] => {
   const all = [
     ...(primary.altLinks ?? []),
-    { source: secondary.source, url: secondary.url },
+    linkOf(secondary),
     ...(secondary.altLinks ?? []),
   ];
   const seen = new Set([primary.url]);

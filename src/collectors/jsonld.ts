@@ -105,7 +105,7 @@ export const parseJsonLdEvent = (event: unknown, site: JsonLdSite): readonly Raw
       ...(endDate === undefined || endDate < startDate ? {} : { endDate }),
       ...(time === undefined ? {} : { time }),
       ...(place.venue === undefined ? {} : { venue: place.venue }),
-      ...(description === undefined ? {} : { rawDescription: description.slice(0, 800) }),
+      ...(description === undefined ? {} : { rawDescription: description.slice(0, 1600) }),
       ...(image === undefined ? {} : { image }),
       ...(price === undefined ? {} : { priceInfo: price }),
     },
