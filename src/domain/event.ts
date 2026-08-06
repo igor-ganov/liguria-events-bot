@@ -110,6 +110,29 @@ export const linkOf = (
     ? { source: event.source, url: event.url }
     : { source: event.source, url: event.url, image: event.image };
 
+/** Dedupe source links by url (first-wins for source, order preserved) while
+ *  FILLING the image from whichever occurrence has one — so a re-merge of an
+ *  image-bearing sighting adds its photo to an older, image-less link instead
+ *  of being discarded as a duplicate. `excludeUrl` drops the primary's own url. */
+export const dedupeLinks = (
+  links: readonly SourceLink[],
+  excludeUrl?: string,
+): readonly SourceLink[] => {
+  const byUrl = new Map<string, SourceLink>();
+  for (const link of links) {
+    if (link.url === excludeUrl) continue;
+    const prev = byUrl.get(link.url);
+    const image = prev?.image ?? link.image;
+    byUrl.set(
+      link.url,
+      image === undefined
+        ? { source: prev?.source ?? link.source, url: link.url }
+        : { source: prev?.source ?? link.source, url: link.url, image },
+    );
+  }
+  return [...byUrl.values()];
+};
+
 /** Index projection: t=title(original) tl=title localized s=start e=end
  *  c=categories f=free v=venue h=time u=url img=image d=description
  *  l=alt links x=unusual/hidden-gem. */
@@ -264,20 +287,12 @@ export const mergeEvent = (
   return { event, changed };
 };
 
-/** Union of source links, first-wins deduped by url, excluding `primaryUrl`. */
+/** Union of source links, deduped by url (image-filling), excluding `primaryUrl`. */
 const unionLinks = (
   primaryUrl: string,
   ...groups: readonly (readonly SourceLink[] | undefined)[]
 ): readonly SourceLink[] =>
-  groups
-    .flatMap((group) => group ?? [])
-    .reduce<readonly SourceLink[]>(
-      (kept, link) =>
-        link.url === primaryUrl || kept.some((existing) => existing.url === link.url)
-          ? kept
-          : [...kept, link],
-      [],
-    );
+  dedupeLinks(groups.flatMap((group) => group ?? []), primaryUrl);
 
 /** Merge two raw sightings of the same event within one run: first wins,
  *  gaps fill, and the second source's link is preserved (AC-1.8). */

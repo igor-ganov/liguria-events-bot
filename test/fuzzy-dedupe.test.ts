@@ -135,4 +135,24 @@ describe('mergeDuplicates', () => {
       { source: 'genovateatro', url: 'https://www.genovateatro.it/x.htm', image: 'https://img/x.jpg' },
     ]);
   });
+
+  test('re-merging an image-bearing sighting fills an older image-less link', () => {
+    // The primary already links this source but without a photo (merged before
+    // per-source images existed). A fresh sighting of the same url carries one.
+    const primary: EventRecord = {
+      ...older,
+      altLinks: [{ source: 'genovateatro', url: 'https://www.genovateatro.it/x.htm' }],
+    };
+    const freshSighting: EventRecord = {
+      ...newer,
+      id: 'c',
+      url: 'https://www.genovateatro.it/x.htm',
+      source: 'genovateatro',
+      image: 'https://img/fresh.jpg',
+      addedAt: 300,
+    };
+    const merged = mergeDuplicates(primary, freshSighting);
+    const link = merged.altLinks?.find((l) => l.url === 'https://www.genovateatro.it/x.htm');
+    assert.equal(link?.image, 'https://img/fresh.jpg');
+  });
 });
