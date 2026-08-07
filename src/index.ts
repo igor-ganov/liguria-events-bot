@@ -6,7 +6,7 @@
 import { isOperator } from './config.ts';
 import type { Env } from './config.ts';
 import { isCategory, parseLocalized, toCompact } from './domain/event.ts';
-import type { Category, CompactEvent, SourceLink } from './domain/event.ts';
+import type { Category, CompactEvent, EventRecord, SourceLink } from './domain/event.ts';
 import { makeBot, sendLong } from './delivery/bot-api.ts';
 import type { Bot, Keyboard } from './delivery/bot-api.ts';
 import {
@@ -922,6 +922,53 @@ const worker = {
         );
         await writeIndex(env.EVENTS, index);
         return Response.json({ rebuilt: index.length, records: records.length });
+      }
+      // Backfill multi-source gallery photos onto events merged before the
+      // per-source-image era: for each altLink without an image, fetch that
+      // source page's og:image and store it. Idempotent and re-runnable — a
+      // subrequest cap just means the next call fills more.
+      if (url.searchParams.get('force') === 'backfill-images') {
+        const records = await readAllRecords(env.EVENTS);
+        const UA = 'DoveGo-bot/1.0 (+https://dovego.it)';
+        const ogImage = async (link: string): Promise<string | undefined> => {
+          try {
+            const res = await fetch(link, { headers: { 'user-agent': UA }, signal: AbortSignal.timeout(8000) });
+            if (!res.ok) return undefined;
+            const html = await res.text();
+            const forward = /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i.exec(html);
+            const reverse = /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i.exec(html);
+            return forward?.[1] ?? reverse?.[1];
+          } catch {
+            return undefined;
+          }
+        };
+        let imagesFilled = 0;
+        const updated: EventRecord[] = [];
+        for (const record of records) {
+          const alt = record.altLinks;
+          if (alt === undefined || alt.every((l) => l.image !== undefined)) continue;
+          const nextLinks: readonly SourceLink[] = await Promise.all(
+            alt.map(async (l): Promise<SourceLink> => {
+              if (l.image !== undefined) return l;
+              const img = await ogImage(l.url);
+              if (img === undefined) return l;
+              imagesFilled += 1;
+              return { ...l, image: img };
+            }),
+          );
+          if (nextLinks.some((l, i) => l.image !== alt[i]?.image)) {
+            const next: EventRecord = { ...record, altLinks: nextLinks };
+            updated.push(next);
+            await env.EVENTS.put(eventKey(record.id), JSON.stringify(next));
+          }
+        }
+        const merged = records.map((r) => updated.find((u) => u.id === r.id) ?? r);
+        const today = romeDate(Date.now());
+        const index = pruneIndex(merged.map(toCompact), today).toSorted((a, b) =>
+          a.s < b.s ? -1 : a.s > b.s ? 1 : a.t.localeCompare(b.t),
+        );
+        await writeIndex(env.EVENTS, index);
+        return Response.json({ recordsUpdated: updated.length, imagesFilled });
       }
       if (url.searchParams.get('force') === 'geocode') {
         try {

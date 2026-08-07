@@ -113,6 +113,7 @@ const toRecord = (
   const { raw } = item;
   const free = freeFromPrice(raw.priceInfo);
   const address = raw.address ?? enrichment?.address;
+  const time = raw.time ?? enrichment?.time;
   return {
     id: item.id,
     title: raw.title,
@@ -128,7 +129,7 @@ const toRecord = (
     ...(enrichment === undefined ? {} : { enrichVersion: ENRICH_VERSION }),
     addedAt: nowSeconds,
     ...(raw.endDate === undefined ? {} : { endDate: raw.endDate }),
-    ...(raw.time === undefined ? {} : { time: raw.time }),
+    ...(time === undefined ? {} : { time }),
     ...(raw.venue === undefined ? {} : { venue: raw.venue }),
     ...(address === undefined ? {} : { address }),
     ...(raw.priceInfo === undefined ? {} : { priceInfo: raw.priceInfo }),
@@ -297,6 +298,9 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
             descriptions: enrichment.descriptions,
             enriched: true,
             enrichVersion: ENRICH_VERSION,
+            ...(record.time === undefined && enrichment.time !== undefined
+              ? { time: enrichment.time }
+              : {}),
             ...(enrichment.titles === undefined ? {} : { titles: enrichment.titles }),
             ...(record.address === undefined && enrichment.address !== undefined
               ? { address: enrichment.address }
