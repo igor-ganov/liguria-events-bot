@@ -141,6 +141,14 @@ describe('parseEventRecord / toCompact / parseIndex', () => {
     assert.equal(parseEventRecord('{"id":"x"}'), undefined);
     assert.equal(parseEventRecord('not json'), undefined);
   });
+  test('a source link keeps its gallery image through the round-trip', () => {
+    const withGallery: EventRecord = {
+      ...record,
+      altLinks: [{ source: 'genovateatro', url: 'https://g/x', image: 'https://img/g.jpg' }],
+    };
+    const parsed = parseEventRecord(JSON.stringify(withGallery));
+    assert.equal(parsed?.altLinks?.[0]?.image, 'https://img/g.jpg');
+  });
   test('index round-trip keeps compact fields', () => {
     const compact = toCompact({ ...record, endDate: '2026-07-12', free: true, time: '21:00' });
     const parsed = parseIndex(JSON.stringify([compact, { bad: true }]));

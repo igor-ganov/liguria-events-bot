@@ -369,7 +369,12 @@ const parseSourceLinks = (value: unknown): readonly SourceLink[] =>
   (asArray(value) ?? []).flatMap((item): readonly SourceLink[] => {
     const source = asNonEmptyString(readProp(item, 'source'));
     const url = asNonEmptyString(readProp(item, 'url'));
-    return source === undefined || url === undefined ? [] : [{ source, url }];
+    // Preserve the per-source cover image — dropping it here silently wiped
+    // every gallery photo on read, however carefully the merges stored it.
+    const image = asNonEmptyString(readProp(item, 'image'));
+    return source === undefined || url === undefined
+      ? []
+      : [image === undefined ? { source, url } : { source, url, image }];
   });
 
 /** Read a localized map, tolerating the legacy plain string (→ en) and
