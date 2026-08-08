@@ -141,6 +141,13 @@ describe('parseEventRecord / toCompact / parseIndex', () => {
     assert.equal(parseEventRecord('{"id":"x"}'), undefined);
     assert.equal(parseEventRecord('not json'), undefined);
   });
+  test('durationMin and enrichVersion survive the round-trip (not stripped on read)', () => {
+    const withMeta: EventRecord = { ...record, durationMin: 90, enrichVersion: 4 };
+    const parsed = parseEventRecord(JSON.stringify(withMeta));
+    assert.equal(parsed?.durationMin, 90);
+    assert.equal(parsed?.enrichVersion, 4);
+    assert.equal(toCompact(withMeta).du, 90);
+  });
   test('a source link keeps its gallery image through the round-trip', () => {
     const withGallery: EventRecord = {
       ...record,

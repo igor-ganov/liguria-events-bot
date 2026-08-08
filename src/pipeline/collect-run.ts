@@ -130,6 +130,7 @@ const toRecord = (
     addedAt: nowSeconds,
     ...(raw.endDate === undefined ? {} : { endDate: raw.endDate }),
     ...(time === undefined ? {} : { time }),
+    ...(enrichment?.durationMin === undefined ? {} : { durationMin: enrichment.durationMin }),
     ...(raw.venue === undefined ? {} : { venue: raw.venue }),
     ...(address === undefined ? {} : { address }),
     ...(raw.priceInfo === undefined ? {} : { priceInfo: raw.priceInfo }),
@@ -300,6 +301,9 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
             enrichVersion: ENRICH_VERSION,
             ...(record.time === undefined && enrichment.time !== undefined
               ? { time: enrichment.time }
+              : {}),
+            ...(record.durationMin === undefined && enrichment.durationMin !== undefined
+              ? { durationMin: enrichment.durationMin }
               : {}),
             ...(enrichment.titles === undefined ? {} : { titles: enrichment.titles }),
             ...(record.address === undefined && enrichment.address !== undefined

@@ -63,6 +63,8 @@ export type EventRecord = Readonly<{
   endDate?: string;
   /** 'HH:MM' when the source exposes it. */
   time?: string;
+  /** Attendance length in minutes, when the source stated it (AC-duration). */
+  durationMin?: number;
   venue?: string;
   address?: string;
   /** Map coordinates of the venue/address, for the map view. */
@@ -153,6 +155,8 @@ export type CompactEvent = Readonly<{
   /** Region slug — what the site scopes its pages by; derived from the city. */
   rg?: string;
   h?: string;
+  /** Attendance length in minutes, when the source stated it. */
+  du?: number;
   u: string;
   img?: string;
   d?: LocalizedText;
@@ -340,6 +344,7 @@ export const toCompact = (event: EventRecord): CompactEvent => {
     ? {}
     : { g: coordPair(event.lat, event.lng) }),
   ...(event.time === undefined ? {} : { h: event.time }),
+  ...(event.durationMin === undefined ? {} : { du: event.durationMin }),
   ...(event.city === undefined ? {} : { ct: event.city }),
   ...(region === undefined ? {} : { rg: region }),
   ...(event.image === undefined ? {} : { img: event.image }),
@@ -422,6 +427,10 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
   }
   const endDate = asNonEmptyString(readProp(value, 'endDate'));
   const time = asNonEmptyString(readProp(value, 'time'));
+  const durationMin = asNumber(readProp(value, 'durationMin'));
+  // Preserve the enrich version — dropping it here re-enriched every record on
+  // every run (it always read back as undefined < current version).
+  const enrichVersion = asNumber(readProp(value, 'enrichVersion'));
   const venue = asNonEmptyString(readProp(value, 'venue'));
   const address = asNonEmptyString(readProp(value, 'address'));
   const lat = asNumber(readProp(value, 'lat'));
@@ -447,6 +456,8 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
     addedAt,
     ...(endDate === undefined ? {} : { endDate }),
     ...(time === undefined ? {} : { time }),
+    ...(durationMin === undefined ? {} : { durationMin }),
+    ...(enrichVersion === undefined ? {} : { enrichVersion }),
     ...(venue === undefined ? {} : { venue }),
     ...(address === undefined ? {} : { address }),
     ...(lat === undefined ? {} : { lat }),
@@ -486,6 +497,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
   const gLng = asNumber(gArr[1]);
   const g = gLat === undefined || gLng === undefined ? undefined : coordPair(gLat, gLng);
   const h = asNonEmptyString(readProp(value, 'h'));
+  const du = asNumber(readProp(value, 'du'));
   const ct = asNonEmptyString(readProp(value, 'ct'));
   const rg = asNonEmptyString(readProp(value, 'rg'));
   const img = asNonEmptyString(readProp(value, 'img'));
@@ -506,6 +518,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
     ...(a === undefined ? {} : { a }),
     ...(g === undefined ? {} : { g }),
     ...(h === undefined ? {} : { h }),
+    ...(du === undefined ? {} : { du }),
     ...(ct === undefined ? {} : { ct }),
     ...(rg === undefined ? {} : { rg }),
     ...(img === undefined ? {} : { img }),

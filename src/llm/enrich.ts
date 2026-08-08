@@ -30,6 +30,8 @@ export type Enrichment = Readonly<{
   address?: string;
   /** Start time HH:MM, only when the source text states one; else absent. */
   time?: string;
+  /** Attendance length in minutes, only when the source clearly states it. */
+  durationMin?: number;
   unusual: boolean;
   /** Content-policy violation — such events are dropped, never stored. */
   blocked?: boolean;
@@ -44,7 +46,8 @@ const ENRICH_BATCH = 2;
 // older version are re-run so the whole corpus converges on the new output.
 // v2 = the richer 3-5 sentence descriptions (was 1-2 sentences at v1/undefined).
 // v3 = also extract a start time (HH:MM) from the source text when stated.
-export const ENRICH_VERSION = 3;
+// v4 = also extract an attendance duration (minutes) when the source states it.
+export const ENRICH_VERSION = 4;
 const EXTRACT_BATCH = 20;
 
 export const chunk = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
@@ -81,6 +84,9 @@ const ENRICH_SYSTEM = [
   'Also give "time": the start time as "HH:MM" (24-hour) ONLY when the source',
   'text explicitly states a clock time (e.g. "ore 21", "h 18:30", "alle 20:45");',
   'omit the field otherwise — never guess a time.',
+  'Also give "durationMin": the attendance length in whole minutes ONLY when the',
+  'source clearly implies it (e.g. "spettacolo di 90 minuti", "tour di 2 ore",',
+  'explicit start AND end times). Omit it otherwise — never guess a duration.',
   'Also set "unusual": true ONLY for offbeat, niche, experimental or',
   'distinctly non-touristy happenings (a neighbourhood performance, an',
   'unconventional venue, an oddball one-off, immersive/site-specific art);',
@@ -93,7 +99,7 @@ const ENRICH_SYSTEM = [
   'otherwise illegal. Ordinary cultural, political, religious or community',
   'events are NOT blocked — block only genuinely harmful content. In doubt, false.',
   'Respond with STRICT valid JSON, no markdown, no backticks:',
-  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "titles": { "en": "…", "it": "…", "ru": "…" }, "descriptions": { "en": "…", "it": "…", "ru": "…" }, "address": "…", "time": "HH:MM", "unusual": true|false, "blocked": true|false } ] }',
+  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "titles": { "en": "…", "it": "…", "ru": "…" }, "descriptions": { "en": "…", "it": "…", "ru": "…" }, "address": "…", "time": "HH:MM", "durationMin": 90, "unusual": true|false, "blocked": true|false } ] }',
 ].join('\n');
 
 const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment])[] => {
@@ -112,6 +118,9 @@ const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment
   const address = asNonEmptyString(readProp(value, 'address'));
   const rawTime = asNonEmptyString(readProp(value, 'time'));
   const time = rawTime !== undefined && /^([01]\d|2[0-3]):[0-5]\d$/.test(rawTime) ? rawTime : undefined;
+  const rawDur = readProp(value, 'durationMin');
+  const durationMin =
+    typeof rawDur === 'number' && rawDur >= 15 && rawDur <= 1440 ? Math.round(rawDur) : undefined;
   const enrichment: Enrichment = {
     categories,
     descriptions,
@@ -119,6 +128,7 @@ const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment
     ...(titles === undefined ? {} : { titles }),
     ...(address === undefined ? {} : { address }),
     ...(time === undefined ? {} : { time }),
+    ...(durationMin === undefined ? {} : { durationMin }),
     ...(asBoolean(readProp(value, 'blocked')) === true ? { blocked: true } : {}),
   };
   return [[id, enrichment]];
