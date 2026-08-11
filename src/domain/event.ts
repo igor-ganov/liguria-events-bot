@@ -162,6 +162,9 @@ export type CompactEvent = Readonly<{
   d?: LocalizedText;
   l?: readonly SourceLink[];
   x?: boolean;
+  /** First-seen time (epoch seconds) — the crawler's `addedAt`, projected so the
+   *  feed can offer a "newest added first" sort. */
+  cr?: number;
 }>;
 
 /** Display title in a language — falls back to the original (AC-2b.2). */
@@ -336,6 +339,7 @@ export const toCompact = (event: EventRecord): CompactEvent => {
   s: event.startDate,
   c: event.categories,
   u: event.url,
+  cr: event.addedAt,
   ...(event.endDate === undefined ? {} : { e: event.endDate }),
   ...(event.free === true ? { f: true } : {}),
   ...(venue === undefined ? {} : { v: venue }),
@@ -505,6 +509,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
   const tl = parseLocalized(readProp(value, 'tl'));
   const l = parseSourceLinks(readProp(value, 'l'));
   const x = asBoolean(readProp(value, 'x'));
+  const cr = asNumber(readProp(value, 'cr'));
   return {
     id,
     t,
@@ -525,6 +530,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
     ...(d === undefined ? {} : { d }),
     ...(l.length === 0 ? {} : { l }),
     ...(x === true ? { x: true } : {}),
+    ...(cr === undefined ? {} : { cr }),
   };
 };
 

@@ -161,4 +161,10 @@ describe('parseEventRecord / toCompact / parseIndex', () => {
     const parsed = parseIndex(JSON.stringify([compact, { bad: true }]));
     assert.deepEqual(parsed, [compact]);
   });
+  test('cr projects the first-seen addedAt and survives the index round-trip', () => {
+    const compact = toCompact(record);
+    assert.equal(compact.cr, record.addedAt); // 1_700_000_000
+    const parsed = parseIndex(JSON.stringify([compact]));
+    assert.equal(parsed?.[0]?.cr, record.addedAt);
+  });
 });
