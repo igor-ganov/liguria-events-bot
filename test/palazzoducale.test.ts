@@ -62,6 +62,13 @@ describe('parsePalazzoducaleHtml (fixture)', () => {
     assert.ok(withImage.length >= 5, 'expected card images');
     const timed = events.filter((event) => event.time !== undefined);
     assert.ok(timed.length >= 5, 'expected timed events with `ore HH:MM`');
+    // Every Palazzo Ducale event is stamped with the palace's coordinates, so it
+    // never depends on the geocoder (which chokes on the room names).
+    const located = events.filter((event) => event.lat !== undefined && event.lng !== undefined);
+    assert.ok(located.length >= Math.ceil(events.length / 2), 'most events should carry the palace coords');
+    for (const event of located) {
+      assert.ok(Math.abs((event.lat ?? 0) - 44.4076) < 0.01 && Math.abs((event.lng ?? 0) - 8.9344) < 0.01);
+    }
   });
 });
 

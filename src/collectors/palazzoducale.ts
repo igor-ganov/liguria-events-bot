@@ -33,6 +33,13 @@ const TYPE_HINTS: readonly (readonly [RegExp, Category])[] = [
 export const mapDucaleType = (label: string): Category | undefined =>
   TYPE_HINTS.find(([pattern]) => pattern.test(label))?.[1];
 
+// Palazzo Ducale is one building on Piazza Matteotti; its whole programme runs
+// there (Cortile Maggiore, Sala del Maggior Consiglio, Sottoporticato, Munizioniere
+// …), so the palace's own coordinates place every event precisely. The geocoder
+// otherwise chokes on the room names and left 22 of 24 events off the map.
+const PALACE = { lat: 44.40758, lng: 8.93436 } as const;
+const atPalace = (venue: string): boolean => venue === '' || /palazzo\s*ducale/i.test(venue);
+
 type Draft = { href: string; title: string; type: string; info: string; img: string };
 
 export const parsePalazzoducaleHtml = async (html: string): Promise<readonly RawEvent[]> => {
@@ -92,6 +99,7 @@ export const parsePalazzoducaleHtml = async (html: string): Promise<readonly Raw
         ...(info.endDate === undefined ? {} : { endDate: info.endDate }),
         ...(info.time === undefined ? {} : { time: info.time }),
         ...(venue === '' ? {} : { venue }),
+        ...(atPalace(venue) ? { lat: PALACE.lat, lng: PALACE.lng } : {}),
         ...(hint === undefined ? {} : { categoryHint: hint }),
         ...(draft.img === '' ? {} : { image: draft.img }),
       },

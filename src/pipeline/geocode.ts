@@ -137,7 +137,19 @@ const lookup = async (
   if (boxed !== undefined) return boxed;
   await sleep(RATE_MS);
   const open = await query(fetchFn, { q: address });
-  return open !== undefined && !misplaced(city, open) ? open : undefined;
+  if (open !== undefined && !misplaced(city, open)) return open;
+  // Last resort: the bare venue (the part before the first comma). A landmark
+  // name — "Castello della Pietra", "Teatro Carlo Felice" — often resolves when
+  // the full street address does not, and it catches events filed under the
+  // province capital but actually in a comune the address misnames. Still
+  // distance-checked, so a name collision elsewhere in Italy is refused.
+  const venue = address.split(',')[0]?.trim();
+  if (venue !== undefined && venue !== '' && venue !== address) {
+    await sleep(RATE_MS);
+    const byVenue = await query(fetchFn, { q: `${venue}, Italia` });
+    if (byVenue !== undefined && !misplaced(city, byVenue)) return byVenue;
+  }
+  return undefined;
 };
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
