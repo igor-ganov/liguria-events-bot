@@ -86,10 +86,11 @@ export const needsPoint = (event: CompactEvent): boolean => {
 };
 
 // Versioned: a cached miss is never retried, so improving the lookup means
-// giving every address that missed under the old one a fresh chance. v3 = after
-// JSON-LD coords land at scrape time and the v5 enrichment cleans up addresses.
+// giving every address that missed under the old one a fresh chance. v4 = the
+// bare-venue fallback landed after v3's cache was already written, so its misses
+// (Teatro alla Scala, Castello della Pietra…) never got the new last resort.
 const addressKey = (city: string, address: string): string =>
-  `geo3:${city}:${address.trim().toLowerCase()}`;
+  `geo4:${city}:${address.trim().toLowerCase()}`;
 
 const parsePoint = (value: unknown): Point | undefined => {
   const first = Array.isArray(value) ? value[0] : undefined;
