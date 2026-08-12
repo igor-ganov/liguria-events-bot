@@ -70,6 +70,17 @@ const imageOf = (event: unknown): string | undefined => {
   return asNonEmptyString(image) ?? asNonEmptyString(readProp(image, 'url'));
 };
 
+/** schema.org Places carry `geo: { latitude, longitude }` — the venue's own
+ *  coordinates, straight from the source. Taking them here means the event never
+ *  needs the geocoder (and never misses). latitude/longitude may be number or
+ *  string; 0,0 is a placeholder, not a location. */
+const geoOf = (event: unknown): Readonly<{ lat: number; lng: number }> | undefined => {
+  const geo = readProp(readProp(event, 'location'), 'geo');
+  const lat = Number(readProp(geo, 'latitude'));
+  const lng = Number(readProp(geo, 'longitude'));
+  return Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0) ? { lat, lng } : undefined;
+};
+
 const urlOf = (event: unknown): string | undefined =>
   asNonEmptyString(readProp(event, 'url')) ??
   asNonEmptyString(readProp(readProp(event, 'offers'), 'url'));
@@ -92,6 +103,7 @@ export const parseJsonLdEvent = (event: unknown, site: JsonLdSite): readonly Raw
   const image = imageOf(event);
   const price = priceOf(event);
   const time = timeOf(asNonEmptyString(readProp(event, 'startDate')));
+  const geo = geoOf(event);
   const city = place.city ?? site.fallbackCity;
 
   if (title === undefined || startDate === undefined || url === undefined) return [];
@@ -105,9 +117,10 @@ export const parseJsonLdEvent = (event: unknown, site: JsonLdSite): readonly Raw
       ...(endDate === undefined || endDate < startDate ? {} : { endDate }),
       ...(time === undefined ? {} : { time }),
       ...(place.venue === undefined ? {} : { venue: place.venue }),
-      ...(description === undefined ? {} : { rawDescription: description.slice(0, 1600) }),
+      ...(description === undefined ? {} : { rawDescription: description.slice(0, 4000) }),
       ...(image === undefined ? {} : { image }),
       ...(price === undefined ? {} : { priceInfo: price }),
+      ...(geo === undefined ? {} : { lat: geo.lat, lng: geo.lng }),
     },
   ];
 };

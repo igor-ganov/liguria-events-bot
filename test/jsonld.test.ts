@@ -50,6 +50,25 @@ describe('parseJsonLdEvent', () => {
     assert.deepEqual(parseJsonLdEvent({ '@type': 'Event' }, site), []);
     assert.deepEqual(parseJsonLdEvent(undefined, site), []);
   });
+
+  test('the venue geo coordinates are taken straight from the source', () => {
+    const geo = { '@type': 'GeoCoordinates', latitude: 42.404, longitude: 12.865 };
+    const [raw] = parseJsonLdEvent(ld({ location: { '@type': 'Place', name: 'Auditorium (RI)', geo } }), site);
+    assert.equal(raw?.lat, 42.404);
+    assert.equal(raw?.lng, 12.865);
+  });
+
+  test('string geo values (schema.org allows either) still parse', () => {
+    const [raw] = parseJsonLdEvent(ld({ location: { name: 'X', geo: { latitude: '44.4', longitude: '8.9' } } }), site);
+    assert.equal(raw?.lat, 44.4);
+    assert.equal(raw?.lng, 8.9);
+  });
+
+  test('a 0,0 geo placeholder is treated as no coordinates', () => {
+    const [raw] = parseJsonLdEvent(ld({ location: { name: 'X', geo: { latitude: 0, longitude: 0 } } }), site);
+    assert.equal(raw?.lat, undefined);
+    assert.equal(raw?.lng, undefined);
+  });
 });
 
 describe('collapseRuns', () => {

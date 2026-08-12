@@ -156,7 +156,7 @@ const pendingOf = (item: Identified): PendingEnrich => ({
   ...(item.raw.categoryHint === undefined ? {} : { categoryHint: item.raw.categoryHint }),
   ...(item.raw.rawDescription === undefined
     ? {}
-    : { raw: item.raw.rawDescription.slice(0, 1400) }),
+    : { raw: item.raw.rawDescription.slice(0, 4000) }),
 });
 
 const pendingOfRecord = (record: EventRecord): PendingEnrich => ({

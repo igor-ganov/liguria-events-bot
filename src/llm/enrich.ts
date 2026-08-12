@@ -37,17 +37,18 @@ export type Enrichment = Readonly<{
   blocked?: boolean;
 }>;
 
-// Three-language descriptions cost ~3× tokens, and the richer 3-5 sentence
-// bodies below roughly doubled the per-event output — 2 events per call keeps
-// the completion under the 4096 cap (the truncated-JSON failure we hit before).
-const ENRICH_BATCH = 2;
+// Three-language descriptions cost ~3× tokens, and the fuller bodies below push
+// the per-event output higher still — ONE event per call keeps the completion
+// well under the 4096 cap (the truncated-JSON batch loss we hit before).
+const ENRICH_BATCH = 1;
 
 // Bump when the enrichment prompt changes materially: records enriched at an
 // older version are re-run so the whole corpus converges on the new output.
 // v2 = the richer 3-5 sentence descriptions (was 1-2 sentences at v1/undefined).
 // v3 = also extract a start time (HH:MM) from the source text when stated.
 // v4 = also extract an attendance duration (minutes) when the source states it.
-export const ENRICH_VERSION = 4;
+// v5 = fuller descriptions that keep the FULL schedule; 1 event/call for headroom.
+export const ENRICH_VERSION = 5;
 const EXTRACT_BATCH = 20;
 
 export const chunk = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
@@ -64,14 +65,18 @@ const ENRICH_SYSTEM = [
   'For EVERY input event return 1 to 3 categories from this fixed list,',
   'most specific first (a food festival with concerts is ["food","music"]):',
   CATEGORIES.join(', '),
-  'a fresh, neutral 3-5 sentence description IN YOUR OWN WORDS in EACH of',
-  'English, Italian and Russian. Cover, drawing ONLY on what the input supports:',
-  '(1) what the event actually is; (2) what makes it distinctive or worth',
-  'attending; (3) concrete practical detail the source gives — the venue, the',
-  'dates or times, whether it is free or ticketed. Be specific and informative,',
-  'not generic filler. Never copy source sentences verbatim, and NEVER invent',
-  'facts: if the source does not state something, simply leave it out rather',
-  'than guessing.',
+  'a thorough, neutral description IN YOUR OWN WORDS in EACH of English, Italian',
+  'and Russian — as complete and informative as the source supports (several',
+  'sentences, more when the source is rich, fewer when it is thin). Cover, drawing',
+  'ONLY on what the input supports: (1) what the event actually is and what happens',
+  'at it; (2) what makes it distinctive or worth attending; (3) EVERY concrete',
+  'practical detail the source gives — the venue and how to reach it, the FULL',
+  'schedule (all dates, start times and sessions, and any recurrence), whether it',
+  'is free or ticketed and how to book, the programme or line-up, any age/access',
+  'notes. Never drop schedule detail the source states. Be specific and',
+  'informative, not generic filler. Never copy source sentences verbatim, and',
+  'NEVER invent facts: if the source does not state something, simply leave it out',
+  'rather than guessing.',
   'Also give a display "titles" map with the event title in each language:',
   'translate only the descriptive / common-noun parts and KEEP proper nouns',
   'unchanged (festival & event names, venue names, person & brand names). If a',
