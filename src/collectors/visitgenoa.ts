@@ -160,7 +160,7 @@ export const parseDetailHtml = async (html: string): Promise<DetailFields> => {
   const priceMatch = PRICE_PATTERN.exec(text);
   const priceInfo = priceMatch?.[0]?.trim();
   const venueText = decodeEntities(venue);
-  const rawDescription = text.slice(0, 1600).trim();
+  const rawDescription = text.slice(0, 4000).trim();
   return {
     ...(venueText === '' ? {} : { venue: venueText }),
     ...(time === undefined ? {} : { time }),
