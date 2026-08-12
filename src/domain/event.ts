@@ -279,6 +279,12 @@ export const mergeEvent = (
     ...(existing.image === undefined && incoming.image !== undefined
       ? { image: incoming.image }
       : {}),
+    // A source that now hands us the venue's coordinates (JSON-LD geo, or a
+    // fixed-venue collector) backfills them onto an event stored before we read
+    // them — so a re-crawl fills the map without waiting on the geocoder.
+    ...(existing.lat === undefined && incoming.lat !== undefined && incoming.lng !== undefined
+      ? { lat: incoming.lat, lng: incoming.lng }
+      : {}),
     // Backfill: events stored before the city dimension existed carry none.
     ...(existing.city === undefined && incoming.city !== undefined
       ? { city: incoming.city }
@@ -296,6 +302,8 @@ export const mergeEvent = (
     event.priceInfo !== existing.priceInfo ||
     event.rawDescription !== existing.rawDescription ||
     event.image !== existing.image ||
+    event.lat !== existing.lat ||
+    event.lng !== existing.lng ||
     event.altLinks !== existing.altLinks;
   return { event, changed };
 };
