@@ -85,12 +85,12 @@ export const needsPoint = (event: CompactEvent): boolean => {
   return event.g === undefined || misplaced(city, { lat: event.g[0], lng: event.g[1] });
 };
 
-// Versioned: a cached miss is never retried, so improving the lookup means
-// giving every address that missed under the old one a fresh chance. v4 = the
-// bare-venue fallback landed after v3's cache was already written, so its misses
-// (Teatro alla Scala, Castello della Pietra…) never got the new last resort.
+// A cached HIT lives for good; a cached MISS now expires after a week (see
+// resolveJob), so a later improvement to the lookup retries it automatically —
+// no more cache-version bumps to un-poison old misses. v5 = the venue fallback
+// tries the city first; it is the last forced bump.
 const addressKey = (city: string, address: string): string =>
-  `geo4:${city}:${address.trim().toLowerCase()}`;
+  `geo5:${city}:${address.trim().toLowerCase()}`;
 
 const parsePoint = (value: unknown): Point | undefined => {
   const first = Array.isArray(value) ? value[0] : undefined;
@@ -141,14 +141,18 @@ const lookup = async (
   if (open !== undefined && !misplaced(city, open)) return open;
   // Last resort: the bare venue (the part before the first comma). A landmark
   // name — "Castello della Pietra", "Teatro Carlo Felice" — often resolves when
-  // the full street address does not, and it catches events filed under the
-  // province capital but actually in a comune the address misnames. Still
-  // distance-checked, so a name collision elsewhere in Italy is refused.
+  // the full street address does not. Try it IN ITS CITY first, so an ambiguous
+  // name ("Palazzo Ducale") lands on the right one instead of Venice's; then
+  // bare, which catches events the address misfiles into the wrong comune
+  // (Castello della Pietra is in Vobbia, not the "Recco" its address claims).
+  // Both distance-checked, so a collision elsewhere in Italy is refused.
   const venue = address.split(',')[0]?.trim();
   if (venue !== undefined && venue !== '' && venue !== address) {
-    await sleep(RATE_MS);
-    const byVenue = await query(fetchFn, { q: `${venue}, Italia` });
-    if (byVenue !== undefined && !misplaced(city, byVenue)) return byVenue;
+    for (const q of [`${venue}, ${city}`, `${venue}, Italia`]) {
+      await sleep(RATE_MS);
+      const hit = await query(fetchFn, { q });
+      if (hit !== undefined && !misplaced(city, hit)) return hit;
+    }
   }
   return undefined;
 };
@@ -190,7 +194,13 @@ const resolveJob = async (deps: GeocodeDeps, job: Job): Promise<Point | undefine
     return cachedValue === '' ? undefined : (JSON.parse(cachedValue) as Point);
   }
   const point = await lookup(deps.fetchFn, job.address, job.city);
-  await deps.kv.put(key, point === undefined ? '' : JSON.stringify(point));
+  // A hit is cached indefinitely; a MISS only for a week, so an improved lookup
+  // (or a venue that gains an OSM node) is retried automatically.
+  await deps.kv.put(
+    key,
+    point === undefined ? '' : JSON.stringify(point),
+    point === undefined ? { expirationTtl: 7 * 24 * 3600 } : undefined,
+  );
   await sleep(RATE_MS);
   return point;
 };
