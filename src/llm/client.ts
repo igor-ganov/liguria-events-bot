@@ -25,9 +25,18 @@ export type ChatFn = (system: string, user: string) => Promise<string>;
 
 const WORKERS_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const GEMINI_MODEL = 'gemini-2.5-flash';
-const GEMINI_TIMEOUT_MS = 25_000;
-const GEMINI_ATTEMPTS = 2;
+// A bot reply runs in a waitUntil with a ~30s grace window; if the LLM overruns
+// it the worker is evicted before the answer OR the error message is sent, and
+// the user gets total silence. So every provider is hard-bounded and the whole
+// call must fit the window: Workers AI can hang with no timeout of its own, and
+// Gemini used to be 2×25s = 50s on its own.
+const WORKERS_AI_TIMEOUT_MS = 14_000;
+const GEMINI_TIMEOUT_MS = 16_000;
+const GEMINI_ATTEMPTS = 1;
 const MAX_TOKENS = 4096;
+
+const timeout = (ms: number, label: string): Promise<never> =>
+  new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timeout`)), ms));
 
 /** Workers AI replies either legacy `{response}` or OpenAI-style
  *  `{choices:[{message:{content}}]}` depending on the model route. */
@@ -43,13 +52,18 @@ const runWorkersAi = async (
   user: string,
 ): Promise<string | undefined> => {
   try {
-    const result = await ai.run(WORKERS_AI_MODEL, {
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      max_tokens: MAX_TOKENS,
-    });
+    // Workers AI's binding has no signal, so race it against a wall clock — an
+    // unbounded run here is what evicts the worker before it can fall back.
+    const result = await Promise.race([
+      ai.run(WORKERS_AI_MODEL, {
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        max_tokens: MAX_TOKENS,
+      }),
+      timeout(WORKERS_AI_TIMEOUT_MS, 'workers-ai'),
+    ]);
     return workersAiText(result);
   } catch {
     return undefined;

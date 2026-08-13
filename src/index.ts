@@ -65,6 +65,10 @@ import { asArray, asBoolean, asNonEmptyString, asNumber, readProp } from './util
 
 const QA_CORPUS_DAYS = 30;
 const QA_CORPUS_CAP = 120;
+// The whole answer must be produced AND sent inside the waitUntil grace window,
+// or the worker is evicted and the user gets silence. Cap the LLM work so the
+// reply (answer, or the qa.failed fallback) always goes out first.
+const QA_DEADLINE_MS = 24_000;
 // The crawl is due on elapsed time, never on a clock hour. The pulse arrives
 // from a GitHub cron that routinely drifts 15-40 minutes, so an exact-hour
 // gate skips the window entirely and the next attempt is a day away — that is
@@ -426,7 +430,10 @@ const handleQuestion = async (
       env.EVENTS,
       compacts.slice(0, QA_CORPUS_CAP).map((event) => event.id),
     );
-    const answer = await makeAnswer(chatOf(env))(question, events, forced, today);
+    const answer = await Promise.race([
+      makeAnswer(chatOf(env))(question, events, forced, today),
+      new Promise<string>((_, reject) => setTimeout(() => reject(new Error('answer deadline')), QA_DEADLINE_MS)),
+    ]);
     await sendLong(bot, answer);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
