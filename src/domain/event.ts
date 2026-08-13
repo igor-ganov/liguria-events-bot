@@ -55,12 +55,27 @@ export const isLang = (value: unknown): value is Lang => LANGS.some((lang) => la
 export const descriptionOf = (text: LocalizedText | undefined, lang: Lang): string =>
   (text?.[lang] || text?.en) ?? '';
 
+/** A single dated occurrence of an umbrella event — the individual concert on a
+ *  given night of a months-long festival. The event's span (startDate..endDate)
+ *  is the whole run; `sessions` is the concrete programme inside it. */
+export type Session = Readonly<{
+  /** 'YYYY-MM-DD'. */
+  date: string;
+  /** 'HH:MM' when known. */
+  time?: string;
+  /** What is on that night, when the programme names it. */
+  title?: string;
+}>;
+
 export type EventRecord = Readonly<{
   id: string;
   title: string;
   /** 'YYYY-MM-DD', Europe/Rome calendar date. */
   startDate: string;
   endDate?: string;
+  /** The concrete dated programme inside a multi-day/umbrella event, so the feed
+   *  can show the specific occurrence on each day instead of the whole run. */
+  sessions?: readonly Session[];
   /** 'HH:MM' when the source exposes it. */
   time?: string;
   /** Attendance length in minutes, when the source stated it (AC-duration). */
@@ -157,6 +172,8 @@ export type CompactEvent = Readonly<{
   h?: string;
   /** Attendance length in minutes, when the source stated it. */
   du?: number;
+  /** Programme: the dated occurrences inside an umbrella event (p = programme). */
+  p?: readonly Session[];
   u: string;
   img?: string;
   d?: LocalizedText;
@@ -357,6 +374,7 @@ export const toCompact = (event: EventRecord): CompactEvent => {
     : { g: coordPair(event.lat, event.lng) }),
   ...(event.time === undefined ? {} : { h: event.time }),
   ...(event.durationMin === undefined ? {} : { du: event.durationMin }),
+  ...(event.sessions === undefined || event.sessions.length === 0 ? {} : { p: event.sessions }),
   ...(event.city === undefined ? {} : { ct: event.city }),
   ...(region === undefined ? {} : { rg: region }),
   ...(event.image === undefined ? {} : { img: event.image }),
@@ -410,6 +428,29 @@ export const parseLocalized = (
   };
 };
 
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Parse a programme of dated occurrences; accepts the record's `sessions` or
+ *  the compact `p`. Items without a valid ISO date are dropped. */
+export const parseSessions = (value: unknown): readonly Session[] | undefined => {
+  const arr = asArray(value);
+  if (arr === undefined) return undefined;
+  const out = arr.flatMap((item): readonly Session[] => {
+    const date = asNonEmptyString(readProp(item, 'date'));
+    if (date === undefined || !isIsoDate(date)) return [];
+    const time = asNonEmptyString(readProp(item, 'time'));
+    const title = asNonEmptyString(readProp(item, 'title'));
+    return [
+      {
+        date,
+        ...(time !== undefined && TIME_RE.test(time) ? { time } : {}),
+        ...(title === undefined ? {} : { title }),
+      },
+    ];
+  });
+  return out.length === 0 ? undefined : out;
+};
+
 export const parseEventRecord = (text: string): EventRecord | undefined => {
   const value = parseJson(text);
   const id = asNonEmptyString(readProp(value, 'id'));
@@ -455,6 +496,7 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
   const city = asNonEmptyString(readProp(value, 'city'));
   const altLinks = parseSourceLinks(readProp(value, 'altLinks'));
   const titles = parseLocalized(readProp(value, 'titles'));
+  const sessions = parseSessions(readProp(value, 'sessions') ?? readProp(value, 'p'));
   return {
     id,
     title,
@@ -480,6 +522,7 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
     ...(unusual === undefined ? {} : { unusual }),
     ...(image === undefined ? {} : { image }),
     ...(city === undefined ? {} : { city }),
+    ...(sessions === undefined ? {} : { sessions }),
     ...(altLinks.length === 0 ? {} : { altLinks }),
   };
 };

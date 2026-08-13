@@ -131,6 +131,7 @@ const toRecord = (
     ...(raw.endDate === undefined ? {} : { endDate: raw.endDate }),
     ...(time === undefined ? {} : { time }),
     ...(enrichment?.durationMin === undefined ? {} : { durationMin: enrichment.durationMin }),
+    ...(enrichment?.sessions === undefined ? {} : { sessions: enrichment.sessions }),
     ...(raw.venue === undefined ? {} : { venue: raw.venue }),
     ...(address === undefined ? {} : { address }),
     ...(raw.priceInfo === undefined ? {} : { priceInfo: raw.priceInfo }),

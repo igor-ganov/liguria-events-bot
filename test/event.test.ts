@@ -9,6 +9,7 @@ import {
   normalizeTitle,
   parseEventRecord,
   parseIndex,
+  parseSessions,
   toCompact,
 } from '../src/domain/event.ts';
 import type { EventRecord, RawEvent } from '../src/domain/event.ts';
@@ -129,6 +130,34 @@ describe('freeFromPrice', () => {
     assert.equal(freeFromPrice('ingresso libero'), true);
     assert.equal(freeFromPrice('Biglietto € 15,00'), false);
     assert.equal(freeFromPrice(undefined), false);
+  });
+});
+
+describe('parseSessions / sessions round-trip', () => {
+  test('keeps valid dated items, drops undated ones, projects to compact `p`', () => {
+    const sessions = parseSessions([
+      { date: '2026-07-15', time: '21:00', title: 'Concerto A' },
+      { date: 'not-a-date', time: '20:00' }, // dropped
+      { date: '2026-07-20' }, // date only
+    ]);
+    assert.deepEqual(sessions, [
+      { date: '2026-07-15', time: '21:00', title: 'Concerto A' },
+      { date: '2026-07-20' },
+    ]);
+    const compact = toCompact({ ...record, endDate: '2026-10-31', sessions });
+    assert.deepEqual(compact.p, sessions);
+    // The compact `p` round-trips back through parseEventRecord.
+    const back = parseEventRecord(JSON.stringify({ ...record, endDate: '2026-10-31', p: sessions }));
+    assert.deepEqual(back?.sessions, sessions);
+  });
+
+  test('a bad start time on a session is dropped, the date kept', () => {
+    assert.deepEqual(parseSessions([{ date: '2026-07-15', time: '25:99' }]), [{ date: '2026-07-15' }]);
+  });
+
+  test('an empty or non-array programme is undefined', () => {
+    assert.equal(parseSessions([]), undefined);
+    assert.equal(parseSessions('nope'), undefined);
   });
 });
 

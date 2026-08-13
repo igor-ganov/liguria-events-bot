@@ -5,7 +5,7 @@
  */
 import { isOperator } from './config.ts';
 import type { Env } from './config.ts';
-import { isCategory, parseLocalized, toCompact } from './domain/event.ts';
+import { isCategory, parseLocalized, parseSessions, toCompact } from './domain/event.ts';
 import type { Category, CompactEvent, EventRecord, SourceLink } from './domain/event.ts';
 import { makeBot, sendLong } from './delivery/bot-api.ts';
 import type { Bot, Keyboard } from './delivery/bot-api.ts';
@@ -791,6 +791,9 @@ const worker = {
         const endDate = asNonEmptyString(readProp(item, 'e'));
         const lat = asNumber(readProp(item, 'lat'));
         const lng = asNumber(readProp(item, 'lng'));
+        const sessions = parseSessions(readProp(item, 'p'));
+        const time = asNonEmptyString(readProp(item, 'h'));
+        const durationMin = asNumber(readProp(item, 'du'));
         if (id === undefined) continue;
         const record = await readEventRecord(env.EVENTS, id);
         if (record === undefined) continue;
@@ -806,6 +809,9 @@ const worker = {
             ...(endDate === undefined ? {} : { endDate }),
             ...(lat === undefined ? {} : { lat }),
             ...(lng === undefined ? {} : { lng }),
+            ...(sessions === undefined ? {} : { sessions }),
+            ...(time === undefined ? {} : { time }),
+            ...(durationMin === undefined ? {} : { durationMin }),
             ...(unusual === undefined ? {} : { unusual }),
           },
           nowMs,

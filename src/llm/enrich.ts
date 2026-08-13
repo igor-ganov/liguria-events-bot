@@ -3,8 +3,8 @@
  * events, and extract structured events from Telegram post text. Both parse
  * defensively — an unusable LLM item is skipped, never trusted (AC-2.3).
  */
-import { CATEGORIES, isCategory, isIsoDate, parseLocalized } from '../domain/event.ts';
-import type { Category, LocalizedText, RawEvent } from '../domain/event.ts';
+import { CATEGORIES, isCategory, isIsoDate, parseLocalized, parseSessions } from '../domain/event.ts';
+import type { Category, LocalizedText, RawEvent, Session } from '../domain/event.ts';
 import type { RawPost } from '../collectors/types.ts';
 import { extractJson } from './client.ts';
 import type { ChatFn } from './client.ts';
@@ -32,6 +32,8 @@ export type Enrichment = Readonly<{
   time?: string;
   /** Attendance length in minutes, only when the source clearly states it. */
   durationMin?: number;
+  /** The dated programme inside an umbrella event — individual occurrences. */
+  sessions?: readonly Session[];
   unusual: boolean;
   /** Content-policy violation — such events are dropped, never stored. */
   blocked?: boolean;
@@ -48,7 +50,9 @@ const ENRICH_BATCH = 1;
 // v3 = also extract a start time (HH:MM) from the source text when stated.
 // v4 = also extract an attendance duration (minutes) when the source states it.
 // v5 = fuller descriptions that keep the FULL schedule; 1 event/call for headroom.
-export const ENRICH_VERSION = 5;
+// v6 = extract a dated "sessions" programme (umbrella events become findable on
+// a specific day), and write the address in Italian so it matches OSM/the map.
+export const ENRICH_VERSION = 6;
 const EXTRACT_BATCH = 20;
 
 export const chunk = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
@@ -81,17 +85,28 @@ const ENRICH_SYSTEM = [
   'translate only the descriptive / common-noun parts and KEEP proper nouns',
   'unchanged (festival & event names, venue names, person & brand names). If a',
   'title is wholly a proper noun, repeat it identically in all three.',
-  'Also give "address": a concise Google-Maps-geocodable location for the',
-  'venue, e.g. "Teatro della Tosse, Piazza Renato Negri 4, Genova". Use the',
-  'input venue and the comune the event names; always end with the comune and',
-  'the province, never with a city the event is not in. Omit the field ONLY if',
-  'you truly cannot place it.',
+  'Also give "address": a concise, geocodable location for the venue, e.g.',
+  '"Teatro della Tosse, Piazza Renato Negri 4, Genova". Write it IN ITALIAN, the',
+  'way the place is labelled locally ("Musei Reali", not "Royal Museums"), so it',
+  'matches the map. Use the input venue and the comune the event names; always',
+  'end with the comune and the province, never with a city the event is not in.',
+  'Omit the field ONLY if you truly cannot place it.',
   'Also give "time": the start time as "HH:MM" (24-hour) ONLY when the source',
   'text explicitly states a clock time (e.g. "ore 21", "h 18:30", "alle 20:45");',
   'omit the field otherwise — never guess a time.',
   'Also give "durationMin": the attendance length in whole minutes ONLY when the',
   'source clearly implies it (e.g. "spettacolo di 90 minuti", "tour di 2 ore",',
   'explicit start AND end times). Omit it otherwise — never guess a duration.',
+  'Also give "sessions": the concrete dated PROGRAMME inside the event, when the',
+  'source lists individual occurrences — a festival\'s separate concert nights, a',
+  'run\'s specific show dates, a season\'s dated events. Each item:',
+  '{ "date": "YYYY-MM-DD", "time": "HH:MM" (when stated), "title": "<what is on',
+  'that date>" (when the programme names it) }. List EVERY dated occurrence the',
+  'source gives, in date order; expand an explicit recurrence ("ogni venerdì e',
+  'sabato di luglio, ore 21") into its concrete dates within the run. This is how',
+  'a months-long umbrella event becomes findable on a specific day, so do not skip',
+  'programme detail the source states. Omit the field for a single-date event, or',
+  'when the source gives no per-date programme — NEVER invent dates or times.',
   'Also set "unusual": true ONLY for offbeat, niche, experimental or',
   'distinctly non-touristy happenings (a neighbourhood performance, an',
   'unconventional venue, an oddball one-off, immersive/site-specific art);',
@@ -104,7 +119,7 @@ const ENRICH_SYSTEM = [
   'otherwise illegal. Ordinary cultural, political, religious or community',
   'events are NOT blocked — block only genuinely harmful content. In doubt, false.',
   'Respond with STRICT valid JSON, no markdown, no backticks:',
-  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "titles": { "en": "…", "it": "…", "ru": "…" }, "descriptions": { "en": "…", "it": "…", "ru": "…" }, "address": "…", "time": "HH:MM", "durationMin": 90, "unusual": true|false, "blocked": true|false } ] }',
+  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "titles": { "en": "…", "it": "…", "ru": "…" }, "descriptions": { "en": "…", "it": "…", "ru": "…" }, "address": "…", "time": "HH:MM", "durationMin": 90, "sessions": [ { "date": "YYYY-MM-DD", "time": "HH:MM", "title": "…" } ], "unusual": true|false, "blocked": true|false } ] }',
 ].join('\n');
 
 const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment])[] => {
@@ -126,6 +141,7 @@ const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment
   const rawDur = readProp(value, 'durationMin');
   const durationMin =
     typeof rawDur === 'number' && rawDur >= 15 && rawDur <= 1440 ? Math.round(rawDur) : undefined;
+  const sessions = parseSessions(readProp(value, 'sessions'));
   const enrichment: Enrichment = {
     categories,
     descriptions,
@@ -134,6 +150,7 @@ const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment
     ...(address === undefined ? {} : { address }),
     ...(time === undefined ? {} : { time }),
     ...(durationMin === undefined ? {} : { durationMin }),
+    ...(sessions === undefined ? {} : { sessions }),
     ...(asBoolean(readProp(value, 'blocked')) === true ? { blocked: true } : {}),
   };
   return [[id, enrichment]];
