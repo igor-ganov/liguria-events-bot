@@ -32,14 +32,17 @@ const eventLine = (event: EventRecord): string =>
     event.categories.join('/'),
     event.priceInfo ?? (event.free === true ? 'free' : ''),
     event.url,
-    event.descriptions.en,
+    // A gist, not the whole description — the model needs enough to pick and
+    // summarise, and a 30k-char corpus is what made the answer slow enough to
+    // overrun the reply window.
+    event.descriptions.en.slice(0, 180),
   ]
     .filter((part) => part !== '')
     .join(' | ');
 
 export const serializeCorpus = (
   events: readonly EventRecord[],
-  maxChars = 30_000,
+  maxChars = 16_000,
 ): string => {
   const sorted = events.toSorted((a, b) => a.startDate.localeCompare(b.startDate));
   const lines: string[] = [];
@@ -63,7 +66,9 @@ export const answerSystem = (forced: Language | undefined, today: string): strin
     'relevant, say so honestly and suggest the closest alternatives from the',
     'list, if any.',
     'When you mention an event, include its link in parentheses.',
-    'Be concise and friendly; plain text, no markdown headers.',
+    'Be concise and friendly; plain text, no markdown headers. Keep the reply',
+    'SHORT — pick at most the ~8 most relevant events, one or two sentences each,',
+    'so the answer is fast to produce. Do not dump the whole list.',
     forced === undefined
       ? 'Answer in the SAME language as the user question (Russian, Italian or English).'
       : `Always answer in ${LANG_NAME[forced]}.`,

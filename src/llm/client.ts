@@ -25,14 +25,14 @@ export type ChatFn = (system: string, user: string) => Promise<string>;
 
 const WORKERS_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const GEMINI_MODEL = 'gemini-2.5-flash';
-// A bot reply runs in a waitUntil with a ~30s grace window; if the LLM overruns
-// it the worker is evicted before the answer OR the error message is sent, and
-// the user gets total silence. So every provider is hard-bounded and the whole
-// call must fit the window: Workers AI can hang with no timeout of its own, and
-// Gemini used to be 2×25s = 50s on its own.
-const WORKERS_AI_TIMEOUT_MS = 14_000;
-const GEMINI_TIMEOUT_MS = 16_000;
-const GEMINI_ATTEMPTS = 1;
+// Workers AI's binding has no timeout of its own and CAN hang — an unbounded run
+// is what let a slow bot answer evict the worker before it could reply. Bound it,
+// but generously: enrichment (awaited, off the request path) legitimately takes
+// tens of seconds. The bot's own 24s answer deadline (index.ts) is what keeps a
+// slow question inside the waitUntil grace; this only stops an infinite hang.
+const WORKERS_AI_TIMEOUT_MS = 45_000;
+const GEMINI_TIMEOUT_MS = 24_000;
+const GEMINI_ATTEMPTS = 2;
 const MAX_TOKENS = 4096;
 
 const timeout = (ms: number, label: string): Promise<never> =>

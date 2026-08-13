@@ -64,7 +64,7 @@ import { CATEGORIES } from './domain/event.ts';
 import { asArray, asBoolean, asNonEmptyString, asNumber, readProp } from './util/json.ts';
 
 const QA_CORPUS_DAYS = 30;
-const QA_CORPUS_CAP = 120;
+const QA_CORPUS_CAP = 80;
 // The whole answer must be produced AND sent inside the waitUntil grace window,
 // or the worker is evicted and the user gets silence. Cap the LLM work so the
 // reply (answer, or the qa.failed fallback) always goes out first.
