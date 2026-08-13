@@ -149,6 +149,11 @@ describe('parseSessions / sessions round-trip', () => {
     // The compact `p` round-trips back through parseEventRecord.
     const back = parseEventRecord(JSON.stringify({ ...record, endDate: '2026-10-31', p: sessions }));
     assert.deepEqual(back?.sessions, sessions);
+    // …and, crucially, survives the compact-index read (parseIndex/parseCompact),
+    // which serves events.json — reconstructing the object field-by-field once
+    // silently dropped the programme even though the stored blob carried it.
+    const fromIndex = parseIndex(JSON.stringify([compact]));
+    assert.deepEqual(fromIndex?.[0]?.p, sessions);
   });
 
   test('a bad start time on a session is dropped, the date kept', () => {

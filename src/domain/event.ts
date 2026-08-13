@@ -553,6 +553,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
   const g = gLat === undefined || gLng === undefined ? undefined : coordPair(gLat, gLng);
   const h = asNonEmptyString(readProp(value, 'h'));
   const du = asNumber(readProp(value, 'du'));
+  const p = parseSessions(readProp(value, 'p'));
   const ct = asNonEmptyString(readProp(value, 'ct'));
   const rg = asNonEmptyString(readProp(value, 'rg'));
   const img = asNonEmptyString(readProp(value, 'img'));
@@ -575,6 +576,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
     ...(g === undefined ? {} : { g }),
     ...(h === undefined ? {} : { h }),
     ...(du === undefined ? {} : { du }),
+    ...(p === undefined ? {} : { p }),
     ...(ct === undefined ? {} : { ct }),
     ...(rg === undefined ? {} : { rg }),
     ...(img === undefined ? {} : { img }),
