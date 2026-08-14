@@ -160,7 +160,11 @@ const fetchDetailHtml = async (fetchFn: FetchFn, url: string): Promise<string | 
   }
 };
 
-const DETAIL_FETCH_CAP = 10;
+// Matches the pipeline's ENRICH_PER_RUN so every record about to be re-enriched
+// has had its detail page attempted first (never enriched from a bare title
+// while its body was still unfetched). The whole mentelocale corpus was
+// collected listing-only, so there is a large backlog to heal.
+const DETAIL_FETCH_CAP = 24;
 
 /**
  * Fill venue/time/price/description for mentelocale events by fetching their

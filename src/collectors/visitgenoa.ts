@@ -24,7 +24,9 @@ export const VISITGENOA_SOURCE = 'visitgenoa';
 const BASE_URL = 'https://www.visitgenoa.it';
 const LISTING_URL = (page: number): string => `${BASE_URL}/en/events?page=${page}`;
 const USER_AGENT = 'Mozilla/5.0 (compatible; event-collecter/0.0)';
-const DETAIL_FETCH_CAP = 10;
+// Matches the pipeline's ENRICH_PER_RUN so every record about to be re-enriched
+// has had its detail page attempted first, never enriched from a bare title.
+const DETAIL_FETCH_CAP = 24;
 
 // ────────────────────────────────────────────────────────── pure parsing ──
 

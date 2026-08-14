@@ -316,6 +316,11 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
     // batches run concurrently). Un-enriched fresh events are still stored
     // (enriched:false) and drain across later runs. ENRICH_PER_RUN * 1/BATCH
     // concurrent Gemini calls must stay well under the RPM ceiling.
+    // The detail fetchers' per-source budget (see DETAIL_FETCH_CAP) is >=
+    // ENRICH_PER_RUN, so every record in the slice below was detail-ATTEMPTED
+    // first: it carries a real body when the source page had one, and only
+    // falls back to the title when the page genuinely offers nothing — the
+    // prompt forbids filler in that case, so the result is still clean.
     const ENRICH_PER_RUN = 24;
     const pending = [...freshDetailed.map(pendingOf), ...retryFilled.map(pendingOfRecord)].slice(
       0,
