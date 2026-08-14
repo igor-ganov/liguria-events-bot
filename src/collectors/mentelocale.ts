@@ -88,6 +88,105 @@ export const parseMentelocaleHtml = async (
   });
 };
 
+// ─────────────────────────────────────────────────────────── detail page ──
+
+export type MentelocaleDetail = Readonly<{
+  venue?: string;
+  time?: string;
+  priceInfo?: string;
+  rawDescription?: string;
+}>;
+
+// The listing card carries only a title + date. The real body — venue, start
+// time, programme, price — lives in the article's <div class="Testo">, with the
+// facts wrapped in <strong>/<em>, so a plain <p> text handler misses them; a
+// scoped universal text collector captures the whole subtree instead.
+// "alle 21", "ore 21", "h 18:30", "alle 20:45", "21.30": hour, optional minutes.
+const ML_TIME_PATTERN =
+  /\b(?:alle|ore|h)\s+(?:ore\s+|le\s+)?([01]?\d|2[0-3])(?:[:.]([0-5]\d))?\b|\b([01]?\d|2[0-3]):([0-5]\d)\b/i;
+const ML_PRICE_PATTERN =
+  /(bigliett[oi][^.]{0,80}€\s?\d+[.,]?\d*|€\s?\d+[.,]?\d*|ingresso\s+(?:libero|gratuito|a\s+offerta\s+libera)|offerta\s+libera|gratuito|free\s+(?:entry|admission))/i;
+
+export const parseMentelocaleDetail = async (html: string): Promise<MentelocaleDetail> => {
+  let body = '';
+  let collecting = false;
+  let inScript = false;
+  const rewriter = new HTMLRewriter()
+    .on('div.Testo', {
+      element: (element) => {
+        collecting = true;
+        element.onEndTag(() => {
+          collecting = false;
+        });
+      },
+    })
+    .on('script, style', {
+      element: (element) => {
+        inScript = true;
+        element.onEndTag(() => {
+          inScript = false;
+        });
+      },
+    })
+    .on('*', {
+      text: (chunk) => {
+        if (collecting && !inScript && body.length < 6000) body += chunk.text;
+      },
+    });
+  await rewriter.transform(new Response(html)).arrayBuffer();
+
+  const text = decodeEntities(body).replace(/\s+/g, ' ').trim();
+  const timeMatch = ML_TIME_PATTERN.exec(text) ?? undefined;
+  const time =
+    timeMatch === undefined
+      ? undefined
+      : `${(timeMatch[1] ?? timeMatch[3] ?? '').padStart(2, '0')}:${timeMatch[2] ?? timeMatch[4] ?? '00'}`;
+  const priceInfo = ML_PRICE_PATTERN.exec(text)?.[0]?.trim();
+  const rawDescription = text.slice(0, 4000);
+  return {
+    ...(time === undefined ? {} : { time }),
+    ...(priceInfo === undefined ? {} : { priceInfo }),
+    ...(rawDescription === '' ? {} : { rawDescription }),
+  };
+};
+
+const fetchDetailHtml = async (fetchFn: FetchFn, url: string): Promise<string | undefined> => {
+  try {
+    const response = await fetchFn(url, { headers: { 'user-agent': USER_AGENT } });
+    if (!response.ok) return undefined;
+    return await response.text();
+  } catch {
+    return undefined;
+  }
+};
+
+const DETAIL_FETCH_CAP = 10;
+
+/**
+ * Fill venue/time/price/description for mentelocale events by fetching their
+ * detail pages — the listing carries only a title, so without this the LLM has
+ * nothing to describe and falls back to filler. Only touches mentelocale events
+ * (others pass through untouched) and is bounded per run.
+ */
+export const makeMentelocaleDetailFetcher =
+  (fetchFn: FetchFn) =>
+  async (events: readonly RawEvent[]): Promise<readonly RawEvent[]> => {
+    let budget = DETAIL_FETCH_CAP;
+    return Promise.all(
+      events.map(async (event) => {
+        if (event.source !== MENTELOCALE_SOURCE || event.rawDescription !== undefined || budget <= 0) {
+          return event;
+        }
+        budget -= 1;
+        const html = await fetchDetailHtml(fetchFn, event.url);
+        if (html === undefined) return event;
+        const detail = await parseMentelocaleDetail(html);
+        // Existing event fields win; the fetched detail only fills the gaps.
+        return { ...detail, ...event };
+      }),
+    );
+  };
+
 // The agenda is paginated 15-per-page ("Pagina 1 di 6"); reading only the first
 // page dropped ~70 events — every sagra and out-of-town happening (Sori,
 // Lavagna…) lives on the later pages.

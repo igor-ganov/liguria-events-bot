@@ -10,12 +10,24 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
   lt: '<',
   gt: '>',
   nbsp: ' ',
+  // Italian accented vowels (grave + acute) — pervasive in the sources' bodies.
+  agrave: 'à', egrave: 'è', igrave: 'ì', ograve: 'ò', ugrave: 'ù',
+  aacute: 'á', eacute: 'é', iacute: 'í', oacute: 'ó', uacute: 'ú',
+  Agrave: 'À', Egrave: 'È', Igrave: 'Ì', Ograve: 'Ò', Ugrave: 'Ù',
+  ccedil: 'ç', Ccedil: 'Ç',
+  // Typographic punctuation the article bodies use freely.
+  rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“', sbquo: '‚', bdquo: '„',
+  ndash: '–', mdash: '—', hellip: '…', laquo: '«', raquo: '»',
+  deg: '°', euro: '€', apos: "'", middot: '·',
 };
+
+const NAMED_ENTITY_RE = new RegExp(`&(${Object.keys(NAMED_ENTITIES).join('|')});`, 'g');
 
 export const decodeEntities = (text: string): string =>
   text
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => String.fromCodePoint(Number.parseInt(hex, 16)))
     .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
-    .replace(/&(amp|quot|lt|gt|nbsp);/g, (_, name: string) => NAMED_ENTITIES[name] ?? '')
+    .replace(NAMED_ENTITY_RE, (_, name: string) => NAMED_ENTITIES[name] ?? '')
     .replace(/\s+/g, ' ')
     .trim();
 

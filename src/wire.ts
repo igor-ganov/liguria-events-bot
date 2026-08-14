@@ -4,7 +4,12 @@
  * pure and unit-testable (AC-8.4).
  */
 import { makeVisitgenoaCollector, makeDetailFetcher } from './collectors/visitgenoa.ts';
-import { makeMentelocaleCollector, MENTELOCALE_CITIES } from './collectors/mentelocale.ts';
+import {
+  makeMentelocaleCollector,
+  makeMentelocaleDetailFetcher,
+  MENTELOCALE_CITIES,
+} from './collectors/mentelocale.ts';
+import type { RawEvent } from './domain/event.ts';
 import { makeEventiesagreCollector } from './collectors/eventiesagre.ts';
 import { makeTicketmasterCollector } from './collectors/ticketmaster.ts';
 import { makeJsonLdCollector } from './collectors/jsonld.ts';
@@ -74,7 +79,10 @@ export const buildCollectDeps = (env: Env): CollectDeps => {
     ],
     extract: makeExtractFromPosts(chat),
     enrich: makeEnrichEvents(chat),
-    details: makeDetailFetcher(fetch),
+    // Each fetcher only touches its own source and passes the rest through, so
+    // chaining them fills detail for both visitgenoa and mentelocale events.
+    details: ((visitgenoa, mentelocale) => (events: readonly RawEvent[]) =>
+      visitgenoa(events).then(mentelocale))(makeDetailFetcher(fetch), makeMentelocaleDetailFetcher(fetch)),
     judgeSameEvent: makeJudgeSameEvent(chat),
     fetchFn: fetch,
     now,

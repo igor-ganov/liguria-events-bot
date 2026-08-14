@@ -169,7 +169,23 @@ const pendingOfRecord = (record: EventRecord): PendingEnrich => ({
   ...(record.city === undefined ? {} : { city: record.city }),
   ...(record.rawDescription === undefined
     ? {}
-    : { raw: record.rawDescription.slice(0, 1400) }),
+    : { raw: record.rawDescription.slice(0, 4000) }),
+});
+
+// Project a stored record back to a RawEvent so the detail fetchers can re-fetch
+// its source page. `rawDescription` is carried through so a fetcher skips any
+// record that already has a body (its per-source budget goes to the empty ones).
+const rawFromRecord = (record: EventRecord): RawEvent => ({
+  title: record.title,
+  startDate: record.startDate,
+  url: record.url,
+  source: record.source,
+  ...(record.endDate === undefined ? {} : { endDate: record.endDate }),
+  ...(record.venue === undefined ? {} : { venue: record.venue }),
+  ...(record.time === undefined ? {} : { time: record.time }),
+  ...(record.city === undefined ? {} : { city: record.city }),
+  ...(record.priceInfo === undefined ? {} : { priceInfo: record.priceInfo }),
+  ...(record.rawDescription === undefined ? {} : { rawDescription: record.rawDescription }),
 });
 
 type FuzzyOutcome = Readonly<{
@@ -271,13 +287,37 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       return raw === undefined ? item : { id: item.id, raw };
     });
 
+    // Heal the corpus: re-fetch detail pages for stale records that never
+    // captured a body (collected before detail-fetching, or by a listing-only
+    // source), so the fuller prompt has real material instead of just a title.
+    // Bounded by each fetcher's per-source budget; drains over successive runs.
+    // The fetched body/time/price persist even when a record is not re-enriched
+    // this run, so the next run builds on it rather than re-fetching forever.
+    const retryDetailed = await deps.details(retryRecords.map(rawFromRecord));
+    const retryFilled = retryRecords.map((record, i): EventRecord => {
+      const detail = retryDetailed[i];
+      if (detail === undefined) return record;
+      return {
+        ...record,
+        ...(record.rawDescription === undefined && detail.rawDescription !== undefined
+          ? { rawDescription: detail.rawDescription }
+          : {}),
+        ...(record.venue === undefined && detail.venue !== undefined ? { venue: detail.venue } : {}),
+        ...(record.time === undefined && detail.time !== undefined ? { time: detail.time } : {}),
+        ...(record.priceInfo === undefined && detail.priceInfo !== undefined
+          ? { priceInfo: detail.priceInfo }
+          : {}),
+        ...(record.free === undefined && freeFromPrice(detail.priceInfo) ? { free: true } : {}),
+      };
+    });
+
     // Bound LLM work per run: the whole run must fit the 30s waitUntil window
     // AND stay under the Gemini fallback's ~15 req/min rate limit (enrich
     // batches run concurrently). Un-enriched fresh events are still stored
     // (enriched:false) and drain across later runs. ENRICH_PER_RUN * 1/BATCH
     // concurrent Gemini calls must stay well under the RPM ceiling.
     const ENRICH_PER_RUN = 24;
-    const pending = [...freshDetailed.map(pendingOf), ...retryRecords.map(pendingOfRecord)].slice(
+    const pending = [...freshDetailed.map(pendingOf), ...retryFilled.map(pendingOfRecord)].slice(
       0,
       ENRICH_PER_RUN,
     );
@@ -290,7 +330,7 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
     const freshRecords = freshDetailed.map((item) =>
       toRecord(item, enrichments.get(item.id), nowSeconds),
     );
-    const retried = retryRecords.map((record): EventRecord => {
+    const retried = retryFilled.map((record): EventRecord => {
       const enrichment = enrichments.get(record.id);
       return enrichment === undefined
         ? record

@@ -52,7 +52,9 @@ const ENRICH_BATCH = 1;
 // v5 = fuller descriptions that keep the FULL schedule; 1 event/call for headroom.
 // v6 = extract a dated "sessions" programme (umbrella events become findable on
 // a specific day), and write the address in Italian so it matches OSM/the map.
-export const ENRICH_VERSION = 6;
+// v7 = full descriptions with an absolute ban on "no details provided" filler;
+// mentelocale now fetches its detail page so the body is real, not just a title.
+export const ENRICH_VERSION = 7;
 const EXTRACT_BATCH = 20;
 
 export const chunk = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
@@ -70,17 +72,22 @@ const ENRICH_SYSTEM = [
   'most specific first (a food festival with concerts is ["food","music"]):',
   CATEGORIES.join(', '),
   'a thorough, neutral description IN YOUR OWN WORDS in EACH of English, Italian',
-  'and Russian — as complete and informative as the source supports (several',
-  'sentences, more when the source is rich, fewer when it is thin). Cover, drawing',
-  'ONLY on what the input supports: (1) what the event actually is and what happens',
-  'at it; (2) what makes it distinctive or worth attending; (3) EVERY concrete',
-  'practical detail the source gives — the venue and how to reach it, the FULL',
-  'schedule (all dates, start times and sessions, and any recurrence), whether it',
-  'is free or ticketed and how to book, the programme or line-up, any age/access',
-  'notes. Never drop schedule detail the source states. Be specific and',
-  'informative, not generic filler. Never copy source sentences verbatim, and',
-  'NEVER invent facts: if the source does not state something, simply leave it out',
-  'rather than guessing.',
+  'and Russian. It must be FULL and richly detailed — several substantial',
+  'sentences, a real paragraph of body, never a single thin sentence. Use ALL of',
+  'the input: (1) what the event actually is and what happens at it; (2) what',
+  'makes it distinctive or worth attending; (3) EVERY concrete practical detail',
+  'the source gives — the venue and how to reach it, the FULL schedule (all dates,',
+  'start times and sessions, and any recurrence), whether it is free or ticketed',
+  'and how to book, the programme or line-up, the performers, any age/access',
+  'notes. Never drop schedule or programme detail the source states.',
+  'ABSOLUTELY FORBIDDEN: never comment on missing, absent or unavailable',
+  'information. Do NOT write phrases like "no further details are provided", "the',
+  'source does not provide", "unfortunately", "not specified", "no information',
+  'available", "details are unknown" or anything similar. A detail you do not have',
+  'is simply omitted in silence — you write about what IS known, never about what',
+  'is not. Never copy source sentences verbatim, and NEVER invent facts: if the',
+  'source does not state something, just leave it out — but say NOTHING about its',
+  'absence.',
   'Also give a display "titles" map with the event title in each language:',
   'translate only the descriptive / common-noun parts and KEEP proper nouns',
   'unchanged (festival & event names, venue names, person & brand names). If a',
