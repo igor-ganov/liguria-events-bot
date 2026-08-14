@@ -54,7 +54,9 @@ const ENRICH_BATCH = 1;
 // a specific day), and write the address in Italian so it matches OSM/the map.
 // v7 = full descriptions with an absolute ban on "no details provided" filler;
 // mentelocale now fetches its detail page so the body is real, not just a title.
-export const ENRICH_VERSION = 7;
+// v8 = descriptions are a STRUCTURED Markdown article (lead + labelled sections:
+// Programme, Performers, Getting there, Tickets, When), not one wall of text.
+export const ENRICH_VERSION = 8;
 const EXTRACT_BATCH = 20;
 
 export const chunk = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
@@ -72,22 +74,24 @@ const ENRICH_SYSTEM = [
   'most specific first (a food festival with concerts is ["food","music"]):',
   CATEGORIES.join(', '),
   'a thorough, neutral description IN YOUR OWN WORDS in EACH of English, Italian',
-  'and Russian. It must be FULL and richly detailed — several substantial',
-  'sentences, a real paragraph of body, never a single thin sentence. Use ALL of',
-  'the input: (1) what the event actually is and what happens at it; (2) what',
-  'makes it distinctive or worth attending; (3) EVERY concrete practical detail',
-  'the source gives — the venue and how to reach it, the FULL schedule (all dates,',
-  'start times and sessions, and any recurrence), whether it is free or ticketed',
-  'and how to book, the programme or line-up, the performers, any age/access',
-  'notes. Never drop schedule or programme detail the source states.',
-  'ABSOLUTELY FORBIDDEN: never comment on missing, absent or unavailable',
-  'information. Do NOT write phrases like "no further details are provided", "the',
-  'source does not provide", "unfortunately", "not specified", "no information',
-  'available", "details are unknown" or anything similar. A detail you do not have',
-  'is simply omitted in silence — you write about what IS known, never about what',
-  'is not. Never copy source sentences verbatim, and NEVER invent facts: if the',
-  'source does not state something, just leave it out — but say NOTHING about its',
-  'absence.',
+  'and Russian, written as a STRUCTURED ARTICLE in light Markdown — NEVER one',
+  'undifferentiated wall of text. Structure every description exactly so:',
+  '- Open with a lead paragraph (2-4 sentences): what the event is and why it is',
+  '  worth attending.',
+  '- Then add short labelled sections, each as a Markdown heading on its own line',
+  '  ("## <Label>") followed by its content, and ONLY the sections you truly have',
+  '  content for. Use these labels (translated into the description\'s own',
+  '  language), in this order when present: Programme / line-up; Performers (who',
+  '  is involved); Getting there (the venue and how to reach it); Tickets (price',
+  '  and how to book); When (all dates, start times, recurrence). Use "- " bullet',
+  '  lists for programmes, line-ups and multiple dates or times.',
+  'Cover EVERY concrete detail the input gives, placed in the right section, and',
+  'never drop schedule or programme detail. ABSOLUTELY FORBIDDEN: never output an',
+  'empty section, a section saying the information is unknown, or any phrase like',
+  '"no further details", "not specified", "unfortunately", "no information',
+  'available", "details are unknown" — omit what you do not have in SILENCE. Never',
+  'copy source sentences verbatim, and NEVER invent facts: if the source does not',
+  'state something, just leave it out — but say NOTHING about its absence.',
   'Also give a display "titles" map with the event title in each language:',
   'translate only the descriptive / common-noun parts and KEEP proper nouns',
   'unchanged (festival & event names, venue names, person & brand names). If a',
