@@ -58,7 +58,10 @@ const ENRICH_BATCH = 1;
 // Programme, Performers, Getting there, Tickets, When), not one wall of text.
 // v9 = each section heading carries a stable "[tag]" (programme/performers/
 // getting-there/tickets/when) so the site can icon + style sections per type.
-export const ENRICH_VERSION = 9;
+// v10 = the prompt actually PRODUCES that structure: the old "no markdown"
+// envelope note made the model emit plain prose; the example now shows the
+// Markdown-with-\n-and-[tags] shape the description strings must follow.
+export const ENRICH_VERSION = 10;
 const EXTRACT_BATCH = 20;
 
 export const chunk = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
@@ -134,8 +137,13 @@ const ENRICH_SYSTEM = [
   'nationality, religion, gender, sexual orientation or disability, or is',
   'otherwise illegal. Ordinary cultural, political, religious or community',
   'events are NOT blocked — block only genuinely harmful content. In doubt, false.',
-  'Respond with STRICT valid JSON, no markdown, no backticks:',
-  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "titles": { "en": "…", "it": "…", "ru": "…" }, "descriptions": { "en": "…", "it": "…", "ru": "…" }, "address": "…", "time": "HH:MM", "durationMin": 90, "sessions": [ { "date": "YYYY-MM-DD", "time": "HH:MM", "title": "…" } ], "unusual": true|false, "blocked": true|false } ] }',
+  'Respond with STRICT valid JSON only — no code fences, no backticks around the',
+  'JSON envelope. The description STRINGS, however, MUST contain the Markdown',
+  'described above: a lead paragraph, then "## [tag] Label" section headings on',
+  'their own lines and "- " bullet lists, with real "\\n" newlines between them.',
+  'That Markdown inside the strings is required, not a violation. Follow the',
+  'shape of this example exactly (note the \\n newlines and the [tags]):',
+  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "titles": { "en": "…", "it": "…", "ru": "…" }, "descriptions": { "en": "Two-time-Grammy pianist Andrea Bacchetti plays a candlelit recital in a Baroque villa — a rare chance to hear a 1772 Guadagnini up close.\\n\\n## [programme] Programme\\n- Beethoven — Romance in F\\n- Kreisler — Liebesleid\\n\\n## [getting-there] Getting there\\nVilla Borzino, Busalla (Genoa); A7 motorway or the Genoa–Arquata rail line.\\n\\n## [tickets] Tickets\\nFree admission, donation welcome.\\n\\n## [when] When\\nFriday 14 August 2026, 21:00.", "it": "<same shape, in Italian, with localized labels>", "ru": "<same shape, in Russian, with localized labels>" }, "address": "…", "time": "HH:MM", "durationMin": 90, "sessions": [ { "date": "YYYY-MM-DD", "time": "HH:MM", "title": "…" } ], "unusual": true|false, "blocked": true|false } ] }',
 ].join('\n');
 
 const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment])[] => {
