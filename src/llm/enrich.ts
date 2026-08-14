@@ -56,7 +56,9 @@ const ENRICH_BATCH = 1;
 // mentelocale now fetches its detail page so the body is real, not just a title.
 // v8 = descriptions are a STRUCTURED Markdown article (lead + labelled sections:
 // Programme, Performers, Getting there, Tickets, When), not one wall of text.
-export const ENRICH_VERSION = 8;
+// v9 = each section heading carries a stable "[tag]" (programme/performers/
+// getting-there/tickets/when) so the site can icon + style sections per type.
+export const ENRICH_VERSION = 9;
 const EXTRACT_BATCH = 20;
 
 export const chunk = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
@@ -79,12 +81,15 @@ const ENRICH_SYSTEM = [
   '- Open with a lead paragraph (2-4 sentences): what the event is and why it is',
   '  worth attending.',
   '- Then add short labelled sections, each as a Markdown heading on its own line',
-  '  ("## <Label>") followed by its content, and ONLY the sections you truly have',
-  '  content for. Use these labels (translated into the description\'s own',
-  '  language), in this order when present: Programme / line-up; Performers (who',
-  '  is involved); Getting there (the venue and how to reach it); Tickets (price',
-  '  and how to book); When (all dates, start times, recurrence). Use "- " bullet',
-  '  lists for programmes, line-ups and multiple dates or times.',
+  '  in the form "## [tag] <Label>": <Label> is the section name in the',
+  '  description\'s OWN language, and [tag] is a fixed English keyword the app',
+  '  uses to choose an icon and styling. Use ONLY these tags, and only the',
+  '  sections you truly have content for, in this order when present:',
+  '  [programme] (the programme / line-up), [performers] (who is involved),',
+  '  [getting-there] (the venue and how to reach it), [tickets] (price and how',
+  '  to book), [when] (all dates, start times, recurrence). For example a',
+  '  Tickets section in Italian is exactly "## [tickets] Biglietti". Use "- "',
+  '  bullet lists for programmes, line-ups and multiple dates or times.',
   'Cover EVERY concrete detail the input gives, placed in the right section, and',
   'never drop schedule or programme detail. ABSOLUTELY FORBIDDEN: never output an',
   'empty section, a section saying the information is unknown, or any phrase like',
