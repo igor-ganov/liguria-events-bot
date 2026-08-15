@@ -6,6 +6,7 @@
 import {
   eventIdOf,
   freeFromPrice,
+  hasCjk,
   localized,
   mergeEvent,
   mergeRaw,
@@ -278,7 +279,16 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       }
       // Re-enrich when it never succeeded OR was written by an older prompt
       // version — that backfills the richer descriptions across the corpus.
-      if (!event.enriched || (event.enrichVersion ?? 0) < ENRICH_VERSION) retryRecords.push(event);
+      // Re-enrich when never enriched, written by an older prompt version, OR
+      // carrying a hallucinated CJK glyph — the last self-heals a stray CJK
+      // character in the stored text without a whole-corpus version bump.
+      if (
+        !event.enriched ||
+        (event.enrichVersion ?? 0) < ENRICH_VERSION ||
+        hasCjk(event.descriptions)
+      ) {
+        retryRecords.push(event);
+      }
     }
 
     const detailed = await deps.details(freshItems.map((item) => item.raw));

@@ -3,7 +3,7 @@
  * events, and extract structured events from Telegram post text. Both parse
  * defensively — an unusable LLM item is skipped, never trusted (AC-2.3).
  */
-import { CATEGORIES, isCategory, isIsoDate, parseLocalized, parseSessions } from '../domain/event.ts';
+import { CATEGORIES, hasCjk, isCategory, isIsoDate, parseLocalized, parseSessions } from '../domain/event.ts';
 import type { Category, LocalizedText, RawEvent, Session } from '../domain/event.ts';
 import type { RawPost } from '../collectors/types.ts';
 import { extractJson } from './client.ts';
@@ -100,6 +100,9 @@ const ENRICH_SYSTEM = [
   'available", "details are unknown" — omit what you do not have in SILENCE. Never',
   'copy source sentences verbatim, and NEVER invent facts: if the source does not',
   'state something, just leave it out — but say NOTHING about its absence.',
+  'Write each language in ITS OWN script only: Latin for English and Italian,',
+  'Cyrillic for Russian. NEVER emit a Chinese, Japanese or Korean character — not',
+  'one glyph, anywhere in any field.',
   'Also give a display "titles" map with the event title in each language:',
   'translate only the descriptive / common-noun parts and KEEP proper nouns',
   'unchanged (festival & event names, venue names, person & brand names). If a',
@@ -159,6 +162,9 @@ const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment
   const legacy = readProp(value, 'category');
   const categories = [...many, ...(isCategory(legacy) ? [legacy] : [])].slice(0, 3);
   if (id === undefined || categories.length === 0 || descriptions === undefined) return [];
+  // Reject a hallucinated CJK glyph in a Latin/Cyrillic description or title:
+  // dropping the item leaves the record unenriched, so it re-generates cleanly.
+  if (hasCjk(descriptions) || (titles !== undefined && hasCjk(titles))) return [];
   const address = asNonEmptyString(readProp(value, 'address'));
   const rawTime = asNonEmptyString(readProp(value, 'time'));
   const time = rawTime !== undefined && /^([01]\d|2[0-3]):[0-5]\d$/.test(rawTime) ? rawTime : undefined;

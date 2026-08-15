@@ -428,6 +428,15 @@ export const parseLocalized = (
   };
 };
 
+// Hiragana/Katakana, CJK (incl. Ext-A), Hangul, CJK-compat. Our targets are
+// Latin (en/it) and Cyrillic (ru), so a CJK glyph is always a model
+// hallucination — output carrying one is rejected and re-generated.
+const CJK_RE = /[぀-ヿ㐀-鿿가-힯豈-﫿]/;
+
+/** True if any language of a localized text carries CJK/kana/hangul. */
+export const hasCjk = (text: LocalizedText): boolean =>
+  CJK_RE.test(text.en) || CJK_RE.test(text.it) || CJK_RE.test(text.ru);
+
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /** Parse a programme of dated occurrences; accepts the record's `sessions` or

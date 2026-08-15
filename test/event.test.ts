@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   eventIdOf,
   freeFromPrice,
+  hasCjk,
   mergeEvent,
   mergeRaw,
   normalizeTitle,
@@ -130,6 +131,14 @@ describe('freeFromPrice', () => {
     assert.equal(freeFromPrice('ingresso libero'), true);
     assert.equal(freeFromPrice('Biglietto € 15,00'), false);
     assert.equal(freeFromPrice(undefined), false);
+  });
+});
+
+describe('hasCjk', () => {
+  test('flags a stray CJK/kana/hangul glyph, passes clean Latin/Cyrillic', () => {
+    assert.equal(hasCjk({ en: 'ok', it: 'ok', ru: 'уже近 тут' }), true);
+    assert.equal(hasCjk({ en: 'カ', it: 'ok', ru: 'ok' }), true);
+    assert.equal(hasCjk({ en: 'A concert', it: 'Un concerto', ru: 'Концерт — всё чисто' }), false);
   });
 });
 
