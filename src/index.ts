@@ -5,7 +5,13 @@
  */
 import { isOperator } from './config.ts';
 import type { Env } from './config.ts';
-import { isCategory, parseLocalized, parseSessions, toCompact } from './domain/event.ts';
+import {
+  isCategory,
+  parseLocalized,
+  parseSessions,
+  toCompact,
+  withDerivedSpan,
+} from './domain/event.ts';
 import type { Category, CompactEvent, EventRecord, SourceLink } from './domain/event.ts';
 import { makeBot, sendLong } from './delivery/bot-api.ts';
 import type { Bot, Keyboard } from './delivery/bot-api.ts';
@@ -799,6 +805,9 @@ const worker = {
         const lat = asNumber(readProp(item, 'lat'));
         const lng = asNumber(readProp(item, 'lng'));
         const sessions = parseSessions(readProp(item, 'p'));
+        // `k: true` marks a container; only meaningful with a programme to
+        // stand on, so it is ignored unless sessions come with it or are stored.
+        const container = readProp(item, 'k') === true;
         const time = asNonEmptyString(readProp(item, 'h'));
         const durationMin = asNumber(readProp(item, 'du'));
         if (id === undefined) continue;
@@ -806,7 +815,7 @@ const worker = {
         if (record === undefined) continue;
         await writeEventRecord(
           env.EVENTS,
-          {
+          withDerivedSpan({
             ...record,
             enriched: true,
             ...(categories.length === 0 ? {} : { categories }),
@@ -817,10 +826,11 @@ const worker = {
             ...(lat === undefined ? {} : { lat }),
             ...(lng === undefined ? {} : { lng }),
             ...(sessions === undefined ? {} : { sessions }),
+            ...(container ? { kind: 'container' as const } : {}),
             ...(time === undefined ? {} : { time }),
             ...(durationMin === undefined ? {} : { durationMin }),
             ...(unusual === undefined ? {} : { unusual }),
-          },
+          }),
           nowMs,
         );
         applied += 1;

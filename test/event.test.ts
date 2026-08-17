@@ -10,10 +10,12 @@ import {
   normalizeTitle,
   parseEventRecord,
   parseIndex,
+  containerSpan,
   parseSessions,
+  withDerivedSpan,
   toCompact,
 } from '../src/domain/event.ts';
-import type { EventRecord, RawEvent } from '../src/domain/event.ts';
+import type { EventRecord, RawEvent, Session } from '../src/domain/event.ts';
 
 const record: EventRecord = {
   id: 'abc123def456',
@@ -209,5 +211,68 @@ describe('parseEventRecord / toCompact / parseIndex', () => {
     assert.equal(compact.cr, record.addedAt); // 1_700_000_000
     const parsed = parseIndex(JSON.stringify([compact]));
     assert.equal(parsed?.[0]?.cr, record.addedAt);
+  });
+});
+
+describe('event kind: containers vs standalone events', () => {
+  // Deliberately out of order: the span must not depend on the source's ordering.
+  const sessions: readonly Session[] = [
+    { date: '2026-08-20', time: '21:00' },
+    { date: '2026-08-05' },
+    { date: '2026-08-12' },
+  ];
+
+  test('containerSpan is first..last session date, whatever order they arrive in', () => {
+    assert.deepEqual(containerSpan(sessions), { startDate: '2026-08-05', endDate: '2026-08-20' });
+  });
+
+  test('containerSpan is undefined without a programme to derive it from', () => {
+    assert.equal(containerSpan(undefined), undefined);
+    assert.equal(containerSpan([]), undefined);
+  });
+
+  test('a container takes its span from the programme, not from the source', () => {
+    const derived = withDerivedSpan({
+      ...record,
+      kind: 'container',
+      startDate: '2026-06-01', // the marketing window the source advertised
+      endDate: '2026-09-30',
+      sessions,
+    });
+    assert.equal(derived.startDate, '2026-08-05');
+    assert.equal(derived.endDate, '2026-08-20');
+  });
+
+  test('a single-session container collapses to one day, with no end date', () => {
+    const derived = withDerivedSpan({
+      ...record,
+      kind: 'container',
+      sessions: [{ date: '2026-08-05' }],
+    });
+    assert.equal(derived.startDate, '2026-08-05');
+    assert.equal(derived.endDate, undefined);
+  });
+
+  test('a standalone event keeps its own span even when it lists sessions', () => {
+    const standalone = { ...record, startDate: '2026-06-01', endDate: '2026-09-30', sessions };
+    assert.deepEqual(withDerivedSpan(standalone), standalone);
+  });
+
+  test('a container with no sessions is left alone rather than guessed at', () => {
+    const bare = { ...record, kind: 'container' as const, startDate: '2026-06-01' };
+    assert.deepEqual(withDerivedSpan(bare), bare);
+  });
+
+  test('the kind round-trips through the record and the compact index', () => {
+    const container = { ...record, kind: 'container' as const, sessions };
+    assert.equal(toCompact(container).k, true);
+    assert.equal(toCompact(record).k, undefined); // standalone stays unmarked
+    assert.equal(parseEventRecord(JSON.stringify(container))?.kind, 'container');
+    assert.equal(parseIndex(JSON.stringify([toCompact(container)]))?.[0]?.k, true);
+    assert.equal(parseIndex(JSON.stringify([toCompact(record)]))?.[0]?.k, undefined);
+  });
+
+  test('a junk kind reads as standalone — a bad value must never hide an event', () => {
+    assert.equal(parseEventRecord(JSON.stringify({ ...record, kind: 'nonsense' }))?.kind, undefined);
   });
 });

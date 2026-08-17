@@ -55,9 +55,24 @@ export const isLang = (value: unknown): value is Lang => LANGS.some((lang) => la
 export const descriptionOf = (text: LocalizedText | undefined, lang: Lang): string =>
   (text?.[lang] || text?.en) ?? '';
 
-/** A single dated occurrence of an umbrella event — the individual concert on a
- *  given night of a months-long festival. The event's span (startDate..endDate)
- *  is the whole run; `sessions` is the concrete programme inside it. */
+/**
+ * What an event's dates MEAN.
+ *
+ * - `standalone` — the event runs across its own span: an exhibition open every
+ *   day from the 1st to the 30th is on, and findable, on the 14th.
+ * - `container` — the event is nothing but its programme: a festival with
+ *   concerts on the 5th, the 12th and the 20th does NOT happen on the 8th, and
+ *   must not surface in that day's feed or in a filter bounded by it. Its span
+ *   is derived from the sessions rather than declared.
+ *
+ * Absent means standalone: that is what every event collected before this
+ * distinction existed is, unless a session programme says otherwise.
+ */
+export type EventKind = 'standalone' | 'container';
+
+/** A single dated occurrence of an event's programme — the individual concert on
+ *  a given night of a months-long festival. For a `container` these ARE the
+ *  event's occurrences; for a `standalone` they are highlights inside its run. */
 export type Session = Readonly<{
   /** 'YYYY-MM-DD'. */
   date: string;
@@ -73,6 +88,9 @@ export type EventRecord = Readonly<{
   /** 'YYYY-MM-DD', Europe/Rome calendar date. */
   startDate: string;
   endDate?: string;
+  /** Whether the dates are the event's own run or only its programme; absent
+   *  means `standalone`. See EventKind. */
+  kind?: EventKind;
   /** The concrete dated programme inside a multi-day/umbrella event, so the feed
    *  can show the specific occurrence on each day instead of the whole run. */
   sessions?: readonly Session[];
@@ -174,6 +192,9 @@ export type CompactEvent = Readonly<{
   du?: number;
   /** Programme: the dated occurrences inside an umbrella event (p = programme). */
   p?: readonly Session[];
+  /** Container (k = kind): the event happens ONLY on its session dates, so it
+   *  must not appear on the empty days between them. Absent = standalone. */
+  k?: true;
   u: string;
   img?: string;
   d?: LocalizedText;
@@ -375,6 +396,10 @@ export const toCompact = (event: EventRecord): CompactEvent => {
   ...(event.time === undefined ? {} : { h: event.time }),
   ...(event.durationMin === undefined ? {} : { du: event.durationMin }),
   ...(event.sessions === undefined || event.sessions.length === 0 ? {} : { p: event.sessions }),
+  // `k` marks a CONTAINER — an event that happens only on its session dates, so
+  // the site must not surface it on the empty days in between. Emitted only when
+  // true; absent is standalone, which is what every other event is.
+  ...(event.kind === 'container' ? { k: true } : {}),
   ...(event.city === undefined ? {} : { ct: event.city }),
   ...(region === undefined ? {} : { rg: region }),
   ...(event.image === undefined ? {} : { img: event.image }),
@@ -436,6 +461,36 @@ const CJK_RE = /[぀-ヿ㐀-鿿가-힯豈-﫿]/;
 /** True if any language of a localized text carries CJK/kana/hangul. */
 export const hasCjk = (text: LocalizedText): boolean =>
   CJK_RE.test(text.en) || CJK_RE.test(text.it) || CJK_RE.test(text.ru);
+
+/**
+ * The span a CONTAINER event actually covers: first to last session date. A
+ * container declares no run of its own — the programme is the event — so its
+ * stored span is derived here rather than taken from the source, which usually
+ * states the marketing window ("all summer") the event does not really occupy.
+ * Undefined when there is no dated programme to derive it from.
+ */
+export const containerSpan = (
+  sessions: readonly Session[] | undefined,
+): Readonly<{ startDate: string; endDate: string }> | undefined => {
+  const dates = [...(sessions ?? [])].map((session) => session.date).sort();
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  return first === undefined || last === undefined
+    ? undefined
+    : { startDate: first, endDate: last };
+};
+
+/**
+ * The record with a container's span pulled from its programme. A standalone
+ * event, or a container with no sessions yet, is returned untouched — never
+ * guess a span the data does not support.
+ */
+export const withDerivedSpan = (event: EventRecord): EventRecord => {
+  const span = event.kind === 'container' ? containerSpan(event.sessions) : undefined;
+  return span === undefined
+    ? event
+    : { ...event, startDate: span.startDate, ...(span.endDate === span.startDate ? {} : { endDate: span.endDate }) };
+};
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -506,6 +561,12 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
   const altLinks = parseSourceLinks(readProp(value, 'altLinks'));
   const titles = parseLocalized(readProp(value, 'titles'));
   const sessions = parseSessions(readProp(value, 'sessions') ?? readProp(value, 'p'));
+  // Accepts the record's `kind` or the compact `k` flag; anything else is
+  // standalone, so a corrupt value can never silently hide an event.
+  const kind: EventKind | undefined =
+    readProp(value, 'kind') === 'container' || readProp(value, 'k') === true
+      ? 'container'
+      : undefined;
   return {
     id,
     title,
@@ -532,6 +593,7 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
     ...(image === undefined ? {} : { image }),
     ...(city === undefined ? {} : { city }),
     ...(sessions === undefined ? {} : { sessions }),
+    ...(kind === undefined ? {} : { kind }),
     ...(altLinks.length === 0 ? {} : { altLinks }),
   };
 };
@@ -586,6 +648,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
     ...(h === undefined ? {} : { h }),
     ...(du === undefined ? {} : { du }),
     ...(p === undefined ? {} : { p }),
+    ...(readProp(value, 'k') === true ? { k: true as const } : {}),
     ...(ct === undefined ? {} : { ct }),
     ...(rg === undefined ? {} : { rg }),
     ...(img === undefined ? {} : { img }),

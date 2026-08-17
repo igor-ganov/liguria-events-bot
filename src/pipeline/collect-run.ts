@@ -11,6 +11,7 @@ import {
   mergeEvent,
   mergeRaw,
   toCompact,
+  withDerivedSpan,
 } from '../domain/event.ts';
 import type { CompactEvent, EventRecord, RawEvent } from '../domain/event.ts';
 import { mergeDuplicates, orderByAge } from '../domain/merge-duplicates.ts';
@@ -115,7 +116,9 @@ const toRecord = (
   const free = freeFromPrice(raw.priceInfo);
   const address = raw.address ?? enrichment?.address;
   const time = raw.time ?? enrichment?.time;
-  return {
+  // A container's span is its programme, not the window the source advertised —
+  // withDerivedSpan rewrites it so the stored dates match the days it is really on.
+  return withDerivedSpan({
     id: item.id,
     title: raw.title,
     startDate: raw.startDate,
@@ -133,6 +136,7 @@ const toRecord = (
     ...(time === undefined ? {} : { time }),
     ...(enrichment?.durationMin === undefined ? {} : { durationMin: enrichment.durationMin }),
     ...(enrichment?.sessions === undefined ? {} : { sessions: enrichment.sessions }),
+    ...(enrichment?.kind === undefined ? {} : { kind: enrichment.kind }),
     ...(raw.venue === undefined ? {} : { venue: raw.venue }),
     ...(address === undefined ? {} : { address }),
     ...(raw.priceInfo === undefined ? {} : { priceInfo: raw.priceInfo }),
@@ -144,7 +148,7 @@ const toRecord = (
     ...(enrichment?.titles === undefined ? {} : { titles: enrichment.titles }),
     ...(enrichment?.unusual === true ? { unusual: true } : {}),
     ...(free ? { free: true } : {}),
-  };
+  });
 };
 
 const pendingOf = (item: Identified): PendingEnrich => ({
@@ -347,10 +351,17 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
     );
     const retried = retryFilled.map((record): EventRecord => {
       const enrichment = enrichments.get(record.id);
+      // Dropped so a re-classification can actually demote a container back to
+      // standalone; the spread below puts it back when it still applies.
+      const { kind: _staleKind, ...withoutKind } = record;
       return enrichment === undefined
         ? record
-        : {
-            ...record,
+        : // The programme and the kind are re-applied on every pass, not just
+          // filled when absent: this is how the corpus MIGRATES onto a new
+          // classification, and how a mis-read programme gets corrected. The
+          // span then follows the programme for a container.
+          withDerivedSpan({
+            ...withoutKind,
             categories: enrichment.categories,
             descriptions: enrichment.descriptions,
             enriched: true,
@@ -361,12 +372,14 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
             ...(record.durationMin === undefined && enrichment.durationMin !== undefined
               ? { durationMin: enrichment.durationMin }
               : {}),
+            ...(enrichment.sessions === undefined ? {} : { sessions: enrichment.sessions }),
+            ...(enrichment.kind === 'container' ? { kind: 'container' as const } : {}),
             ...(enrichment.titles === undefined ? {} : { titles: enrichment.titles }),
             ...(record.address === undefined && enrichment.address !== undefined
               ? { address: enrichment.address }
               : {}),
             ...(enrichment.unusual === true ? { unusual: true } : {}),
-          };
+          });
     });
 
     // Content-policy gate (same rules as user submissions): the enrichment

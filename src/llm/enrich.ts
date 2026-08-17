@@ -4,7 +4,7 @@
  * defensively — an unusable LLM item is skipped, never trusted (AC-2.3).
  */
 import { CATEGORIES, hasCjk, isCategory, isIsoDate, parseLocalized, parseSessions } from '../domain/event.ts';
-import type { Category, LocalizedText, RawEvent, Session } from '../domain/event.ts';
+import type { Category, EventKind, LocalizedText, RawEvent, Session } from '../domain/event.ts';
 import type { RawPost } from '../collectors/types.ts';
 import { extractJson } from './client.ts';
 import type { ChatFn } from './client.ts';
@@ -34,6 +34,9 @@ export type Enrichment = Readonly<{
   durationMin?: number;
   /** The dated programme inside an umbrella event — individual occurrences. */
   sessions?: readonly Session[];
+  /** Whether the dates are the event's own run (`standalone`) or only the days
+   *  its programme occupies (`container`). See EventKind. */
+  kind?: EventKind;
   unusual: boolean;
   /** Content-policy violation — such events are dropped, never stored. */
   blocked?: boolean;
@@ -61,7 +64,10 @@ const ENRICH_BATCH = 1;
 // v10 = the prompt actually PRODUCES that structure: the old "no markdown"
 // envelope note made the model emit plain prose; the example now shows the
 // Markdown-with-\n-and-[tags] shape the description strings must follow.
-export const ENRICH_VERSION = 10;
+// v11 = classify "kind": a container happens ONLY on its session dates (a
+// concert series, a festival of separate nights) and must not surface on the
+// empty days between them; a standalone runs across its whole span.
+export const ENRICH_VERSION = 11;
 const EXTRACT_BATCH = 20;
 
 export const chunk = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
@@ -129,6 +135,25 @@ const ENRICH_SYSTEM = [
   'a months-long umbrella event becomes findable on a specific day, so do not skip',
   'programme detail the source states. Omit the field for a single-date event, or',
   'when the source gives no per-date programme — NEVER invent dates or times.',
+  'Also give "kind", the single most consequential field here — it decides which',
+  'days the event is findable on:',
+  '- "container" — the event happens ONLY on the dates in "sessions" and NOTHING',
+  '  happens in between. A concert series, a festival of separate nights, a',
+  '  cinema season, a course meeting weekly, a market held on given weekends. If',
+  '  someone asks "what is on" on a date between two sessions, this event is NOT',
+  '  an answer, so it must never be listed on those days.',
+  '- "standalone" — the event genuinely runs across its whole span, every day of',
+  '  it. An exhibition open daily for three months, a month-long installation, a',
+  '  venue\'s continuous opening. It IS an answer on any day in its span.',
+  'Decide by ONE question: on a day between two listed dates, with no session,',
+  'can a visitor turn up and experience this event? Yes → "standalone". No →',
+  '"container". An exhibition that also runs a few guided tours stays',
+  '"standalone" — the tours are highlights inside a run that is open regardless.',
+  'A festival whose ONLY content is its dated nights is "container", even when',
+  'the source advertises it as one long season.',
+  'A single-date event is "standalone". When "sessions" is empty or absent, the',
+  'answer is "standalone" — never mark an event a container with no programme to',
+  'stand on, or it disappears from the site entirely.',
   'Also set "unusual": true ONLY for offbeat, niche, experimental or',
   'distinctly non-touristy happenings (a neighbourhood performance, an',
   'unconventional venue, an oddball one-off, immersive/site-specific art);',
@@ -146,7 +171,7 @@ const ENRICH_SYSTEM = [
   'their own lines and "- " bullet lists, with real "\\n" newlines between them.',
   'That Markdown inside the strings is required, not a violation. Follow the',
   'shape of this example exactly (note the \\n newlines and the [tags]):',
-  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "titles": { "en": "…", "it": "…", "ru": "…" }, "descriptions": { "en": "Two-time-Grammy pianist Andrea Bacchetti plays a candlelit recital in a Baroque villa — a rare chance to hear a 1772 Guadagnini up close.\\n\\n## [programme] Programme\\n- Beethoven — Romance in F\\n- Kreisler — Liebesleid\\n\\n## [getting-there] Getting there\\nVilla Borzino, Busalla (Genoa); A7 motorway or the Genoa–Arquata rail line.\\n\\n## [tickets] Tickets\\nFree admission, donation welcome.\\n\\n## [when] When\\nFriday 14 August 2026, 21:00.", "it": "<same shape, in Italian, with localized labels>", "ru": "<same shape, in Russian, with localized labels>" }, "address": "…", "time": "HH:MM", "durationMin": 90, "sessions": [ { "date": "YYYY-MM-DD", "time": "HH:MM", "title": "…" } ], "unusual": true|false, "blocked": true|false } ] }',
+  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "titles": { "en": "…", "it": "…", "ru": "…" }, "descriptions": { "en": "Two-time-Grammy pianist Andrea Bacchetti plays a candlelit recital in a Baroque villa — a rare chance to hear a 1772 Guadagnini up close.\\n\\n## [programme] Programme\\n- Beethoven — Romance in F\\n- Kreisler — Liebesleid\\n\\n## [getting-there] Getting there\\nVilla Borzino, Busalla (Genoa); A7 motorway or the Genoa–Arquata rail line.\\n\\n## [tickets] Tickets\\nFree admission, donation welcome.\\n\\n## [when] When\\nFriday 14 August 2026, 21:00.", "it": "<same shape, in Italian, with localized labels>", "ru": "<same shape, in Russian, with localized labels>" }, "address": "…", "time": "HH:MM", "durationMin": 90, "sessions": [ { "date": "YYYY-MM-DD", "time": "HH:MM", "title": "…" } ], "kind": "container"|"standalone", "unusual": true|false, "blocked": true|false } ] }',
 ].join('\n');
 
 const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment])[] => {
@@ -172,6 +197,11 @@ const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment
   const durationMin =
     typeof rawDur === 'number' && rawDur >= 15 && rawDur <= 1440 ? Math.round(rawDur) : undefined;
   const sessions = parseSessions(readProp(value, 'sessions'));
+  // A container is only meaningful with a programme to stand on: marking one
+  // without sessions would leave an event with no days at all, i.e. invisible.
+  // Anything the model returns other than the exact word is standalone.
+  const kind: EventKind | undefined =
+    readProp(value, 'kind') === 'container' && sessions !== undefined ? 'container' : undefined;
   const enrichment: Enrichment = {
     categories,
     descriptions,
@@ -181,6 +211,7 @@ const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment
     ...(time === undefined ? {} : { time }),
     ...(durationMin === undefined ? {} : { durationMin }),
     ...(sessions === undefined ? {} : { sessions }),
+    ...(kind === undefined ? {} : { kind }),
     ...(asBoolean(readProp(value, 'blocked')) === true ? { blocked: true } : {}),
   };
   return [[id, enrichment]];
