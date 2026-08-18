@@ -940,17 +940,16 @@ const worker = {
       if (url.searchParams.get('force') === 'rebuild') {
         const stored = await readAllRecords(env.EVENTS);
         const today = romeDate(Date.now());
-        // A container's run follows its programme. Re-derive it here and write
-        // back the records whose stored dates disagree, so a corpus classified
-        // before the rule is repaired without an LLM call. Idempotent.
-        const records = stored.map(withDerivedSpan);
-        const repaired = records.filter((record, i) => {
-          const before = stored[i];
-          return (
-            before !== undefined &&
-            (before.startDate !== record.startDate || before.endDate !== record.endDate)
-          );
+        // Repair pass, no LLM involved: re-read the programme (which drops the
+        // repeated evenings older runs stored) and re-derive the container's
+        // run from it, then write back whatever actually changed. Idempotent.
+        const records = stored.map((record) => {
+          const sessions = parseSessions(record.sessions);
+          return withDerivedSpan(sessions === undefined ? record : { ...record, sessions });
         });
+        const repaired = records.filter(
+          (record, i) => JSON.stringify(stored[i]) !== JSON.stringify(record),
+        );
         await Promise.all(repaired.map((record) => writeEventRecord(env.EVENTS, record, Date.now())));
         const index = pruneIndex(records.map(toCompact), today).toSorted((a, b) =>
           a.s < b.s ? -1 : a.s > b.s ? 1 : a.t.localeCompare(b.t),
