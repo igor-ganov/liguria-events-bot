@@ -487,9 +487,16 @@ export const containerSpan = (
  */
 export const withDerivedSpan = (event: EventRecord): EventRecord => {
   const span = event.kind === 'container' ? containerSpan(event.sessions) : undefined;
-  return span === undefined
-    ? event
-    : { ...event, startDate: span.startDate, ...(span.endDate === span.startDate ? {} : { endDate: span.endDate }) };
+  if (span === undefined) return event;
+  // The advertised end is dropped, not merely left unset: a container whose
+  // programme collapses to a single day was keeping a months-long `endDate`
+  // from the source and going on claiming every day in between.
+  const { endDate: _advertised, ...rest } = event;
+  return {
+    ...rest,
+    startDate: span.startDate,
+    ...(span.endDate === span.startDate ? {} : { endDate: span.endDate }),
+  };
 };
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -512,7 +519,16 @@ export const parseSessions = (value: unknown): readonly Session[] | undefined =>
       },
     ];
   });
-  return out.length === 0 ? undefined : out;
+  // The same evening listed twice (models repeat themselves) would show up as
+  // two occurrences in the feed, so a session is unique by date + time.
+  const seen = new Set<string>();
+  const unique = out.filter((session) => {
+    const key = `${session.date}|${session.time ?? ''}`;
+    const fresh = !seen.has(key);
+    seen.add(key);
+    return fresh;
+  });
+  return unique.length === 0 ? undefined : unique;
 };
 
 export const parseEventRecord = (text: string): EventRecord | undefined => {

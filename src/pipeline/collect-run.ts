@@ -276,9 +276,15 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
     }));
     for (const { item, record } of stored) {
       if (record === undefined) continue;
-      const { event, changed } = mergeEvent(record, item.raw);
-      if (changed) {
-        mergedIds.add(item.id);
+      const merged = mergeEvent(record, item.raw);
+      // A container's run follows its programme, re-derived on every sighting:
+      // a record written before that rule (or by an older prompt) is repaired
+      // here, with no LLM call and no version bump.
+      const event = withDerivedSpan(merged.event);
+      const spanChanged =
+        event.startDate !== record.startDate || event.endDate !== record.endDate;
+      if (merged.changed) mergedIds.add(item.id);
+      if (merged.changed || spanChanged) {
         updatedRecords.push(event);
       }
       // Re-enrich when it never succeeded OR was written by an older prompt

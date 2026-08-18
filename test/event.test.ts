@@ -243,14 +243,29 @@ describe('event kind: containers vs standalone events', () => {
     assert.equal(derived.endDate, '2026-08-20');
   });
 
-  test('a single-session container collapses to one day, with no end date', () => {
+  test('a single-session container collapses to one day, dropping the advertised end', () => {
+    // Live data: a lecture series with one date left was still carrying
+    // endDate 2026-11-04 from the source, so it claimed seven empty months.
     const derived = withDerivedSpan({
       ...record,
       kind: 'container',
+      endDate: '2026-11-04',
       sessions: [{ date: '2026-08-05' }],
     });
     assert.equal(derived.startDate, '2026-08-05');
     assert.equal(derived.endDate, undefined);
+    assert.equal('endDate' in derived, false);
+  });
+
+  test('the same evening listed twice is one occurrence, not two', () => {
+    assert.deepEqual(parseSessions([{ date: '2026-06-11' }, { date: '2026-06-11' }]), [
+      { date: '2026-06-11' },
+    ]);
+    // Two showings on one day are still two sessions.
+    assert.deepEqual(
+      parseSessions([{ date: '2026-06-11', time: '17:00' }, { date: '2026-06-11', time: '21:00' }]),
+      [{ date: '2026-06-11', time: '17:00' }, { date: '2026-06-11', time: '21:00' }],
+    );
   });
 
   test('a standalone event keeps its own span even when it lists sessions', () => {

@@ -938,13 +938,25 @@ const worker = {
       // carried forward untouched for events that did not change, so a new
       // projected field (the region) would never reach the events already in it.
       if (url.searchParams.get('force') === 'rebuild') {
-        const records = await readAllRecords(env.EVENTS);
+        const stored = await readAllRecords(env.EVENTS);
         const today = romeDate(Date.now());
+        // A container's run follows its programme. Re-derive it here and write
+        // back the records whose stored dates disagree, so a corpus classified
+        // before the rule is repaired without an LLM call. Idempotent.
+        const records = stored.map(withDerivedSpan);
+        const repaired = records.filter((record, i) => {
+          const before = stored[i];
+          return (
+            before !== undefined &&
+            (before.startDate !== record.startDate || before.endDate !== record.endDate)
+          );
+        });
+        await Promise.all(repaired.map((record) => writeEventRecord(env.EVENTS, record, Date.now())));
         const index = pruneIndex(records.map(toCompact), today).toSorted((a, b) =>
           a.s < b.s ? -1 : a.s > b.s ? 1 : a.t.localeCompare(b.t),
         );
         await writeIndex(env.EVENTS, index);
-        return Response.json({ rebuilt: index.length, records: records.length });
+        return Response.json({ rebuilt: index.length, records: records.length, repaired: repaired.length });
       }
       // Backfill multi-source gallery photos onto events merged before the
       // per-source-image era: for each altLink without an image, fetch that
