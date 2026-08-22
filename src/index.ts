@@ -41,6 +41,7 @@ import {
   appendRunLog,
   eventKey,
   readAllRecords,
+  readAnyEventRecord,
   readEventRecord,
   readEventRecords,
   readIndex,
@@ -767,6 +768,21 @@ const worker = {
     }
     if (url.pathname === '/events.json' && request.method === 'GET') {
       return serveEventsJson(env, url);
+    }
+
+    // One event by id, INCLUDING events that have already happened. The index
+    // only carries what is still to come, so without this a link shared last
+    // month resolves to nothing — which is how the site came to answer 15 806
+    // of its own URLs with a 404.
+    const oneEvent = /^\/event\/([a-z0-9]{6,32})$/.exec(url.pathname);
+    if (oneEvent !== null && request.method === 'GET') {
+      const record = await readAnyEventRecord(env.EVENTS, oneEvent[1] ?? '');
+      if (record === undefined) {
+        return Response.json({ error: 'not_found' }, { status: 404 });
+      }
+      return Response.json(toCompact(record), {
+        headers: { 'cache-control': 'public, max-age=600' },
+      });
     }
     // Rebuild events:index from the stored records (recovery after a lost
     // index), without re-collecting or re-enriching. Gated by the tick secret.

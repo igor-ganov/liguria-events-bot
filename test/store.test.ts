@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import {
   acquireLock,
   appendRunLog,
+  archiveTtlSeconds,
+  readAnyEventRecord,
   readEventRecord,
   readIndex,
   readRunLog,
@@ -46,6 +48,29 @@ describe('store', () => {
     assert.deepEqual(await readEventRecord(kv, record.id), record);
     const ttl = kv.ttls.get(`event:${record.id}`);
     assert.ok(ttl !== undefined && ttl > 13 * 86_400 && ttl < 16 * 86_400);
+  });
+
+  test('the archived copy outlives the event by more than a year', async () => {
+    const kv = makeKvStub();
+    const nowMs = Date.parse('2026-07-01T00:00:00Z');
+    await writeEventRecord(kv, record, nowMs);
+    const ttl = kv.ttls.get(`archive:${record.id}`);
+    assert.ok(ttl !== undefined && ttl > 380 * 86_400);
+    assert.ok(archiveTtlSeconds(record, nowMs) > (kv.ttls.get(`event:${record.id}`) ?? 0));
+  });
+
+  test('a record whose working copy expired is still found in the archive', async () => {
+    // This is the whole point: three days after the event the working record is
+    // gone, and the page must not go with it.
+    const kv = makeKvStub();
+    await writeEventRecord(kv, record, Date.parse('2026-07-01T00:00:00Z'));
+    kv.data.delete(`event:${record.id}`);
+    assert.equal(await readEventRecord(kv, record.id), undefined);
+    assert.deepEqual(await readAnyEventRecord(kv, record.id), record);
+  });
+
+  test('an id that never existed is still nothing, in either tier', async () => {
+    assert.equal(await readAnyEventRecord(makeKvStub(), 'nosuchevent'), undefined);
   });
 
   test('recordTtlSeconds never drops under an hour', () => {

@@ -36,6 +36,9 @@ export const LOCK_TTL_SECONDS = 180;
 
 export const eventKey = (id: string): string => `event:${id}`;
 
+/** The archived copy of a record, read only when the working one has expired. */
+export const archiveKey = (id: string): string => `archive:${id}`;
+
 export const readIndex = async (kv: KvLike): Promise<readonly CompactEvent[]> => {
   const raw = await kv.get(INDEX_KEY);
   if (raw === null) return [];
@@ -89,14 +92,39 @@ export const recordTtlSeconds = (event: EventRecord, nowMs: number): number => {
   return Math.max(3600, Math.floor((expiresAtMs - nowMs) / 1000));
 };
 
+// A shared link must outlive the evening it points at. The working record still
+// expires days after the event — that keeps the pipeline's key scan small — so
+// the page is kept alive by a second copy that nothing but the single-event
+// lookup ever reads. Before this, three days after an event its page 404'd, and
+// Search Console had counted 15 806 of those.
+const ARCHIVE_DAYS = 400;
+
+/** Seconds until the archived copy expires: over a year past the event. */
+export const archiveTtlSeconds = (event: EventRecord, nowMs: number): number => {
+  const lastDay = event.endDate ?? event.startDate;
+  const expiresAtMs = Date.parse(`${lastDay}T23:59:59Z`) + ARCHIVE_DAYS * DAY_SECONDS * 1000;
+  return Math.max(3600, Math.floor((expiresAtMs - nowMs) / 1000));
+};
+
 export const writeEventRecord = async (
   kv: KvLike,
   event: EventRecord,
   nowMs: number,
-): Promise<void> =>
-  kv.put(eventKey(event.id), JSON.stringify(event), {
-    expirationTtl: recordTtlSeconds(event, nowMs),
-  });
+): Promise<void> => {
+  const body = JSON.stringify(event);
+  await kv.put(eventKey(event.id), body, { expirationTtl: recordTtlSeconds(event, nowMs) });
+  await kv.put(archiveKey(event.id), body, { expirationTtl: archiveTtlSeconds(event, nowMs) });
+};
+
+/** A record by id, falling back to the archive once the working copy has gone —
+ *  what keeps a link to a past event resolving instead of 404ing. */
+export const readAnyEventRecord = async (
+  kv: KvLike,
+  id: string,
+): Promise<EventRecord | undefined> => {
+  const live = await readEventRecord(kv, id);
+  return live ?? parseEventRecord((await kv.get(archiveKey(id))) ?? '') ?? undefined;
+};
 
 /** Best-effort KV lock (AC-8.2) — same read-then-put idiom as the reference. */
 export const acquireLock = async (kv: KvLike): Promise<boolean> => {
