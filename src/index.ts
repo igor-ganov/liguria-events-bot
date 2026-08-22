@@ -25,6 +25,8 @@ import {
 import { t } from './i18n.ts';
 import type { TranslationKey } from './i18n.ts';
 import { detectLanguage, makeAnswer, makePlan } from './llm/answer.ts';
+import { archivedSample } from './health/archived-sample.ts';
+import { runHealth } from './health/run-health.ts';
 import { runCollect } from './pipeline/collect-run.ts';
 import type { RunSummary } from './pipeline/collect-run.ts';
 import { romeDate, romeHour } from './pipeline/clock.ts';
@@ -650,6 +652,22 @@ const serveCalendar = async (env: Env, url: URL): Promise<Response> => {
 };
 
 /** Public JSON corpus for the static-site build (public-calendar AC-4.x). */
+const SITE_ORIGIN = 'https://dovego.it';
+
+/** Run every check against the live site and the stored corpus. */
+const healthReport = async (env: Env) => {
+  const [index, runLog] = await Promise.all([readIndex(env.EVENTS), readRunLog(env.EVENTS)]);
+  return runHealth({
+    fetchFn: fetch,
+    origin: SITE_ORIGIN,
+    index,
+    runLog: asArray(runLog) ?? [],
+    archivedId: await archivedSample(env.EVENTS, index),
+    today: romeDate(Date.now()),
+    nowMs: Date.now(),
+  });
+};
+
 const serveEventsJson = async (env: Env, url: URL): Promise<Response> => {
   const index = await readIndex(env.EVENTS);
   const events = filterEvents(index, filterFromQuery(url.searchParams));
@@ -768,6 +786,15 @@ const worker = {
     }
     if (url.pathname === '/events.json' && request.method === 'GET') {
       return serveEventsJson(env, url);
+    }
+
+    // The site's own vital signs, computed rather than assumed. Public: it
+    // reports on public URLs and holds nothing a visitor could not check by
+    // hand — and a status page nobody can reach is a status page nobody reads.
+    if (url.pathname === '/health' && request.method === 'GET') {
+      return Response.json(await healthReport(env), {
+        headers: { 'cache-control': 'public, max-age=120' },
+      });
     }
 
     // One event by id, INCLUDING events that have already happened. The index
