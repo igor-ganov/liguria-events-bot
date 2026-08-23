@@ -51,3 +51,34 @@ export const pastEventCheck = async (
     ? ok(key, title, `all three locales of ${id} answer 200`)
     : bad(key, title, `${dead.join(', ')} answered ${dead.map((_, i) => codes[i]).join(', ')}`);
 };
+
+/**
+ * The three codes, told apart.
+ *
+ * A real place with nothing on must answer 200, an event that existed and is
+ * gone must answer 410, and nonsense must answer 404. The site used to answer
+ * 404 to all three — claiming a provincial capital did not exist, and telling
+ * Google that an event which had ended was never there.
+ */
+export const httpSemanticsCheck = async (
+  fetchFn: FetchFn,
+  origin: string,
+  goneId: string | undefined,
+): Promise<CheckResult> => {
+  const id = 'http-semantics';
+  const title = 'Absent, gone and never-were answer different codes';
+  const cases: readonly Readonly<{ path: string; want: number; what: string }>[] = [
+    { path: '/liguria/savona/', want: 200, what: 'a city with nothing on' },
+    { path: `/event/${goneId ?? 'ffffffffffff'}/`, want: 410, what: 'an event that is gone' },
+    { path: '/event/zzz/', want: 404, what: 'an id that was never ours' },
+  ];
+  const codes = await Promise.all(cases.map((one) => fetchStatus(fetchFn, `${origin}${one.path}`)));
+  const wrong = cases.filter((one, i) => codes[i] !== one.want);
+  return wrong.length === 0
+    ? ok(id, title, '200 / 410 / 404, as they should be')
+    : bad(
+        id,
+        title,
+        wrong.map((one, i) => `${one.what} answered ${codes[cases.indexOf(one)]}, want ${one.want}`).join('; '),
+      );
+};

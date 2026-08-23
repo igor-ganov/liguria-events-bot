@@ -665,6 +665,8 @@ const healthReport = async (env: Env) => {
     index,
     runLog: asArray(runLog) ?? [],
     archivedId: await archivedSample(env.EVENTS, index),
+    // A record that expired before the archive existed: the case 410 is for.
+    goneId: '1e6b4b74d225',
     today: romeDate(Date.now()),
     nowMs: Date.now(),
   });

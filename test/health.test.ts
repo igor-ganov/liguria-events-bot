@@ -3,7 +3,7 @@ import { describe, test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { corpusChecks } from '../src/health/corpus-checks.ts';
 import { indexCheck, lastRunCheck } from '../src/health/pipeline-checks.ts';
-import { robotsCheck, sitemapCheck } from '../src/health/site-checks.ts';
+import { httpSemanticsCheck, robotsCheck, sitemapCheck } from '../src/health/site-checks.ts';
 import { eventMarkupCheck } from '../src/health/markup-checks.ts';
 import { classifyFailure, emptyReason, tallyFailures } from '../src/llm/llm-failure.ts';
 import { healthAlert } from '../src/health/health-alert.ts';
@@ -259,5 +259,40 @@ describe('emptyReason', () => {
 
   test('silence is its own reason', () => {
     assert.equal(emptyReason('   '), 'no-answer');
+  });
+});
+
+describe('httpSemanticsCheck', () => {
+  const base = 'https://dovego.it';
+  const routes = (city: number, gone: number, nonsense: number) =>
+    serving({
+      [`${base}/liguria/savona/`]: { status: city },
+      [`${base}/event/1e6b4b74d225/`]: { status: gone },
+      [`${base}/event/zzz/`]: { status: nonsense },
+    });
+
+  test('200 / 410 / 404 is the shape it wants', async () => {
+    const check = await httpSemanticsCheck(routes(200, 410, 404), base, '1e6b4b74d225');
+    assert.equal(check.status, 'ok');
+  });
+
+  test('a city answering 404 is caught, and named', async () => {
+    // Savona is a provincial capital. It answered 404 because the city list was
+    // derived from events rather than from the place table.
+    const check = await httpSemanticsCheck(routes(404, 410, 404), base, '1e6b4b74d225');
+    assert.equal(check.status, 'fail');
+    assert.match(check.detail, /city with nothing on answered 404/);
+  });
+
+  test('a gone event falling back to 404 is caught', async () => {
+    const check = await httpSemanticsCheck(routes(200, 404, 404), base, '1e6b4b74d225');
+    assert.equal(check.status, 'fail');
+    assert.match(check.detail, /gone answered 404, want 410/);
+  });
+
+  test('nonsense answering 410 is caught too — the signal must stay meaningful', async () => {
+    const check = await httpSemanticsCheck(routes(200, 410, 410), base, '1e6b4b74d225');
+    assert.equal(check.status, 'fail');
+    assert.match(check.detail, /never ours answered 410/);
   });
 });

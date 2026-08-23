@@ -1,7 +1,7 @@
 import { corpusChecks } from './corpus-checks.ts';
 import { eventMarkupCheck, hreflangCheck } from './markup-checks.ts';
 import { indexCheck, lastRunCheck } from './pipeline-checks.ts';
-import { pastEventCheck, robotsCheck, sitemapCheck } from './site-checks.ts';
+import { httpSemanticsCheck, pastEventCheck, robotsCheck, sitemapCheck } from './site-checks.ts';
 import { worstOf } from './types.ts';
 import type { CompactEvent } from '../domain/event.ts';
 import type { FetchFn } from '../collectors/types.ts';
@@ -14,6 +14,8 @@ export type HealthDeps = Readonly<{
   runLog: readonly unknown[];
   /** An id that has left the index — what proves a shared link still opens. */
   archivedId: string | undefined;
+  /** An id of ours that resolves nowhere — what proves 410 rather than 404. */
+  goneId: string | undefined;
   today: string;
   nowMs: number;
 }>;
@@ -32,6 +34,7 @@ export const runHealth = async (deps: HealthDeps): Promise<HealthReport> => {
     pastEventCheck(deps.fetchFn, deps.origin, deps.archivedId),
     eventMarkupCheck(deps.fetchFn, deps.origin, sample),
     hreflangCheck(deps.fetchFn, deps.origin, HREFLANG_SAMPLE),
+    httpSemanticsCheck(deps.fetchFn, deps.origin, deps.goneId),
   ]);
   const checks = [
     ...remote,
