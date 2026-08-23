@@ -233,7 +233,9 @@ export const makeEnrichEvents =
           const items = asArray(readProp(extractJson(reply), 'events')) ?? [];
           // An answer that parses to nothing is a failure too, and used to be
           // indistinguishable from a batch that simply had nothing to add.
-          if (items.length === 0) failures.push('empty-answer');
+          // Carry a sliver of what the model actually said: "empty-answer"
+          // alone cannot tell a refusal from a malformed envelope.
+          if (items.length === 0) failures.push(`empty-answer:${reply.replace(/\s+/g, ' ').slice(0, 60)}`);
           return items.flatMap(parseEnrichment);
         } catch (error: unknown) {
           failures.push(classifyFailure(error));

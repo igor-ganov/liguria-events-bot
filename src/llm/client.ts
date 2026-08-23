@@ -31,9 +31,14 @@ const GEMINI_MODEL = 'gemini-2.5-flash';
 // but generously: enrichment (awaited, off the request path) legitimately takes
 // tens of seconds. The bot's own 24s answer deadline (index.ts) is what keeps a
 // slow question inside the waitUntil grace; this only stops an infinite hang.
-const WORKERS_AI_TIMEOUT_MS = 45_000;
+// Measured on production: the primary model needs a little over 45s for a
+// three-language structured article, so 45s was cutting off calls that were
+// about to succeed. The fallback loses an attempt to pay for it — a second
+// try at a model that just timed out is the least valuable 24 seconds in the
+// budget, and the worst case now comes to 84s rather than 93s.
+const WORKERS_AI_TIMEOUT_MS = 60_000;
 const GEMINI_TIMEOUT_MS = 24_000;
-const GEMINI_ATTEMPTS = 2;
+const GEMINI_ATTEMPTS = 1;
 const MAX_TOKENS = 4096;
 
 const timeout = (ms: number, label: string): Promise<never> =>
