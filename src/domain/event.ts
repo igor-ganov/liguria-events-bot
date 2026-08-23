@@ -260,6 +260,10 @@ export const eventIdOf = async (title: string, startDate: string): Promise<strin
 // ridotto 8", "da 25,00 €". The lowest number is the one worth publishing —
 // it is what a reader is asked for at minimum, and it is what a search result
 // showing "from €8" means.
+// A range names its currency once, after the upper bound — "25–80 EUR" — so a
+// pattern anchored on the currency alone reads the expensive end and calls it
+// the price. The range is matched first, and both of its ends count.
+const RANGE_RE = /([0-9]{1,4}(?:[.,][0-9]{1,2})?)\s*[–—-]\s*([0-9]{1,4}(?:[.,][0-9]{1,2})?)\s*(?:€|eur|euro)/gi;
 const PRICE_RE = /(?:€|eur|euro)\s*([0-9]{1,4}(?:[.,][0-9]{1,2})?)|([0-9]{1,4}(?:[.,][0-9]{1,2})?)\s*(?:€|eur|euro)/gi;
 
 /**
@@ -270,8 +274,13 @@ const PRICE_RE = /(?:€|eur|euro)\s*([0-9]{1,4}(?:[.,][0-9]{1,2})?)|([0-9]{1,4}
  * number out of it. Nothing is invented: a line with no figure yields nothing.
  */
 export const priceFrom = (priceInfo: string | undefined): number | undefined => {
-  const found = [...(priceInfo ?? '').matchAll(PRICE_RE)]
-    .map((match) => Number((match[1] ?? match[2] ?? '').replace(',', '.')))
+  const text = priceInfo ?? '';
+  const numbers = [
+    ...[...text.matchAll(RANGE_RE)].flatMap((match) => [match[1], match[2]]),
+    ...[...text.matchAll(PRICE_RE)].map((match) => match[1] ?? match[2]),
+  ];
+  const found = numbers
+    .map((raw) => Number((raw ?? '').replace(',', '.')))
     .filter((value) => Number.isFinite(value) && value > 0 && value < 2000);
   return found.length === 0 ? undefined : Math.min(...found);
 };

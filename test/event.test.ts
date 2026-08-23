@@ -301,6 +301,13 @@ describe('priceFrom', () => {
     assert.equal(priceFrom('9 EUR'), 9);
   });
 
+  test('a range gives its cheap end, not the expensive one', () => {
+    // Ticketmaster writes "25–80 EUR", naming the currency once at the end, so
+    // a currency-anchored pattern alone reads 80 and calls it the price.
+    assert.equal(priceFrom('25–80 EUR'), 25);
+    assert.equal(priceFrom('25-80 EUR'), 25);
+  });
+
   test('a line with no figure yields nothing — no price is invented', () => {
     assert.equal(priceFrom('Ingresso libero'), undefined);
     assert.equal(priceFrom('Prezzo da definire'), undefined);
