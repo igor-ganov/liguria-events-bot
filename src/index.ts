@@ -25,6 +25,7 @@ import {
 import { t } from './i18n.ts';
 import type { TranslationKey } from './i18n.ts';
 import { detectLanguage, makeAnswer, makePlan } from './llm/answer.ts';
+import { placeIndex } from './domain/places.ts';
 import { archivedSample } from './health/archived-sample.ts';
 import { healthAlert } from './health/health-alert.ts';
 import { runHealth } from './health/run-health.ts';
@@ -804,6 +805,14 @@ const worker = {
     if (url.pathname === '/calendar.ics' && request.method === 'GET') {
       return serveCalendar(env, url);
     }
+    // The canonical places, so the site can give every province capital a page
+    // whether or not anything is on in it. Cheap and constant: no KV read.
+    if (url.pathname === '/places.json' && request.method === 'GET') {
+      return Response.json(placeIndex(), {
+        headers: { 'cache-control': 'public, max-age=86400' },
+      });
+    }
+
     if (url.pathname === '/events.json' && request.method === 'GET') {
       return serveEventsJson(env, url);
     }
