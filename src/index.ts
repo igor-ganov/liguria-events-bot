@@ -26,6 +26,7 @@ import { t } from './i18n.ts';
 import type { TranslationKey } from './i18n.ts';
 import { detectLanguage, makeAnswer, makePlan } from './llm/answer.ts';
 import { archivedSample } from './health/archived-sample.ts';
+import { healthAlert } from './health/health-alert.ts';
 import { runHealth } from './health/run-health.ts';
 import { runCollect } from './pipeline/collect-run.ts';
 import type { RunSummary } from './pipeline/collect-run.ts';
@@ -750,6 +751,21 @@ const collectIfDue = async (env: Env, nowMs: number): Promise<unknown> => {
   }
 };
 
+const HEALTH_STATE_KEY = 'health:last-status';
+
+/** Run the checks, remember the verdict, and tell the operator when it moves. */
+const watchHealth = async (env: Env): Promise<unknown> => {
+  const report = await healthReport(env);
+  const previous = (await env.EVENTS.get(HEALTH_STATE_KEY)) ?? 'ok';
+  const message = healthAlert(report, previous);
+  await env.EVENTS.put(HEALTH_STATE_KEY, report.status);
+  if (message !== undefined && env.OWNER_CHAT_ID !== '') {
+    const bot = makeBot(env.BOT_TOKEN, Number(env.OWNER_CHAT_ID));
+    await bot.sendMessage(message).catch(() => undefined);
+  }
+  return { status: report.status, changed: message !== undefined };
+};
+
 const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
   const hour = romeHour(nowMs);
   const today = romeDate(nowMs);
@@ -761,6 +777,10 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
     error: String(error),
   }));
 
+  // Watch the site every tick, and speak only when the verdict CHANGES: an
+  // alert repeated hourly is an alert nobody reads.
+  const health = await watchHealth(env).catch((error: unknown) => ({ error: String(error) }));
+
   const index = await readIndex(env.EVENTS);
   const userIds = await listUserIds(env.EVENTS);
   for (const userId of userIds) {
@@ -769,7 +789,7 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
       await pushReminders(env, userId, index, today).catch(() => undefined);
     }
   }
-  return { collect, geocode };
+  return { collect, geocode, health };
 };
 
 // ─────────────────────────────────────────────────────────────── export ──

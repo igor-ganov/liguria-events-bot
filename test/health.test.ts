@@ -5,6 +5,7 @@ import { corpusChecks } from '../src/health/corpus-checks.ts';
 import { indexCheck, lastRunCheck } from '../src/health/pipeline-checks.ts';
 import { robotsCheck, sitemapCheck } from '../src/health/site-checks.ts';
 import { eventMarkupCheck } from '../src/health/markup-checks.ts';
+import { healthAlert } from '../src/health/health-alert.ts';
 import { worstOf } from '../src/health/types.ts';
 import { toCompact } from '../src/domain/event.ts';
 import type { CompactEvent, EventRecord } from '../src/domain/event.ts';
@@ -171,5 +172,33 @@ describe('pipeline checks', () => {
   test('an empty index is a failure — the site would have nothing to show', () => {
     assert.equal(statusOf(indexCheck([], '2026-08-20'), 'index-size'), 'fail');
     assert.equal(statusOf(indexCheck([compact()], '2026-08-20'), 'index-size'), 'warn');
+  });
+});
+
+describe('healthAlert', () => {
+  const report = (status: 'ok' | 'warn' | 'fail', checks: readonly { id: string; title: string; status: 'ok' | 'warn' | 'fail'; detail: string }[]) =>
+    ({ at: 0, status, checks });
+
+  test('a verdict that has not moved says nothing — hourly alerts train silence', () => {
+    const failing = report('fail', [{ id: 'a', title: 'X', status: 'fail', detail: 'broken' }]);
+    assert.equal(healthAlert(failing, 'fail'), undefined);
+    assert.equal(healthAlert(report('ok', []), 'ok'), undefined);
+  });
+
+  test('a new problem is announced, with what is wrong in the message', () => {
+    const message = healthAlert(
+      report('fail', [
+        { id: 'a', title: 'A link to a past event still opens', status: 'fail', detail: '/it/... answered 404' },
+        { id: 'b', title: 'Fine', status: 'ok', detail: '' },
+      ]),
+      'ok',
+    );
+    assert.match(message ?? '', /A link to a past event still opens/);
+    assert.match(message ?? '', /404/);
+    assert.equal((message ?? '').includes('Fine'), false); // passing checks are not news
+  });
+
+  test('recovery closes the loop the alert opened', () => {
+    assert.match(healthAlert(report('ok', []), 'fail') ?? '', /restored/);
   });
 });
