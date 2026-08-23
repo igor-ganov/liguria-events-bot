@@ -5,6 +5,7 @@
  */
 import { asNonEmptyString, parseJson, readAt, readProp } from '../util/json.ts';
 import type { FetchFn } from '../util/http.ts';
+import { classifyFailure } from './llm-failure.ts';
 
 export interface AiBinding {
   run(model: string, input: AiChatInput): Promise<unknown>;
@@ -65,10 +66,17 @@ const runWorkersAi = async (
       timeout(WORKERS_AI_TIMEOUT_MS, 'workers-ai'),
     ]);
     return workersAiText(result);
-  } catch {
+  } catch (error: unknown) {
+    // The reason travels with the failure now: a rate limit, a timeout and a
+    // model answering prose are three problems with three different fixes.
+    lastReason.workersAi = classifyFailure(error);
     return undefined;
   }
 };
+
+// The most recent reason each provider gave, so makeChat can say why it failed
+// rather than only that it did.
+const lastReason: { workersAi: string; gemini: string } = { workersAi: '', gemini: '' };
 
 const geminiUrl = (apiKey: string): string =>
   `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
@@ -100,11 +108,15 @@ const runGemini = async (
           contents: [{ role: 'user', parts: [{ text: user }] }],
         }),
       });
-      if (!response.ok) continue;
+      if (!response.ok) {
+        lastReason.gemini = classifyFailure(`http ${response.status}`);
+        continue;
+      }
       const text = geminiTextOf(await response.json());
       if (text !== undefined) return text;
-    } catch {
-      // retry
+      lastReason.gemini = 'empty-answer';
+    } catch (error: unknown) {
+      lastReason.gemini = classifyFailure(error);
     }
   }
   return undefined;
@@ -121,7 +133,9 @@ export const makeChat = (deps: LlmDeps): ChatFn => {
         ? undefined
         : await runGemini(fetchFn, deps.geminiApiKey, system, user);
     if (fallback !== undefined) return fallback;
-    throw new Error('all LLM providers failed');
+    throw new Error(
+      `all LLM providers failed: workers-ai=${lastReason.workersAi || 'unused'}, gemini=${lastReason.gemini || 'unused'}`,
+    );
   };
 };
 

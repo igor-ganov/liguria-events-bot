@@ -5,6 +5,7 @@ import { corpusChecks } from '../src/health/corpus-checks.ts';
 import { indexCheck, lastRunCheck } from '../src/health/pipeline-checks.ts';
 import { robotsCheck, sitemapCheck } from '../src/health/site-checks.ts';
 import { eventMarkupCheck } from '../src/health/markup-checks.ts';
+import { classifyFailure, tallyFailures } from '../src/llm/llm-failure.ts';
 import { healthAlert } from '../src/health/health-alert.ts';
 import { worstOf } from '../src/health/types.ts';
 import { toCompact } from '../src/domain/event.ts';
@@ -200,5 +201,33 @@ describe('healthAlert', () => {
 
   test('recovery closes the loop the alert opened', () => {
     assert.match(healthAlert(report('ok', []), 'fail') ?? '', /restored/);
+  });
+});
+
+describe('classifyFailure', () => {
+  test('the reasons that need different fixes are told apart', () => {
+    assert.equal(classifyFailure(new Error('workers-ai timeout')), 'timeout');
+    assert.equal(classifyFailure(new Error('http 429')), 'rate-limit');
+    assert.equal(classifyFailure(new Error('http 503')), 'http-error');
+    assert.equal(classifyFailure(new Error('Unexpected token < in JSON')), 'bad-json');
+    assert.equal(classifyFailure(new Error('model overloaded')), 'overloaded');
+    assert.equal(classifyFailure(undefined), 'unknown');
+  });
+
+  test('reasons are tallied, so the log carries counts rather than stacks', () => {
+    assert.deepEqual(tallyFailures(['timeout', 'timeout', 'rate-limit']), {
+      timeout: 2,
+      'rate-limit': 1,
+    });
+    assert.deepEqual(tallyFailures([]), {});
+  });
+
+  test('the health check names the dominant reason', () => {
+    const now = Date.parse('2026-08-23T12:00:00Z');
+    const entry = [
+      { at: Math.floor(now / 1000), enrichedOk: 11, enrichFailed: 6, enrichErrors: { timeout: 5, 'rate-limit': 1 } },
+    ];
+    const check = lastRunCheck(entry, now).find((c) => c.id === 'enrich-health');
+    assert.match(check?.detail ?? '', /timeout×5/);
   });
 });

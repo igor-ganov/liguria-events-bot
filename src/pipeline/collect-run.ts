@@ -16,7 +16,7 @@ import {
 import type { CompactEvent, EventRecord, RawEvent } from '../domain/event.ts';
 import { mergeDuplicates, orderByAge } from '../domain/merge-duplicates.ts';
 import type { Collector, FetchFn, RawPost } from '../collectors/types.ts';
-import { ENRICH_VERSION } from '../llm/enrich.ts';
+import { ENRICH_VERSION, lastEnrichFailures } from '../llm/enrich.ts';
 import type { Enrichment, PendingEnrich } from '../llm/enrich.ts';
 import { dedupeCandidates, urlDuplicates } from './dedupe-candidates.ts';
 import { dropSharedArtwork } from './shared-artwork.ts';
@@ -50,6 +50,9 @@ export type RunLogEntry = Readonly<{
   extractedFromPosts: number;
   enrichedOk: number;
   enrichFailed: number;
+  /** Why the failures failed, counted by reason — "6 failed" alone is not
+   *  something anyone can act on. */
+  enrichErrors?: Readonly<Record<string, number>>;
   /** Cross-source duplicates merged by the LLM judge (AC-1.9). */
   fuzzyMerged?: number;
 }>;
@@ -450,6 +453,9 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       extractedFromPosts: extracted.length,
       enrichedOk: enrichments.size,
       enrichFailed: pending.length - enrichments.size,
+      ...(Object.keys(lastEnrichFailures.reasons).length === 0
+        ? {}
+        : { enrichErrors: lastEnrichFailures.reasons }),
       fuzzyMerged: fuzzyMerged.droppedIds.size,
     };
     await appendRunLog(deps.kv, entry);

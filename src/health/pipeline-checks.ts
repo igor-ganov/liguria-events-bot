@@ -11,6 +11,14 @@ export const lastRunCheck = (entries: readonly unknown[], nowMs: number): readon
   const ageHours = Math.round((nowMs - at) / HOUR_MS);
   const okCount = asNumber(readProp(last, 'enrichedOk')) ?? 0;
   const failed = asNumber(readProp(last, 'enrichFailed')) ?? 0;
+  // Name the dominant reason: a rate limit and a model answering prose need
+  // different fixes, and the count alone cannot tell them apart.
+  const reasons = Object(readProp(last, 'enrichErrors'));
+  const worst = Object.entries(reasons)
+    .map(([reason, count]) => `${reason}×${String(count)}`)
+    .sort()
+    .slice(0, 3)
+    .join(', ');
   return [
     {
       id: 'crawl-recent',
@@ -22,7 +30,7 @@ export const lastRunCheck = (entries: readonly unknown[], nowMs: number): readon
       id: 'enrich-health',
       title: 'Enrichment is succeeding more than it fails',
       status: failed > okCount && failed > 3 ? 'fail' : failed > 0 ? 'warn' : 'ok',
-      detail: `${okCount} enriched, ${failed} failed on the last run`,
+      detail: `${okCount} enriched, ${failed} failed on the last run${worst === '' ? '' : ` (${worst})`}`,
     },
   ];
 };

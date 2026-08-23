@@ -7,6 +7,7 @@ import { CATEGORIES, hasCjk, isCategory, isIsoDate, parseLocalized, parseSession
 import type { Category, EventKind, LocalizedText, RawEvent, Session } from '../domain/event.ts';
 import type { RawPost } from '../collectors/types.ts';
 import { extractJson } from './client.ts';
+import { classifyFailure, tallyFailures } from './llm-failure.ts';
 import type { ChatFn } from './client.ts';
 import { asArray, asBoolean, asNonEmptyString, readProp } from '../util/json.ts';
 
@@ -217,20 +218,30 @@ const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment
   return [[id, enrichment]];
 };
 
+/** Why the batches that produced nothing produced nothing, counted by reason.
+ *  Read by the run log, so a failing model names itself. */
+export const lastEnrichFailures: { reasons: Readonly<Record<string, number>> } = { reasons: {} };
+
 export const makeEnrichEvents =
   (chat: ChatFn) =>
   async (events: readonly PendingEnrich[]): Promise<ReadonlyMap<string, Enrichment>> => {
+    const failures: string[] = [];
     const results = await Promise.all(
       chunk(events, ENRICH_BATCH).map(async (batch) => {
         try {
           const reply = await chat(ENRICH_SYSTEM, JSON.stringify({ events: batch }));
           const items = asArray(readProp(extractJson(reply), 'events')) ?? [];
+          // An answer that parses to nothing is a failure too, and used to be
+          // indistinguishable from a batch that simply had nothing to add.
+          if (items.length === 0) failures.push('empty-answer');
           return items.flatMap(parseEnrichment);
-        } catch {
+        } catch (error: unknown) {
+          failures.push(classifyFailure(error));
           return []; // failed batch → events stay enriched:false (AC-2.3)
         }
       }),
     );
+    lastEnrichFailures.reasons = tallyFailures(failures);
     return new Map(results.flat());
   };
 
