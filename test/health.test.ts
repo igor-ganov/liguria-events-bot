@@ -5,7 +5,7 @@ import { corpusChecks } from '../src/health/corpus-checks.ts';
 import { indexCheck, lastRunCheck } from '../src/health/pipeline-checks.ts';
 import { robotsCheck, sitemapCheck } from '../src/health/site-checks.ts';
 import { eventMarkupCheck } from '../src/health/markup-checks.ts';
-import { classifyFailure, tallyFailures } from '../src/llm/llm-failure.ts';
+import { classifyFailure, emptyReason, tallyFailures } from '../src/llm/llm-failure.ts';
 import { healthAlert } from '../src/health/health-alert.ts';
 import { worstOf } from '../src/health/types.ts';
 import { toCompact } from '../src/domain/event.ts';
@@ -242,5 +242,22 @@ describe('classifyFailure: the provider chain', () => {
       classifyFailure(new Error('all LLM providers failed: workers-ai=timeout, gemini=rate-limit')),
       'workers-ai=timeout,gemini=rate-limit',
     );
+  });
+});
+
+describe('emptyReason', () => {
+  test('a reply cut off mid-object is truncation, not a refusal', () => {
+    // Live data: the model answered with a well-formed opening and simply ran
+    // out of tokens, which is a token-budget fix, not a prompt fix.
+    assert.equal(emptyReason('```json\n{ "events": [ { "id": "abc", "categories"'), 'truncated');
+  });
+
+  test('a complete answer that still yielded nothing is a parse problem', () => {
+    assert.equal(emptyReason('{ "events": [] }'), 'unparsed');
+    assert.equal(emptyReason('```json\n{ "events": [] }\n```'), 'unparsed');
+  });
+
+  test('silence is its own reason', () => {
+    assert.equal(emptyReason('   '), 'no-answer');
   });
 });

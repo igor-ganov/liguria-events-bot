@@ -39,7 +39,10 @@ const GEMINI_MODEL = 'gemini-2.5-flash';
 const WORKERS_AI_TIMEOUT_MS = 60_000;
 const GEMINI_TIMEOUT_MS = 24_000;
 const GEMINI_ATTEMPTS = 1;
-const MAX_TOKENS = 4096;
+// A three-language structured article plus its fields does not fit in 4 096:
+// the reply stopped mid-object, the JSON would not parse, and the event was
+// recorded as a failure with no reason. That was half of them.
+const MAX_TOKENS = 8192;
 
 const timeout = (ms: number, label: string): Promise<never> =>
   new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timeout`)), ms));

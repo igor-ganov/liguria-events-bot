@@ -7,7 +7,7 @@ import { CATEGORIES, hasCjk, isCategory, isIsoDate, parseLocalized, parseSession
 import type { Category, EventKind, LocalizedText, RawEvent, Session } from '../domain/event.ts';
 import type { RawPost } from '../collectors/types.ts';
 import { extractJson } from './client.ts';
-import { classifyFailure, tallyFailures } from './llm-failure.ts';
+import { classifyFailure, emptyReason, tallyFailures } from './llm-failure.ts';
 import type { ChatFn } from './client.ts';
 import { asArray, asBoolean, asNonEmptyString, readProp } from '../util/json.ts';
 
@@ -233,9 +233,7 @@ export const makeEnrichEvents =
           const items = asArray(readProp(extractJson(reply), 'events')) ?? [];
           // An answer that parses to nothing is a failure too, and used to be
           // indistinguishable from a batch that simply had nothing to add.
-          // Carry a sliver of what the model actually said: "empty-answer"
-          // alone cannot tell a refusal from a malformed envelope.
-          if (items.length === 0) failures.push(`empty-answer:${reply.replace(/\s+/g, ' ').slice(0, 60)}`);
+          if (items.length === 0) failures.push(emptyReason(reply));
           return items.flatMap(parseEnrichment);
         } catch (error: unknown) {
           failures.push(classifyFailure(error));

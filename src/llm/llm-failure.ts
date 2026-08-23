@@ -29,3 +29,16 @@ export const tallyFailures = (reasons: readonly string[]): Readonly<Record<strin
     (counts, reason) => ({ ...counts, [reason]: (counts[reason] ?? 0) + 1 }),
     {},
   );
+
+/**
+ * Why an answer yielded no events.
+ *
+ * A reply that stops mid-object is not the model refusing — it is the token
+ * budget cutting it off, which is a different fix. It looked identical to a
+ * refusal until this told them apart: half the enrichment failures on
+ * production were three-language articles that did not fit in 4 096 tokens.
+ */
+export const emptyReason = (reply: string): string => {
+  const text = reply.trim().replace(/```\s*$/, '').trimEnd();
+  return text === '' ? 'no-answer' : text.endsWith('}') ? 'unparsed' : 'truncated';
+};
