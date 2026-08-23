@@ -231,3 +231,16 @@ describe('classifyFailure', () => {
     assert.match(check?.detail ?? '', /timeout×5/);
   });
 });
+
+describe('classifyFailure: the provider chain', () => {
+  test('the aggregate keeps each provider’s reason, so the fallback is visible', () => {
+    assert.equal(
+      classifyFailure(new Error('all LLM providers failed: workers-ai=timeout, gemini=unused')),
+      'workers-ai=timeout,gemini=unused',
+    );
+    assert.equal(
+      classifyFailure(new Error('all LLM providers failed: workers-ai=timeout, gemini=rate-limit')),
+      'workers-ai=timeout,gemini=rate-limit',
+    );
+  });
+});

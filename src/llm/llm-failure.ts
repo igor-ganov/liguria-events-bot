@@ -8,6 +8,10 @@
  */
 export const classifyFailure = (error: unknown): string => {
   const text = String(error instanceof Error ? error.message : error).toLowerCase();
+  // The all-providers message already names each provider's reason; collapsing
+  // it to one word hides whether the fallback was even reached.
+  const chain = /all llm providers failed: (.+)$/.exec(text)?.[1];
+  if (chain !== undefined) return chain.replace(/\s+/g, '');
   if (text.includes('timeout') || text.includes('aborted')) return 'timeout';
   if (text.includes('429') || text.includes('rate')) return 'rate-limit';
   if (text.includes('capacity') || text.includes('overload')) return 'overloaded';
