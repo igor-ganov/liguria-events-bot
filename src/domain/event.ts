@@ -190,6 +190,8 @@ export type CompactEvent = Readonly<{
   h?: string;
   /** Attendance length in minutes, when the source stated it. */
   du?: number;
+  /** Cheapest ticket price in euro (pr = price), when the source stated one. */
+  pr?: number;
   /** Programme: the dated occurrences inside an umbrella event (p = programme). */
   p?: readonly Session[];
   /** Container (k = kind): the event happens ONLY on its session dates, so it
@@ -252,6 +254,26 @@ export const eventIdOf = async (title: string, startDate: string): Promise<strin
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('')
     .slice(0, 12);
+};
+
+// Prices as the sources write them: "Biglietto € 15,00", "intero 12 euro,
+// ridotto 8", "da 25,00 €". The lowest number is the one worth publishing —
+// it is what a reader is asked for at minimum, and it is what a search result
+// showing "from €8" means.
+const PRICE_RE = /(?:€|eur|euro)\s*([0-9]{1,4}(?:[.,][0-9]{1,2})?)|([0-9]{1,4}(?:[.,][0-9]{1,2})?)\s*(?:€|eur|euro)/gi;
+
+/**
+ * The cheapest ticket price a free-text price line mentions, in euro.
+ *
+ * Google lists `price` and `priceCurrency` among the fields a missing offer is
+ * marked down for; the crawler has had this text all along and nothing read a
+ * number out of it. Nothing is invented: a line with no figure yields nothing.
+ */
+export const priceFrom = (priceInfo: string | undefined): number | undefined => {
+  const found = [...(priceInfo ?? '').matchAll(PRICE_RE)]
+    .map((match) => Number((match[1] ?? match[2] ?? '').replace(',', '.')))
+    .filter((value) => Number.isFinite(value) && value > 0 && value < 2000);
+  return found.length === 0 ? undefined : Math.min(...found);
 };
 
 export const freeFromPrice = (priceInfo: string | undefined): boolean =>
@@ -395,6 +417,12 @@ export const toCompact = (event: EventRecord): CompactEvent => {
     : { g: coordPair(event.lat, event.lng) }),
   ...(event.time === undefined ? {} : { h: event.time }),
   ...(event.durationMin === undefined ? {} : { du: event.durationMin }),
+  // Derived at projection time from the price line the crawler already had, so
+  // no re-enrichment is needed to fill it in.
+  ...[priceFrom(event.priceInfo)]
+    .filter((price): price is number => price !== undefined)
+    .map((pr) => ({ pr }))
+    .at(0),
   ...(event.sessions === undefined || event.sessions.length === 0 ? {} : { p: event.sessions }),
   // `k` marks a CONTAINER — an event that happens only on its session dates, so
   // the site must not surface it on the empty days in between. Emitted only when
@@ -665,6 +693,10 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
     ...(du === undefined ? {} : { du }),
     ...(p === undefined ? {} : { p }),
     ...(readProp(value, 'k') === true ? { k: true as const } : {}),
+    ...[asNumber(readProp(value, 'pr'))]
+      .filter((price): price is number => price !== undefined)
+      .map((pr) => ({ pr }))
+      .at(0),
     ...(ct === undefined ? {} : { ct }),
     ...(rg === undefined ? {} : { rg }),
     ...(img === undefined ? {} : { img }),

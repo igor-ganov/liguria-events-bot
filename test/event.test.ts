@@ -12,6 +12,7 @@ import {
   parseIndex,
   containerSpan,
   parseSessions,
+  priceFrom,
   withDerivedSpan,
   toCompact,
 } from '../src/domain/event.ts';
@@ -289,5 +290,32 @@ describe('event kind: containers vs standalone events', () => {
 
   test('a junk kind reads as standalone — a bad value must never hide an event', () => {
     assert.equal(parseEventRecord(JSON.stringify({ ...record, kind: 'nonsense' }))?.kind, undefined);
+  });
+});
+
+describe('priceFrom', () => {
+  test('the cheapest figure in the line is the one published', () => {
+    assert.equal(priceFrom('Biglietto € 15,00'), 15);
+    assert.equal(priceFrom('intero 12 euro, ridotto 8 euro'), 8);
+    assert.equal(priceFrom('da 25,00 €'), 25);
+    assert.equal(priceFrom('9 EUR'), 9);
+  });
+
+  test('a line with no figure yields nothing — no price is invented', () => {
+    assert.equal(priceFrom('Ingresso libero'), undefined);
+    assert.equal(priceFrom('Prezzo da definire'), undefined);
+    assert.equal(priceFrom(undefined), undefined);
+  });
+
+  test('numbers that are plainly not prices are ignored', () => {
+    assert.equal(priceFrom('Sala 2, posti 300'), undefined); // no currency at all
+    assert.equal(priceFrom('€ 0'), undefined); // free is said with `free`, not a zero
+  });
+
+  test('the price rides along in the compact projection', () => {
+    const paid = toCompact({ ...record, priceInfo: 'Biglietti da € 18,50' });
+    assert.equal(paid.pr, 18.5);
+    assert.equal(toCompact(record).pr, undefined);
+    assert.equal(parseIndex(JSON.stringify([paid]))?.[0]?.pr, 18.5);
   });
 });
