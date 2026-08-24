@@ -27,6 +27,7 @@ import type { TranslationKey } from './i18n.ts';
 import { detectLanguage, makeAnswer, makePlan } from './llm/answer.ts';
 import { placeIndex } from './domain/places.ts';
 import { archivedSample } from './health/archived-sample.ts';
+import { postDaily } from './channel/post-daily.ts';
 import { healthAlert } from './health/health-alert.ts';
 import { runHealth } from './health/run-health.ts';
 import { runCollect } from './pipeline/collect-run.ts';
@@ -785,6 +786,11 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
   const health = await watchHealth(env).catch((error: unknown) => ({ error: String(error) }));
 
   const index = await readIndex(env.EVENTS);
+  // The public channel: one post a day, silent when there is nothing worth
+  // saying. Five private subscribers is not an audience.
+  const channel = await postDaily(env, index, today, hour).catch((error: unknown) => ({
+    error: String(error),
+  }));
   const userIds = await listUserIds(env.EVENTS);
   for (const userId of userIds) {
     await pushDigest(env, userId, index, today, hour).catch(() => undefined);
@@ -792,7 +798,7 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
       await pushReminders(env, userId, index, today).catch(() => undefined);
     }
   }
-  return { collect, geocode, health };
+  return { collect, geocode, health, channel };
 };
 
 // ─────────────────────────────────────────────────────────────── export ──

@@ -13,6 +13,9 @@ export type SendOptions = Readonly<{ keyboard?: Keyboard }>;
 
 export type Bot = Readonly<{
   sendMessage: (text: string, options?: SendOptions) => Promise<number | undefined>;
+  /** A channel post is a photo with a caption: the picture is what stops the
+   *  scroll, and a text-only post in a feed of photos is skipped. */
+  sendPhoto: (photo: string, caption: string, options?: SendOptions) => Promise<number | undefined>;
   editMessageText: (messageId: number, text: string, options?: SendOptions) => Promise<void>;
   answerCallback: (callbackId: string, text: string) => Promise<void>;
   sendTyping: () => Promise<void>;
@@ -31,7 +34,8 @@ const replyMarkup = (keyboard: Keyboard | undefined): Record<string, unknown> =>
 
 export const makeBot = (
   token: string,
-  chatId: number,
+  // A channel is addressed by @username as often as by numeric id.
+  chatId: number | string,
   fetchFn: FetchFn = fetch,
 ): Bot => {
   const call = async (method: string, payload: Record<string, unknown>): Promise<unknown> => {
@@ -54,6 +58,16 @@ export const makeBot = (
         text,
         parse_mode: 'HTML',
         link_preview_options: { is_disabled: true },
+        ...replyMarkup(options?.keyboard),
+      });
+      return asNumber(readProp(readProp(result, 'result'), 'message_id'));
+    },
+    sendPhoto: async (photo, caption, options) => {
+      const result = await call('sendPhoto', {
+        chat_id: chatId,
+        photo,
+        caption,
+        parse_mode: 'HTML',
         ...replyMarkup(options?.keyboard),
       });
       return asNumber(readProp(readProp(result, 'result'), 'message_id'));

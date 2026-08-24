@@ -16,6 +16,13 @@ export type Env = Readonly<{
   TICKETMASTER_KEY?: string;
   TG_CHANNELS?: string;
   SOURCE_PAGES?: string;
+  /** Public channel the bot broadcasts to (@username or numeric id). Empty
+   *  means the broadcast sits out entirely — no channel, no posts. */
+  CHANNEL_CHAT_ID?: string;
+  /** The channel's own language; its readers are in Italy. */
+  CHANNEL_LANG?: string;
+  /** Rome hour the daily post goes out at. */
+  CHANNEL_HOUR?: string;
 }>;
 
 export const isOperator = (env: Env, chatId: number): boolean =>
@@ -29,4 +36,10 @@ export const tgChannelsOf = (env: Env): readonly string[] =>
 export const sourcePagesOf = (env: Env): number => {
   const pages = Number(env.SOURCE_PAGES ?? '3');
   return Number.isInteger(pages) && pages >= 1 && pages <= 10 ? pages : 3;
+};
+
+/** The channel post's hour in Rome, clamped to a real one. */
+export const channelHourOf = (env: Env): number => {
+  const hour = Number(env.CHANNEL_HOUR ?? '10');
+  return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 10;
 };

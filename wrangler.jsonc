@@ -29,7 +29,16 @@
     // events from post text. aluhaevents = Aluha/Balena Festival promoter.
     "TG_CHANNELS": "[\"aluhaevents\"]",
     // How many visitgenoa listing pages to fetch per collection run.
-    "SOURCE_PAGES": "3"
+    "SOURCE_PAGES": "3",
+    // Public channel the bot broadcasts one event a day to. EMPTY = no
+    // broadcast at all. To switch it on: create the channel, add the bot as an
+    // administrator with "post messages", then put its @username here and
+    // redeploy. Nothing else is needed.
+    "CHANNEL_CHAT_ID": "",
+    // The channel's own language — its readers are in Italy.
+    "CHANNEL_LANG": "it",
+    // Rome hour the daily post goes out at.
+    "CHANNEL_HOUR": "10"
     // Secrets (bun x wrangler secret put …): BOT_TOKEN, WEBHOOK_SECRET,
     // and optional GEMINI_API_KEY. Local dev: .dev.vars (gitignored).
   }
