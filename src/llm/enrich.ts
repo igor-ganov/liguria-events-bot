@@ -8,6 +8,8 @@ import type { Category, EventKind, LocalizedText, RawEvent, Session } from '../d
 import type { RawPost } from '../collectors/types.ts';
 import { extractJson } from './client.ts';
 import { classifyFailure, emptyReason, tallyFailures } from './llm-failure.ts';
+import { makeTranslate } from './translate.ts';
+import type { Translate } from './translate.ts';
 import type { ChatFn } from './client.ts';
 import { asArray, asBoolean, asNonEmptyString, readProp } from '../util/json.ts';
 
@@ -43,9 +45,10 @@ export type Enrichment = Readonly<{
   blocked?: boolean;
 }>;
 
-// Three-language descriptions cost ~3× tokens, and the fuller bodies below push
-// the per-event output higher still — ONE event per call keeps the completion
-// well under the 4096 cap (the truncated-JSON batch loss we hit before).
+// ONE event per call: the fuller bodies push a batched completion past the
+// token cap, and a truncated JSON envelope loses the whole batch rather than
+// one event. Each event now costs three calls — one to read, two to translate
+// — at the same peak concurrency, since the translations run after the read.
 const ENRICH_BATCH = 1;
 
 // Bump when the enrichment prompt changes materially: records enriched at an
@@ -68,7 +71,11 @@ const ENRICH_BATCH = 1;
 // v11 = classify "kind": a container happens ONLY on its session dates (a
 // concert series, a festival of separate nights) and must not surface on the
 // empty days between them; a standalone runs across its whole span.
-export const ENRICH_VERSION = 11;
+// v12 = read the source ONCE, in English, then translate. Asking one call for
+// three structured articles ran past both providers' deadlines on the longest
+// sources — a third of the batches on some runs, and the event was lost each
+// time. Reading is the expensive part; the translations take a short input.
+export const ENRICH_VERSION = 12;
 const EXTRACT_BATCH = 20;
 
 export const chunk = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
@@ -85,9 +92,9 @@ const ENRICH_SYSTEM = [
   'For EVERY input event return 1 to 3 categories from this fixed list,',
   'most specific first (a food festival with concerts is ["food","music"]):',
   CATEGORIES.join(', '),
-  'a thorough, neutral description IN YOUR OWN WORDS in EACH of English, Italian',
-  'and Russian, written as a STRUCTURED ARTICLE in light Markdown — NEVER one',
-  'undifferentiated wall of text. Structure every description exactly so:',
+  'and a thorough, neutral "description" IN YOUR OWN WORDS, IN ENGLISH, written',
+  'as a STRUCTURED ARTICLE in light Markdown — NEVER one undifferentiated wall',
+  'of text. Structure it exactly so:',
   '- Open with a lead paragraph (2-4 sentences): what the event is and why it is',
   '  worth attending.',
   '- Then add short labelled sections, each as a Markdown heading on its own line',
@@ -98,7 +105,7 @@ const ENRICH_SYSTEM = [
   '  [programme] (the programme / line-up), [performers] (who is involved),',
   '  [getting-there] (the venue and how to reach it), [tickets] (price and how',
   '  to book), [when] (all dates, start times, recurrence). For example a',
-  '  Tickets section in Italian is exactly "## [tickets] Biglietti". Use "- "',
+  '  Tickets section in English is exactly "## [tickets] Tickets". Use "- "',
   '  bullet lists for programmes, line-ups and multiple dates or times.',
   'Cover EVERY concrete detail the input gives, placed in the right section, and',
   'never drop schedule or programme detail. ABSOLUTELY FORBIDDEN: never output an',
@@ -107,13 +114,12 @@ const ENRICH_SYSTEM = [
   'available", "details are unknown" — omit what you do not have in SILENCE. Never',
   'copy source sentences verbatim, and NEVER invent facts: if the source does not',
   'state something, just leave it out — but say NOTHING about its absence.',
-  'Write each language in ITS OWN script only: Latin for English and Italian,',
-  'Cyrillic for Russian. NEVER emit a Chinese, Japanese or Korean character — not',
-  'one glyph, anywhere in any field.',
-  'Also give a display "titles" map with the event title in each language:',
-  'translate only the descriptive / common-noun parts and KEEP proper nouns',
-  'unchanged (festival & event names, venue names, person & brand names). If a',
-  'title is wholly a proper noun, repeat it identically in all three.',
+  'NEVER emit a Chinese, Japanese or Korean character — not one glyph, anywhere',
+  'in any field.',
+  'Also give a display "title" in English: translate only the descriptive /',
+  'common-noun parts and KEEP proper nouns unchanged (festival & event names,',
+  'venue names, person & brand names). If the title is wholly a proper noun,',
+  'repeat it identically.',
   'Also give "address": a concise, geocodable location for the venue, e.g.',
   '"Teatro della Tosse, Piazza Renato Negri 4, Genova". Write it IN ITALIAN, the',
   'way the place is labelled locally ("Musei Reali", not "Royal Museums"), so it',
@@ -172,25 +178,33 @@ const ENRICH_SYSTEM = [
   'their own lines and "- " bullet lists, with real "\\n" newlines between them.',
   'That Markdown inside the strings is required, not a violation. Follow the',
   'shape of this example exactly (note the \\n newlines and the [tags]):',
-  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "titles": { "en": "…", "it": "…", "ru": "…" }, "descriptions": { "en": "Two-time-Grammy pianist Andrea Bacchetti plays a candlelit recital in a Baroque villa — a rare chance to hear a 1772 Guadagnini up close.\\n\\n## [programme] Programme\\n- Beethoven — Romance in F\\n- Kreisler — Liebesleid\\n\\n## [getting-there] Getting there\\nVilla Borzino, Busalla (Genoa); A7 motorway or the Genoa–Arquata rail line.\\n\\n## [tickets] Tickets\\nFree admission, donation welcome.\\n\\n## [when] When\\nFriday 14 August 2026, 21:00.", "it": "<same shape, in Italian, with localized labels>", "ru": "<same shape, in Russian, with localized labels>" }, "address": "…", "time": "HH:MM", "durationMin": 90, "sessions": [ { "date": "YYYY-MM-DD", "time": "HH:MM", "title": "…" } ], "kind": "container"|"standalone", "unusual": true|false, "blocked": true|false } ] }',
+  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "title": "…", "description": "Two-time-Grammy pianist Andrea Bacchetti plays a candlelit recital in a Baroque villa — a rare chance to hear a 1772 Guadagnini up close.\n\n## [programme] Programme\n- Beethoven — Romance in F\n- Kreisler — Liebesleid\n\n## [getting-there] Getting there\nVilla Borzino, Busalla (Genoa); A7 motorway or the Genoa–Arquata rail line.\n\n## [tickets] Tickets\nFree admission, donation welcome.\n\n## [when] When\nFriday 14 August 2026, 21:00.", "address": "…", "time": "HH:MM", "durationMin": 90, "sessions": [ { "date": "YYYY-MM-DD", "time": "HH:MM", "title": "…" } ], "kind": "container"|"standalone", "unusual": true|false, "blocked": true|false } ] }',
 ].join('\n');
 
-const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment])[] => {
+/** The reading of the source: everything except the other two languages. */
+export type Analysis = Omit<Enrichment, 'titles' | 'descriptions'> &
+  Readonly<{ title?: string; description: string }>;
+
+export const parseAnalysis = (value: unknown): readonly (readonly [string, Analysis])[] => {
   const id = asNonEmptyString(readProp(value, 'id'));
-  // Accept the descriptions map or a legacy flat "description" string (→ en).
-  const descriptions = parseLocalized(
-    readProp(value, 'descriptions'),
-    asNonEmptyString(readProp(value, 'description')),
-  );
-  // Display titles are optional; the pipeline falls back to the original title.
-  const titles = parseLocalized(readProp(value, 'titles'));
+  // Accept the flat English pair, or a "descriptions" map from a record written
+  // before the split — the corpus re-drains over days, not at once.
+  const description = (
+    asNonEmptyString(readProp(value, 'description')) ??
+    asNonEmptyString(readProp(readProp(value, 'descriptions'), 'en'))
+  )?.trim();
+  const title = (
+    asNonEmptyString(readProp(value, 'title')) ??
+    asNonEmptyString(readProp(readProp(value, 'titles'), 'en'))
+  )?.trim();
   const many = (asArray(readProp(value, 'categories')) ?? []).filter(isCategory);
   const legacy = readProp(value, 'category');
   const categories = [...many, ...(isCategory(legacy) ? [legacy] : [])].slice(0, 3);
-  if (id === undefined || categories.length === 0 || descriptions === undefined) return [];
-  // Reject a hallucinated CJK glyph in a Latin/Cyrillic description or title:
-  // dropping the item leaves the record unenriched, so it re-generates cleanly.
-  if (hasCjk(descriptions) || (titles !== undefined && hasCjk(titles))) return [];
+  if (id === undefined || categories.length === 0 || description === undefined || description === '')
+    return [];
+  // Reject a hallucinated CJK glyph: dropping the item leaves the record
+  // unenriched, so it re-generates cleanly.
+  if (hasCjk({ en: description, it: title ?? '', ru: '' })) return [];
   const address = asNonEmptyString(readProp(value, 'address'));
   const rawTime = asNonEmptyString(readProp(value, 'time'));
   const time = rawTime !== undefined && /^([01]\d|2[0-3]):[0-5]\d$/.test(rawTime) ? rawTime : undefined;
@@ -203,11 +217,11 @@ const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment
   // Anything the model returns other than the exact word is standalone.
   const kind: EventKind | undefined =
     readProp(value, 'kind') === 'container' && sessions !== undefined ? 'container' : undefined;
-  const enrichment: Enrichment = {
+  const enrichment: Analysis = {
     categories,
-    descriptions,
+    description,
     unusual: asBoolean(readProp(value, 'unusual')) === true,
-    ...(titles === undefined ? {} : { titles }),
+    ...(title === undefined ? {} : { title }),
     ...(address === undefined ? {} : { address }),
     ...(time === undefined ? {} : { time }),
     ...(durationMin === undefined ? {} : { durationMin }),
@@ -222,9 +236,46 @@ const parseEnrichment = (value: unknown): readonly (readonly [string, Enrichment
  *  Read by the run log, so a failing model names itself. */
 export const lastEnrichFailures: { reasons: Readonly<Record<string, number>> } = { reasons: {} };
 
+/** Analysis plus its two translations, or nothing. All three are required: a
+ *  record with an Italian description in English is worse than one more run
+ *  without it, and "unenriched" is exactly how the retry is triggered. */
+const localize = async (
+  translate: Translate,
+  analysis: Analysis,
+): Promise<Enrichment | undefined> => {
+  const source = analysis.title === undefined
+    ? { description: analysis.description }
+    : { title: analysis.title, description: analysis.description };
+  // One at a time on purpose. Every event in the run is already being enriched
+  // concurrently; translating in parallel too would double the calls in flight
+  // and push the Gemini fallback past its per-minute ceiling, turning a fix for
+  // timeouts into a source of rate limits.
+  const it = await translate('it')(source);
+  const ru = it === undefined ? undefined : await translate('ru')(source);
+  if (it === undefined || ru === undefined) return undefined;
+  const { title, description, ...rest } = analysis;
+  return {
+    ...rest,
+    descriptions: { en: description, it: it.description, ru: ru.description },
+    ...(title === undefined
+      ? {}
+      : { titles: { en: title, it: it.title ?? title, ru: ru.title ?? title } }),
+  };
+};
+
+/**
+ * Read the source once, in English, then translate what came out.
+ *
+ * One call used to read a source article and write three structured Markdown
+ * articles from it. On the longest sources that completion ran past both
+ * providers' deadlines — a third of the batches on some runs — and the event
+ * was lost. Reading is the expensive part and happens once; the two
+ * translations take a short input and have nothing left to decide.
+ */
 export const makeEnrichEvents =
   (chat: ChatFn) =>
   async (events: readonly PendingEnrich[]): Promise<ReadonlyMap<string, Enrichment>> => {
+    const translate = makeTranslate(chat);
     const failures: string[] = [];
     const results = await Promise.all(
       chunk(events, ENRICH_BATCH).map(async (batch) => {
@@ -234,7 +285,17 @@ export const makeEnrichEvents =
           // An answer that parses to nothing is a failure too, and used to be
           // indistinguishable from a batch that simply had nothing to add.
           if (items.length === 0) failures.push(emptyReason(reply));
-          return items.flatMap(parseEnrichment);
+          const analysed = items.flatMap(parseAnalysis);
+          const localized = await Promise.all(
+            analysed.map(async ([id, analysis]) => {
+              const enrichment = await localize(translate, analysis);
+              if (enrichment === undefined) failures.push('translation');
+              return enrichment === undefined
+                ? []
+                : [[id, enrichment] as readonly [string, Enrichment]];
+            }),
+          );
+          return localized.flat();
         } catch (error: unknown) {
           failures.push(classifyFailure(error));
           return []; // failed batch → events stay enriched:false (AC-2.3)

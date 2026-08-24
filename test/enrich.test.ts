@@ -13,36 +13,82 @@ describe('chunk', () => {
 });
 
 describe('makeEnrichEvents', () => {
-  test('maps valid ids, skips invalid categories, batches ≤15 (AC-2.4)', async () => {
+  // One call reads the source in English; two short calls translate what it
+  // produced. The old shape asked for three structured articles in one
+  // completion, and on the longest sources both providers timed out.
+  const answering = (calls: string[]): ChatFn => async (system, user) => {
+    calls.push(system.slice(0, 40));
+    return system.startsWith('You translate')
+      ? JSON.stringify({ title: 'Concerto', description: 'Un concerto.' })
+      : JSON.stringify({
+          events: [
+            { id: 'one', categories: ['music'], title: 'A concert', description: 'A concert.' },
+            { id: 'two', categories: ['not-a-category'], description: 'Bad.' },
+            { id: '', categories: ['art'], description: 'No id.' },
+          ],
+        });
+  };
+
+  const seven = Array.from({ length: 7 }, (_, i) => ({
+    id: i === 0 ? 'one' : `id${i}`,
+    title: `Event ${i}`,
+    dates: '2026-07-10',
+  }));
+
+  test('reads once and translates twice, per event', async () => {
     const calls: string[] = [];
-    const chat: ChatFn = async (_system, user) => {
-      calls.push(user);
-      return JSON.stringify({
-        events: [
-          { id: 'one', categories: ['music'], descriptions: { en: 'A concert.', it: 'Concerto.', ru: 'Концерт.' } },
-          { id: 'two', categories: ['not-a-category'], descriptions: { en: 'Bad.', it: 'x', ru: 'x' } },
-          { id: '', categories: ['art'], descriptions: { en: 'No id.', it: 'x', ru: 'x' } },
-        ],
-      });
-    };
-    const events = Array.from({ length: 7 }, (_, i) => ({
-      id: i === 0 ? 'one' : `id${i}`,
-      title: `Event ${i}`,
-      dates: '2026-07-10',
-    }));
-    const enriched = await makeEnrichEvents(chat)(events);
-    assert.equal(calls.length, 7); // 7 events → one call each (ENRICH_BATCH=1)
-    assert.deepEqual(enriched.get('one'), { categories: ['music'], descriptions: { en: 'A concert.', it: 'Concerto.', ru: 'Концерт.' }, unusual: false });
+    await makeEnrichEvents(answering(calls))(seven);
+    assert.equal(calls.filter((one) => one.startsWith('You are a data curator')).length, 7);
+    assert.equal(calls.filter((one) => one.startsWith('You translate')).length, 14);
+  });
+
+  test('assembles the three languages from the analysis and its translations', async () => {
+    const enriched = await makeEnrichEvents(answering([]))(seven);
+    assert.deepEqual(enriched.get('one'), {
+      categories: ['music'],
+      descriptions: { en: 'A concert.', it: 'Un concerto.', ru: 'Un concerto.' },
+      titles: { en: 'A concert', it: 'Concerto', ru: 'Concerto' },
+      unusual: false,
+    });
+  });
+
+  test('still drops an item with no usable category or id', async () => {
+    const enriched = await makeEnrichEvents(answering([]))(seven);
     assert.equal(enriched.has('two'), false);
+    assert.equal(enriched.has(''), false);
+  });
+
+  test('a failed translation drops the event rather than storing English as Italian', async () => {
+    // Half a record looks enriched and would never be retried; an unenriched
+    // one comes back on the next run.
+    const chat: ChatFn = async (system) =>
+      system.startsWith('You translate')
+        ? 'not json at all'
+        : JSON.stringify({ events: [{ id: 'one', categories: ['music'], description: 'A concert.' }] });
+    const enriched = await makeEnrichEvents(chat)([{ id: 'one', title: 'X', dates: '2026-07-10' }]);
+    assert.equal(enriched.size, 0);
+  });
+
+  test('a title the model declined to translate falls back to the English one', async () => {
+    const chat: ChatFn = async (system) =>
+      system.startsWith('You translate')
+        ? JSON.stringify({ description: 'Un concerto.' })
+        : JSON.stringify({
+            events: [{ id: 'one', categories: ['music'], title: 'Rolling Stones', description: 'A concert.' }],
+          });
+    const enriched = await makeEnrichEvents(chat)([{ id: 'one', title: 'X', dates: '2026-07-10' }]);
+    assert.deepEqual(enriched.get('one')?.titles, {
+      en: 'Rolling Stones',
+      it: 'Rolling Stones',
+      ru: 'Rolling Stones',
+    });
   });
 
   test('a failing batch degrades to an empty map (AC-2.3)', async () => {
     const chat: ChatFn = async () => {
       throw new Error('llm down');
     };
-    const enriched = await makeEnrichEvents(chat)([
-      { id: 'one', title: 'X', dates: '2026-07-10' },
-    ]);
+    const enriched = await makeEnrichEvents(chat)([{ id: 'one', title: 'X', dates: '2026-07-10' }]);
     assert.equal(enriched.size, 0);
   });
 });
