@@ -23,6 +23,10 @@ export type Env = Readonly<{
   CHANNEL_LANG?: string;
   /** Rome hour the daily post goes out at. */
   CHANNEL_HOUR?: string;
+  /** IndexNow key. The same value must be readable at
+   *  https://dovego.it/<key>.txt, which is how the protocol proves ownership.
+   *  Empty means no submissions are made. */
+  INDEXNOW_KEY?: string;
 }>;
 
 export const isOperator = (env: Env, chatId: number): boolean =>

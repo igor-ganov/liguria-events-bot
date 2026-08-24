@@ -109,3 +109,25 @@ export const ogImageCheck = async (
   if (missing.length > 0) return bad(id, title, `no preview image on ${missing.join(', ')}`);
   return ok(id, title, `${paths.length - branded} of ${paths.length} show a real photograph`);
 };
+
+/**
+ * The IndexNow key file.
+ *
+ * The protocol proves ownership by reading the key back from the host. If the
+ * file stops being served — a deploy that drops `public/`, a redirect rule that
+ * catches it — every submission is refused, and nothing else says so: the
+ * worker goes on posting into a void.
+ */
+export const indexNowKeyCheck = async (
+  fetchFn: FetchFn,
+  origin: string,
+  key: string,
+): Promise<CheckResult> => {
+  const id = 'indexnow-key';
+  const title = 'The IndexNow key is where the protocol looks for it';
+  if (key === '') return { id, title, status: 'warn', detail: 'no key configured — nothing is submitted' };
+  const { status, body } = await fetchText(fetchFn, `${origin}/${key}.txt`);
+  if (status !== 200) return bad(id, title, `${key}.txt answered ${status}`);
+  if (body.trim() !== key) return bad(id, title, `${key}.txt does not contain the key`);
+  return ok(id, title, 'served, and it matches');
+};

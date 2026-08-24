@@ -3,7 +3,13 @@ import { describe, test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { corpusChecks } from '../src/health/corpus-checks.ts';
 import { indexCheck, lastRunCheck } from '../src/health/pipeline-checks.ts';
-import { httpSemanticsCheck, ogImageCheck, robotsCheck, sitemapCheck } from '../src/health/site-checks.ts';
+import {
+  httpSemanticsCheck,
+  indexNowKeyCheck,
+  ogImageCheck,
+  robotsCheck,
+  sitemapCheck,
+} from '../src/health/site-checks.ts';
 import { eventMarkupCheck } from '../src/health/markup-checks.ts';
 import { classifyFailure, emptyReason, tallyFailures } from '../src/llm/llm-failure.ts';
 import { healthAlert } from '../src/health/health-alert.ts';
@@ -335,5 +341,35 @@ describe('ogImageCheck', () => {
       'aaaabbbbcccc',
     );
     assert.equal(check.status, 'fail');
+  });
+});
+
+describe('indexNowKeyCheck', () => {
+  const base = 'https://dovego.it';
+  const key = '7cdb864289c94f1ab158818ddba854f4';
+
+  test('served and matching is the whole requirement', async () => {
+    const check = await indexNowKeyCheck(serving({ [`${base}/${key}.txt`]: { body: key } }), base, key);
+    assert.equal(check.status, 'ok');
+  });
+
+  test('a missing file is a failure — every submission after it is refused', async () => {
+    const check = await indexNowKeyCheck(serving({}), base, key);
+    assert.equal(check.status, 'fail');
+  });
+
+  test('a file serving something else is caught, not trusted for existing', async () => {
+    // A catch-all route or an SPA fallback answers 200 with a page, not a key.
+    const check = await indexNowKeyCheck(
+      serving({ [`${base}/${key}.txt`]: { body: '<!doctype html>' } }),
+      base,
+      key,
+    );
+    assert.equal(check.status, 'fail');
+  });
+
+  test('no key configured is a warning, not a failure — nothing is broken', async () => {
+    const check = await indexNowKeyCheck(serving({}), base, '');
+    assert.equal(check.status, 'warn');
   });
 });

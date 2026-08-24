@@ -28,6 +28,7 @@ import { detectLanguage, makeAnswer, makePlan } from './llm/answer.ts';
 import { placeIndex } from './domain/places.ts';
 import { archivedSample } from './health/archived-sample.ts';
 import { postDaily } from './channel/post-daily.ts';
+import { pingIndexNow } from './indexnow/ping-index-now.ts';
 import { healthAlert } from './health/health-alert.ts';
 import { runHealth } from './health/run-health.ts';
 import { runCollect } from './pipeline/collect-run.ts';
@@ -668,6 +669,7 @@ const healthReport = async (env: Env) => {
     archivedId: await archivedSample(env.EVENTS, index),
     // A record that expired before the archive existed: the case 410 is for.
     goneId: '1e6b4b74d225',
+    indexNowKey: env.INDEXNOW_KEY ?? '',
     today: romeDate(Date.now()),
     nowMs: Date.now(),
   });
@@ -791,6 +793,11 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
   const channel = await postDaily(env, index, today, hour).catch((error: unknown) => ({
     error: String(error),
   }));
+  // Bing, Yandex and Seznam hear about a new page the hour it exists. Google
+  // does not take part — the sitemap is still how it finds out.
+  const indexNow = await pingIndexNow(env, index).catch((error: unknown) => ({
+    error: String(error),
+  }));
   const userIds = await listUserIds(env.EVENTS);
   for (const userId of userIds) {
     await pushDigest(env, userId, index, today, hour).catch(() => undefined);
@@ -798,7 +805,7 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
       await pushReminders(env, userId, index, today).catch(() => undefined);
     }
   }
-  return { collect, geocode, health, channel };
+  return { collect, geocode, health, channel, indexNow };
 };
 
 // ─────────────────────────────────────────────────────────────── export ──

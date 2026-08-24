@@ -1,7 +1,14 @@
 import { corpusChecks } from './corpus-checks.ts';
 import { eventMarkupCheck, hreflangCheck } from './markup-checks.ts';
 import { indexCheck, lastRunCheck } from './pipeline-checks.ts';
-import { httpSemanticsCheck, ogImageCheck, pastEventCheck, robotsCheck, sitemapCheck } from './site-checks.ts';
+import {
+  httpSemanticsCheck,
+  indexNowKeyCheck,
+  ogImageCheck,
+  pastEventCheck,
+  robotsCheck,
+  sitemapCheck,
+} from './site-checks.ts';
 import { worstOf } from './types.ts';
 import type { CompactEvent } from '../domain/event.ts';
 import type { FetchFn } from '../collectors/types.ts';
@@ -16,6 +23,8 @@ export type HealthDeps = Readonly<{
   archivedId: string | undefined;
   /** An id of ours that resolves nowhere — what proves 410 rather than 404. */
   goneId: string | undefined;
+  /** The IndexNow key, so the check can read it back off the site. */
+  indexNowKey: string;
   today: string;
   nowMs: number;
 }>;
@@ -36,6 +45,7 @@ export const runHealth = async (deps: HealthDeps): Promise<HealthReport> => {
     hreflangCheck(deps.fetchFn, deps.origin, HREFLANG_SAMPLE),
     httpSemanticsCheck(deps.fetchFn, deps.origin, deps.goneId),
     ogImageCheck(deps.fetchFn, deps.origin, sample),
+    indexNowKeyCheck(deps.fetchFn, deps.origin, deps.indexNowKey),
   ]);
   const checks = [
     ...remote,
