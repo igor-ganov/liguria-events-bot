@@ -1,12 +1,13 @@
 import type { CompactEvent } from '../domain/event.ts';
 
 /** Events first seen after the watermark, oldest first and bounded. IndexNow
- *  accepts 10 000 URLs per request, but a run that submits a whole backlog at
- *  once is also a run that retries the whole backlog when it fails. */
+ *  accepts 10 000 URLs per request and throttles well below that: 900 URLs in
+ *  one go came back 429. A crawl adds a handful of events an hour, so this cap
+ *  is a backstop, not a working limit. */
 export const newSince = (
   index: readonly CompactEvent[],
   watermark: number,
-  limit = 300,
+  limit = 50,
 ): readonly CompactEvent[] =>
   index
     .filter((event) => (event.cr ?? 0) > watermark)

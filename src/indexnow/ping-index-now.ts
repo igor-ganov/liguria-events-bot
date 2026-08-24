@@ -25,8 +25,18 @@ export const pingIndexNow = async (
 ): Promise<unknown> => {
   const key = env.INDEXNOW_KEY ?? '';
   if (key === '') return { kind: 'off' };
-  const watermark = Number((await env.EVENTS.get(WATERMARK_KEY)) ?? '0');
-  const fresh = newSince(index, watermark);
+  const stored = await env.EVENTS.get(WATERMARK_KEY);
+  // First run: start from now, do not submit the corpus. IndexNow is for pages
+  // that have just appeared; the 1 182 events already in the sitemap are the
+  // search engines' problem to have crawled, and offering them all at once got
+  // 900 URLs answered with 429 — a batch that would then be retried hourly,
+  // for ever, without ever draining.
+  if (stored === null || stored === undefined) {
+    const highest = Math.max(0, ...index.map((event) => event.cr ?? 0));
+    await env.EVENTS.put(WATERMARK_KEY, String(highest));
+    return { kind: 'primed', from: highest };
+  }
+  const fresh = newSince(index, Number(stored));
   if (fresh.length === 0) return { kind: 'nothing-new' };
   const body = indexNowBody(key, fresh.flatMap((event) => eventUrls(event.id)));
   const response = await fetchFn(ENDPOINT, {

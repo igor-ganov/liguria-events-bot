@@ -43,9 +43,10 @@ describe('newSince', () => {
     assert.equal(newSince(events, 0).length, 2);
   });
 
-  test('caps a run so one backlog cannot become a 10 000-URL request', () => {
+  test('caps a run: 900 URLs in one submission came back 429', () => {
     const events = Array.from({ length: 500 }, (_, i) => compact({ id: `e${i}`, addedAt: 200 + i }));
     assert.equal(newSince(events, 0, 100).length, 100);
+    assert.equal(newSince(events, 0).length, 50);
   });
 
   test('takes the oldest first, so the backlog drains in order', () => {
@@ -106,13 +107,30 @@ describe('pingIndexNow', () => {
     return new Response('', { status });
   };
 
+  test('the first run starts the clock instead of offering the whole corpus', async () => {
+    // 1 182 events x 3 locales is not a submission, it is a flood — and the
+    // first attempt was answered 429, which would then repeat hourly for ever.
+    const { binding, store } = kv({});
+    const seen: { body?: unknown } = {};
+    const result = await pingIndexNow(env('k123', binding), index, answering(200, seen));
+    assert.deepEqual(result, { kind: 'primed', from: 150 });
+    assert.equal(seen.body, undefined);
+    assert.equal(store.get('indexnow:watermark'), '150');
+  });
+
+  test('an empty corpus on the first run primes at zero rather than -Infinity', async () => {
+    const { binding, store } = kv({});
+    await pingIndexNow(env('k123', binding), [], answering(200, {}));
+    assert.equal(store.get('indexnow:watermark'), '0');
+  });
+
   test('with no key configured it does nothing at all', async () => {
     const { binding } = kv({});
     assert.deepEqual(await pingIndexNow(env('', binding), index), { kind: 'off' });
   });
 
   test('submits every locale of a new event and remembers how far it got', async () => {
-    const { binding, store } = kv({});
+    const { binding, store } = kv({ 'indexnow:watermark': '100' });
     const seen: { body?: unknown } = {};
     const result = await pingIndexNow(env('k123', binding), index, answering(200, seen));
     assert.deepEqual(result, { kind: 'submitted', urls: 3, status: 200 });
@@ -127,10 +145,10 @@ describe('pingIndexNow', () => {
   test('a refused batch is retried, not silently lost', async () => {
     // The watermark is the only record of what has been said; moving it past a
     // rejection would drop those URLs for good.
-    const { binding, store } = kv({});
+    const { binding, store } = kv({ 'indexnow:watermark': '100' });
     const seen: { body?: unknown } = {};
     const result = await pingIndexNow(env('k123', binding), index, answering(422, seen));
     assert.equal(readProp(result, 'kind'), 'refused');
-    assert.equal(store.get('indexnow:watermark'), undefined);
+    assert.equal(store.get('indexnow:watermark'), '100');
   });
 });
