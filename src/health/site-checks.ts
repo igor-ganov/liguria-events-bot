@@ -82,3 +82,30 @@ export const httpSemanticsCheck = async (
         wrong.map((one, i) => `${one.what} answered ${codes[cases.indexOf(one)]}, want ${one.want}`).join('; '),
       );
 };
+
+/**
+ * Link previews.
+ *
+ * A shared link is the other half of distribution, and for months every one of
+ * them arrived as a grey rectangle: `og:image` was emitted on event pages only,
+ * and there as a hot-link in the source CDN's own aspect ratio. The proxy that
+ * fixes it works from a fixed host allowlist, so the failure this check exists
+ * to catch is a new image source appearing and quietly falling back to the
+ * brand card on every page it touches.
+ */
+export const ogImageCheck = async (
+  fetchFn: FetchFn,
+  origin: string,
+  sampleEventId: string,
+): Promise<CheckResult> => {
+  const id = 'og-images';
+  const title = 'A shared link carries a picture, served by us';
+  const paths = ['/liguria/', '/liguria/genova/', '/liguria/genova/teatro-carlo-felice/', `/event/${sampleEventId}/`];
+  const pages = await Promise.all(paths.map((path) => fetchText(fetchFn, `${origin}${path}`)));
+  const images = pages.map((page) => /<meta property="og:image" content="([^"]+)"/.exec(page.body)?.[1] ?? '');
+  // On our own origin — either a cropped source photograph or the brand card.
+  const missing = paths.filter((_, i) => !(images[i] ?? '').startsWith(`${origin}/`));
+  const branded = images.filter((src) => src.endsWith('/og-default.jpg')).length;
+  if (missing.length > 0) return bad(id, title, `no preview image on ${missing.join(', ')}`);
+  return ok(id, title, `${paths.length - branded} of ${paths.length} show a real photograph`);
+};

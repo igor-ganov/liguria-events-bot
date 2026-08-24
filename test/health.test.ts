@@ -3,7 +3,7 @@ import { describe, test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { corpusChecks } from '../src/health/corpus-checks.ts';
 import { indexCheck, lastRunCheck } from '../src/health/pipeline-checks.ts';
-import { httpSemanticsCheck, robotsCheck, sitemapCheck } from '../src/health/site-checks.ts';
+import { httpSemanticsCheck, ogImageCheck, robotsCheck, sitemapCheck } from '../src/health/site-checks.ts';
 import { eventMarkupCheck } from '../src/health/markup-checks.ts';
 import { classifyFailure, emptyReason, tallyFailures } from '../src/llm/llm-failure.ts';
 import { healthAlert } from '../src/health/health-alert.ts';
@@ -294,5 +294,46 @@ describe('httpSemanticsCheck', () => {
     const check = await httpSemanticsCheck(routes(200, 410, 410), base, '1e6b4b74d225');
     assert.equal(check.status, 'fail');
     assert.match(check.detail, /never ours answered 410/);
+  });
+});
+
+describe('ogImageCheck', () => {
+  const base = 'https://dovego.it';
+  const head = (image: string) => `<html><head><meta property="og:image" content="${image}"></head></html>`;
+  const proxied = `${base}/cdn-cgi/image/width=1200,height=630,fit=cover/img/aHR0cHM6Ly9z`;
+  const branded = `${base}/og-default.jpg`;
+
+  const pages = (...images: readonly string[]) =>
+    serving({
+      [`${base}/liguria/`]: { body: head(images[0] ?? '') },
+      [`${base}/liguria/genova/`]: { body: head(images[1] ?? '') },
+      [`${base}/liguria/genova/teatro-carlo-felice/`]: { body: head(images[2] ?? '') },
+      [`${base}/event/aaaabbbbcccc/`]: { body: head(images[3] ?? '') },
+    });
+
+  test('every page carrying one of ours passes, and says how many are photographs', async () => {
+    const check = await ogImageCheck(pages(proxied, proxied, branded, proxied), base, 'aaaabbbbcccc');
+    assert.equal(check.status, 'ok');
+    assert.equal(check.detail, '3 of 4 show a real photograph');
+  });
+
+  test('the brand card is an answer, not a failure — an empty city has no photo', async () => {
+    const check = await ogImageCheck(pages(branded, branded, branded, branded), base, 'aaaabbbbcccc');
+    assert.equal(check.status, 'ok');
+  });
+
+  test('a page with no preview image at all is named', async () => {
+    const check = await ogImageCheck(pages(proxied, '', proxied, proxied), base, 'aaaabbbbcccc');
+    assert.equal(check.status, 'fail');
+    assert.ok(check.detail.includes('/liguria/genova/'));
+  });
+
+  test('a hot-linked image is a failure — it is not ours to serve or to crop', async () => {
+    const check = await ogImageCheck(
+      pages(proxied, 'https://s1.ticketm.net/dam/a/1.jpg', proxied, proxied),
+      base,
+      'aaaabbbbcccc',
+    );
+    assert.equal(check.status, 'fail');
   });
 });

@@ -1,7 +1,7 @@
 import { corpusChecks } from './corpus-checks.ts';
 import { eventMarkupCheck, hreflangCheck } from './markup-checks.ts';
 import { indexCheck, lastRunCheck } from './pipeline-checks.ts';
-import { httpSemanticsCheck, pastEventCheck, robotsCheck, sitemapCheck } from './site-checks.ts';
+import { httpSemanticsCheck, ogImageCheck, pastEventCheck, robotsCheck, sitemapCheck } from './site-checks.ts';
 import { worstOf } from './types.ts';
 import type { CompactEvent } from '../domain/event.ts';
 import type { FetchFn } from '../collectors/types.ts';
@@ -35,6 +35,7 @@ export const runHealth = async (deps: HealthDeps): Promise<HealthReport> => {
     eventMarkupCheck(deps.fetchFn, deps.origin, sample),
     hreflangCheck(deps.fetchFn, deps.origin, HREFLANG_SAMPLE),
     httpSemanticsCheck(deps.fetchFn, deps.origin, deps.goneId),
+    ogImageCheck(deps.fetchFn, deps.origin, sample),
   ]);
   const checks = [
     ...remote,
