@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { corpusChecks } from '../src/health/corpus-checks.ts';
 import { indexCheck, lastRunCheck } from '../src/health/pipeline-checks.ts';
 import {
+  analyticsCheck,
   httpSemanticsCheck,
   indexNowKeyCheck,
   ogImageCheck,
@@ -371,5 +372,20 @@ describe('indexNowKeyCheck', () => {
   test('no key configured is a warning, not a failure — nothing is broken', async () => {
     const check = await indexNowKeyCheck(serving({}), base, '');
     assert.equal(check.status, 'warn');
+  });
+});
+
+describe('analyticsCheck', () => {
+  const base = 'https://dovego.it';
+
+  test('the beacon on the page is the whole requirement', async () => {
+    const body = '<html><head><script data-cf-beacon=\'{"token":"x"}\'></script></head></html>';
+    const check = await analyticsCheck(serving({ [`${base}/liguria/`]: { body } }), base);
+    assert.equal(check.status, 'ok');
+  });
+
+  test('a page without it fails, because a flat dashboard looks like no traffic', async () => {
+    const check = await analyticsCheck(serving({ [`${base}/liguria/`]: { body: '<html></html>' } }), base);
+    assert.equal(check.status, 'fail');
   });
 });

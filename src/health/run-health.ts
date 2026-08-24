@@ -2,6 +2,7 @@ import { corpusChecks } from './corpus-checks.ts';
 import { eventMarkupCheck, hreflangCheck } from './markup-checks.ts';
 import { indexCheck, lastRunCheck } from './pipeline-checks.ts';
 import {
+  analyticsCheck,
   httpSemanticsCheck,
   indexNowKeyCheck,
   ogImageCheck,
@@ -46,6 +47,7 @@ export const runHealth = async (deps: HealthDeps): Promise<HealthReport> => {
     httpSemanticsCheck(deps.fetchFn, deps.origin, deps.goneId),
     ogImageCheck(deps.fetchFn, deps.origin, sample),
     indexNowKeyCheck(deps.fetchFn, deps.origin, deps.indexNowKey),
+    analyticsCheck(deps.fetchFn, deps.origin),
   ]);
   const checks = [
     ...remote,
