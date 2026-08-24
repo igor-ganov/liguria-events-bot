@@ -85,7 +85,7 @@ export const chunk = <T>(items: readonly T[], size: number): readonly (readonly 
         items.slice(i * size, (i + 1) * size),
       );
 
-const ENRICH_SYSTEM = [
+export const ENRICH_SYSTEM = [
   'You are a data curator for an Italian events guide covering the whole',
   'country. Each input event carries a "city" — the Italian city it belongs',
   'to. Never assume Genoa; use the city each event names.',
@@ -178,7 +178,7 @@ const ENRICH_SYSTEM = [
   'their own lines and "- " bullet lists, with real "\\n" newlines between them.',
   'That Markdown inside the strings is required, not a violation. Follow the',
   'shape of this example exactly (note the \\n newlines and the [tags]):',
-  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "title": "…", "description": "Two-time-Grammy pianist Andrea Bacchetti plays a candlelit recital in a Baroque villa — a rare chance to hear a 1772 Guadagnini up close.\n\n## [programme] Programme\n- Beethoven — Romance in F\n- Kreisler — Liebesleid\n\n## [getting-there] Getting there\nVilla Borzino, Busalla (Genoa); A7 motorway or the Genoa–Arquata rail line.\n\n## [tickets] Tickets\nFree admission, donation welcome.\n\n## [when] When\nFriday 14 August 2026, 21:00.", "address": "…", "time": "HH:MM", "durationMin": 90, "sessions": [ { "date": "YYYY-MM-DD", "time": "HH:MM", "title": "…" } ], "kind": "container"|"standalone", "unusual": true|false, "blocked": true|false } ] }',
+  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "title": "…", "description": "Two-time-Grammy pianist Andrea Bacchetti plays a candlelit recital in a Baroque villa — a rare chance to hear a 1772 Guadagnini up close.\\n\\n## [programme] Programme\\n- Beethoven — Romance in F\\n- Kreisler — Liebesleid\\n\\n## [getting-there] Getting there\\nVilla Borzino, Busalla (Genoa); A7 motorway or the Genoa–Arquata rail line.\\n\\n## [tickets] Tickets\\nFree admission, donation welcome.\\n\\n## [when] When\\nFriday 14 August 2026, 21:00.", "address": "…", "time": "HH:MM", "durationMin": 90, "sessions": [ { "date": "YYYY-MM-DD", "time": "HH:MM", "title": "…" } ], "kind": "container"|"standalone", "unusual": true|false, "blocked": true|false } ] }',
 ].join('\n');
 
 /** The reading of the source: everything except the other two languages. */

@@ -1,7 +1,7 @@
 // T8 — enrichment batching + post extraction (AC-2.1–2.4).
 import { describe, test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { chunk, makeEnrichEvents, makeExtractFromPosts } from '../src/llm/enrich.ts';
+import { ENRICH_SYSTEM, chunk, makeEnrichEvents, makeExtractFromPosts } from '../src/llm/enrich.ts';
 import type { ChatFn } from '../src/llm/client.ts';
 import type { RawPost } from '../src/collectors/types.ts';
 
@@ -128,5 +128,29 @@ describe('makeExtractFromPosts', () => {
     };
     assert.deepEqual(await makeExtractFromPosts(chat)([], '2026-07-01'), []);
     assert.equal(called, false);
+  });
+});
+
+describe('the enrichment prompt', () => {
+  // The JSON example shows a description whose Markdown sections are separated
+  // by escaped newlines. Written with a single backslash in the source, those
+  // become REAL newlines in the prompt — so the example demonstrates a JSON
+  // string broken across lines, the model copies it faithfully, and every reply
+  // comes back unparseable. It did: 23 of 24 events lost in one run.
+  const example = ENRICH_SYSTEM.split('\n').find((line) => line.includes('"events": [ { "id":')) ?? '';
+
+  test('the example is on one line, as JSON requires', () => {
+    assert.notEqual(example, '');
+    assert.ok(!example.includes('\n'));
+  });
+
+  test('its newlines are escaped, not real', () => {
+    const backslashN = String.fromCharCode(92) + 'n';
+    assert.ok(example.includes(`up close.${backslashN}${backslashN}## [programme]`), example.slice(150, 320));
+  });
+
+  test('it asks for the flat English pair, not a three-language map', () => {
+    assert.ok(example.includes('"description":'));
+    assert.ok(!example.includes('"descriptions":'));
   });
 });
