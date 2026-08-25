@@ -3,6 +3,7 @@
 // people mute.
 import { describe, test } from 'bun:test';
 import assert from 'node:assert/strict';
+import { applyIdentity } from '../src/channel/apply-identity.ts';
 import { deletePost } from '../src/channel/delete-post.ts';
 import { digestHeading } from '../src/channel/digest-heading.ts';
 import { eventUrl } from '../src/channel/event-url.ts';
@@ -287,5 +288,60 @@ describe('deletePost', () => {
       throw new Error('network down');
     };
     assert.equal((await deletePost('t', '@dovegoit', 3, throwing)).ok, false);
+  });
+});
+
+describe('applyIdentity', () => {
+  const env = (channel: string): Env => ({
+    EVENTS: {
+      get: async () => null,
+      put: async () => undefined,
+      delete: async () => undefined,
+      list: async () => ({ keys: [], list_complete: true }),
+    },
+    AI: { run: async () => ({}) },
+    BOT_TOKEN: 't',
+    WEBHOOK_SECRET: '',
+    OWNER_CHAT_ID: '',
+    CHANNEL_CHAT_ID: channel,
+  });
+
+  const recording = (calls: string[]): FetchFn => async (input) => {
+    calls.push(String(input).split('/bott/')[1] ?? String(input));
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  test('sets the profile copy in every language the bot speaks', async () => {
+    const calls: string[] = [];
+    await applyIdentity(env('@dovegoit'), recording(calls));
+    assert.equal(calls.filter((one) => one === 'setMyShortDescription').length, 3);
+    assert.equal(calls.filter((one) => one === 'setMyDescription').length, 3);
+    assert.equal(calls.filter((one) => one === 'setMyName').length, 1);
+  });
+
+  test('describes the channel and gives it a picture', async () => {
+    const calls: string[] = [];
+    await applyIdentity(env('@dovegoit'), recording(calls));
+    assert.ok(calls.includes('setChatDescription'));
+    assert.ok(calls.includes('setChatPhoto'));
+  });
+
+  test('with no channel configured it still sets up the bot, and says why not the channel', async () => {
+    const result = await applyIdentity(env(''), recording([]));
+    const steps = readProp(result, 'steps');
+    const channel = (Array.isArray(steps) ? steps : []).filter((s) => readProp(s, 'step') === 'channel');
+    assert.equal(channel.length, 1);
+    assert.equal(readProp(channel[0], 'error'), 'no channel configured');
+  });
+
+  test('a refused step is reported, not swallowed', async () => {
+    const refusing: FetchFn = async () =>
+      new Response(JSON.stringify({ ok: false, description: 'Bad Request: NAME_NOT_MODIFIED' }), { status: 400 });
+    const result = await applyIdentity(env('@dovegoit'), refusing);
+    const steps = Array.isArray(readProp(result, 'steps')) ? readProp(result, 'steps') : [];
+    assert.ok((steps as readonly unknown[]).some((s) => readProp(s, 'ok') === false));
   });
 });

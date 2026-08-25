@@ -27,6 +27,7 @@ import type { TranslationKey } from './i18n.ts';
 import { detectLanguage, makeAnswer, makePlan } from './llm/answer.ts';
 import { placeIndex } from './domain/places.ts';
 import { archivedSample } from './health/archived-sample.ts';
+import { applyIdentity } from './channel/apply-identity.ts';
 import { deletePost } from './channel/delete-post.ts';
 import { postDaily } from './channel/post-daily.ts';
 import { pingIndexNow } from './indexnow/ping-index-now.ts';
@@ -1063,6 +1064,12 @@ const worker = {
         if (chat === '' || !Number.isInteger(messageId)) {
           return Response.json({ error: 'need a channel and an integer id' }, { status: 400 });
         }
+      // Apply the bot's and the channel's own descriptions from the repo, in
+      // every language it speaks. Profile copy typed into BotFather lives in
+      // one place nobody can review and no deploy can restore.
+      if (url.searchParams.get('force') === 'identity') {
+        return Response.json(await applyIdentity(env));
+      }
         return Response.json({ deleted: await deletePost(env.BOT_TOKEN, chat, messageId) });
       }
       // Backfill multi-source gallery photos onto events merged before the
