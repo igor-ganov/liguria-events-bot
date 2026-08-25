@@ -97,6 +97,30 @@ describe('renderPost', () => {
     const post = renderPost(withImage({ descriptions: { en: long, it: long, ru: long } }), 'it');
     assert.ok(post.caption.length <= 1024, `caption was ${post.caption.length}`);
   });
+
+  test('the link counts against that limit — it is part of the caption', () => {
+    // It was appended after the body had been clipped to fit, and Telegram
+    // refused the whole post: "message caption is too long".
+    const long = 'parola '.repeat(400);
+    const post = renderPost(
+      withImage({
+        title: 'Un titolo abbastanza lungo per contare qualcosa nel budget',
+        venue: 'Teatro Comunale di Un Posto Con Un Nome Lungo',
+        descriptions: { en: long, it: long, ru: long },
+      }),
+      'it',
+    );
+    assert.ok(post.caption.includes(post.url), 'the link has to be in the caption');
+    assert.ok(post.caption.length <= 1024, `caption was ${post.caption.length}`);
+  });
+
+  test('a description that leaves no room still yields a postable caption', () => {
+    const post = renderPost(
+      withImage({ title: 'T'.repeat(900), descriptions: { en: 'x', it: 'x', ru: 'x' } }),
+      'it',
+    );
+    assert.ok(post.caption.includes(post.url));
+  });
 });
 
 describe('rememberPosted', () => {

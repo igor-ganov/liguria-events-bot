@@ -31,10 +31,13 @@ export const renderPost = (event: CompactEvent, lang: Lang): ChannelPost => {
   const head = `${emoji} <b>${escapeHtml(titleOf(event, lang))}</b>`;
   const when = `📅 ${escapeHtml(formatDateSpan(event))}${where === '' ? '' : ` · 📍 ${escapeHtml(where)}`}`;
   const body = escapeHtml(event.d?.[lang] ?? '');
-  const room = CAPTION_LIMIT - head.length - when.length - 8;
-  return {
-    photo: event.img ?? '',
-    caption: [head, when, clip(body, Math.max(room, 0))].filter((part) => part !== '').join('\n\n'),
-    url: eventUrl(event.id, lang),
-  };
+  const url = eventUrl(event.id, lang);
+  // The link is part of the caption, so it has to be part of the budget. It
+  // was appended after the body had been clipped to fit, and Telegram refused
+  // the whole post: "message caption is too long".
+  const fixed = [head, when, url].join('\n\n').length + 2;
+  const caption = [head, when, clip(body, Math.max(CAPTION_LIMIT - fixed, 0)), url]
+    .filter((part) => part !== '')
+    .join('\n\n');
+  return { photo: event.img ?? '', caption, url };
 };

@@ -45,7 +45,7 @@ export const postDaily = async (
     env.BOT_TOKEN,
     chat,
     channelPhotoUrl(post.photo),
-    `${post.caption}\n\n${post.url}`,
+    post.caption,
     fetchFn,
   );
   // Remember only what was actually said. Recording a failed send as posted
