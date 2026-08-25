@@ -1,5 +1,5 @@
 import { escapeHtml } from '../delivery/render.ts';
-import { cityNameOf } from '../domain/city.ts';
+import { cityNameOf, citySlug } from '../domain/city.ts';
 import { digestHeading } from './digest-heading.ts';
 import { eventUrl } from './event-url.ts';
 import { titleOf } from '../domain/event.ts';
@@ -14,8 +14,15 @@ const MORE: Readonly<Record<Lang, string>> = {
   ru: 'Все события дня',
 };
 
+// The crawler fills the venue with the city's own name often enough to matter,
+// and "Milano · Milano" under a heading that already says Milano is noise.
+const venueOf = (event: CompactEvent): string | undefined => {
+  const venue = event.v ?? '';
+  return venue === '' || citySlug(venue) === (event.ct ?? '') ? undefined : venue;
+};
+
 const detail = (event: CompactEvent): string =>
-  [event.h, event.v].filter((part) => part !== undefined && part !== '').join(' · ');
+  [event.h, venueOf(event)].filter((part) => part !== undefined && part !== '').join(' · ');
 
 const line = (lang: Lang) => (event: CompactEvent): string => {
   const title = `<a href="${eventUrl(event.id, lang)}">${escapeHtml(titleOf(event, lang))}</a>`;

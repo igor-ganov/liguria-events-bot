@@ -347,3 +347,23 @@ describe('applyIdentity', () => {
     assert.ok((steps as readonly unknown[]).some((s) => readProp(s, 'ok') === false));
   });
 });
+
+describe('renderDigest and the venue that is not one', () => {
+  test('drops a venue that is just the city name again', () => {
+    // The crawler fills the venue with the city's own name often enough to
+    // matter — 55 events in one live snapshot said venue "Milano" in Milano.
+    const digest = renderDigest([event({ city: 'milano', venue: 'Milano', time: '11:00' })], 'it', TODAY);
+    assert.ok(digest.includes('— 11:00'));
+    assert.ok(!digest.includes('11:00 · Milano'));
+  });
+
+  test('keeps a real venue in the same city', () => {
+    const digest = renderDigest([event({ city: 'milano', venue: 'Gallerie d’Italia' })], 'it', TODAY);
+    assert.ok(digest.includes('Gallerie d’Italia'));
+  });
+
+  test('an event with neither a time nor a venue is still a line', () => {
+    const digest = renderDigest([event({ venue: undefined })], 'it', TODAY);
+    assert.ok(digest.includes('Concerto di Ferragosto'));
+  });
+});
