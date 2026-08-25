@@ -1,17 +1,20 @@
 import { channelHourOf } from '../config.ts';
-import { channelPhotoUrl } from './photo-url.ts';
-import { postPhoto } from './post-photo.ts';
-import { pickPost } from './pick-post.ts';
-import { rememberPosted } from './remember-posted.ts';
-import { renderPost } from './render-post.ts';
-import { asArray, parseJson } from '../util/json.ts';
+import { eventUrl } from './event-url.ts';
 import { isLang } from '../domain/event.ts';
+import { pickDigest } from './pick-digest.ts';
+import { postText } from './post-text.ts';
+import { rememberPosted } from './remember-posted.ts';
+import { renderDigest } from './render-digest.ts';
+import { asArray, parseJson } from '../util/json.ts';
 import type { CompactEvent } from '../domain/event.ts';
 import type { Env } from '../config.ts';
 import type { FetchFn } from '../util/http.ts';
 
 const POSTED_KEY = 'channel:posted';
 const MEMORY = 400;
+/** Below this the day has nothing to report, and a digest of one line is worse
+ *  than no post at all. */
+const MINIMUM = 3;
 
 const readPosted = async (env: Env): Promise<readonly string[]> =>
   (asArray(parseJson((await env.EVENTS.get(POSTED_KEY)) ?? '[]')) ?? []).filter(
@@ -19,12 +22,15 @@ const readPosted = async (env: Env): Promise<readonly string[]> =>
   );
 
 /**
- * One post a day to the public channel.
+ * The day's digest to the public channel.
  *
- * The bot has a handful of private subscribers, which is not an audience. A
- * channel is the only surface where this project can push rather than wait —
- * and it stays silent when there is nothing worth saying, because a channel
- * that posts filler is a channel people mute.
+ * One event a day was a channel about whichever listing happened to be
+ * soonest. A digest is a reason to open the channel: several things worth
+ * doing, grouped by city, so a reader scans for their own and finds answers
+ * rather than a single roll of the dice.
+ *
+ * It stays silent when the day has nothing to report. A channel that posts
+ * filler is a channel people mute.
  */
 export const postDaily = async (
   env: Env,
@@ -36,22 +42,27 @@ export const postDaily = async (
   const chat = env.CHANNEL_CHAT_ID ?? '';
   if (chat === '' || hour !== channelHourOf(env)) return { kind: 'not-due' };
   const posted = await readPosted(env);
-  const event = pickPost(index, today, posted);
-  if (event === undefined) return { kind: 'nothing-to-say' };
+  const events = pickDigest(index, today, posted);
+  if (events.length < MINIMUM) return { kind: 'nothing-to-say', found: events.length };
   const wanted = env.CHANNEL_LANG ?? 'it';
   const lang = isLang(wanted) ? wanted : 'it';
-  const post = renderPost(event, lang);
-  const sent = await postPhoto(
+  // The picture comes from the first event's own page: Telegram renders its
+  // og:image, which is already our 1200x630 crop on our own origin.
+  const sent = await postText(
     env.BOT_TOKEN,
     chat,
-    channelPhotoUrl(post.photo),
-    post.caption,
+    renderDigest(events, lang, today),
+    eventUrl(events[0]?.id ?? '', lang),
     fetchFn,
   );
-  // Remember only what was actually said. Recording a failed send as posted
-  // is how the first channel post vanished: the run reported success, the
-  // event was struck off, and the channel stayed empty.
-  if (!sent.ok) return { kind: 'failed', id: event.id, error: sent.error };
-  await env.EVENTS.put(POSTED_KEY, JSON.stringify(rememberPosted(posted, event.id, MEMORY)));
-  return { kind: 'posted', id: event.id, messageId: sent.messageId };
+  // Remember only what was actually said. Recording a failed send as posted is
+  // how the first channel post vanished: the run reported success, the events
+  // were struck off, and the channel stayed empty.
+  if (!sent.ok) return { kind: 'failed', error: sent.error };
+  const remembered = events.reduce(
+    (list: readonly string[], event) => rememberPosted(list, event.id, MEMORY),
+    posted,
+  );
+  await env.EVENTS.put(POSTED_KEY, JSON.stringify(remembered));
+  return { kind: 'posted', events: events.length, messageId: sent.messageId };
 };

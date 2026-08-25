@@ -1,3 +1,4 @@
+import { readProp } from '../util/json.ts';
 import type { FetchFn } from '../util/http.ts';
 
 /**
@@ -21,12 +22,9 @@ export const deletePost = async (
       body: JSON.stringify({ chat_id: chatId, message_id: messageId }),
     });
     const body: unknown = await response.json();
-    const ok = typeof body === 'object' && body !== null && 'ok' in body && body.ok === true;
-    const description =
-      typeof body === 'object' && body !== null && 'description' in body
-        ? String(body.description)
-        : `HTTP ${response.status}`;
-    return ok ? { ok: true } : { ok: false, error: description };
+    return readProp(body, 'ok') === true
+      ? { ok: true }
+      : { ok: false, error: String(readProp(body, 'description') ?? `HTTP ${response.status}`) };
   } catch (error: unknown) {
     return { ok: false, error: String(error) };
   }

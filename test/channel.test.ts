@@ -1,134 +1,173 @@
-// A Telegram channel is the only place this project can push rather than wait.
-// The bot has five subscribers; a channel is what turns a crawl into an
-// audience. These are the parts that decide what goes out and what it says.
+// The public channel. It posts a digest once a day, or nothing: five private
+// subscribers is not an audience, and a channel that posts filler is a channel
+// people mute.
 import { describe, test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { pickPost } from '../src/channel/pick-post.ts';
-import { renderPost } from '../src/channel/render-post.ts';
-import { rememberPosted } from '../src/channel/remember-posted.ts';
-import { postDaily } from '../src/channel/post-daily.ts';
-import { channelPhotoUrl } from '../src/channel/photo-url.ts';
-import { leadOf } from '../src/channel/lead-of.ts';
 import { deletePost } from '../src/channel/delete-post.ts';
+import { digestHeading } from '../src/channel/digest-heading.ts';
+import { eventUrl } from '../src/channel/event-url.ts';
+import { onDay } from '../src/channel/on-day.ts';
+import { pickDigest } from '../src/channel/pick-digest.ts';
+import { postDaily } from '../src/channel/post-daily.ts';
+import { rememberPosted } from '../src/channel/remember-posted.ts';
+import { renderDigest } from '../src/channel/render-digest.ts';
 import { readProp } from '../src/util/json.ts';
+import { toCompact } from '../src/domain/event.ts';
+import type { CompactEvent, EventRecord } from '../src/domain/event.ts';
 import type { Env } from '../src/config.ts';
 import type { KvLike } from '../src/pipeline/store.ts';
 import type { FetchFn } from '../src/util/http.ts';
-import { toCompact } from '../src/domain/event.ts';
-import type { CompactEvent, EventRecord } from '../src/domain/event.ts';
 
+const TODAY = '2026-08-25';
+
+// Fixture data, not prose: the corpus is trilingual, so a record that stands
+// in for one has to be.
 const base: EventRecord = {
   id: 'aaaabbbbcccc',
   title: 'Concerto di Ferragosto',
-  startDate: '2026-09-01',
+  startDate: TODAY,
   categories: ['music'],
   descriptions: { en: 'A concert by the sea.', it: 'Un concerto sul mare.', ru: 'Концерт у моря.' },
   url: 'https://example.org/concerto',
   source: 'mentelocale',
+  city: 'genova',
   enriched: true,
   addedAt: 1,
 };
 
-const compact = (over: Partial<EventRecord> = {}): CompactEvent => toCompact({ ...base, ...over });
-const withImage = (over: Partial<EventRecord> = {}): CompactEvent =>
-  compact({ image: 'https://s1.ticketm.net/1.jpg', ...over });
+const event = (over: Partial<EventRecord> = {}): CompactEvent => toCompact({ ...base, ...over });
 
-describe('pickPost', () => {
-  const today = '2026-08-25';
+const many = (count: number, over: Partial<EventRecord> = {}): readonly CompactEvent[] =>
+  Array.from({ length: count }, (_, i) => event({ id: `id${i}${over.city ?? ''}`, ...over }));
 
-  test('takes the soonest upcoming event that has a picture', () => {
-    const picked = pickPost(
-      [
-        withImage({ id: 'later', startDate: '2026-09-10' }),
-        withImage({ id: 'sooner', startDate: '2026-08-27' }),
-      ],
-      today,
-      [],
-    );
-    assert.equal(picked?.id, 'sooner');
+describe('onDay', () => {
+  test('a standalone event covers every day of its run', () => {
+    const run = event({ startDate: '2026-08-01', endDate: '2026-09-30' });
+    assert.equal(onDay(run, TODAY), true);
   });
 
-  test('skips what has gone out already — a channel that repeats itself is muted', () => {
-    const picked = pickPost(
-      [withImage({ id: 'sooner', startDate: '2026-08-27' }), withImage({ id: 'next', startDate: '2026-08-28' })],
-      today,
-      ['sooner'],
-    );
-    assert.equal(picked?.id, 'next');
+  test('a container is on only on its programmed dates', () => {
+    // Otherwise a three-month festival lands in every digest of its run.
+    const festival = event({
+      kind: 'container',
+      startDate: '2026-08-01',
+      endDate: '2026-09-30',
+      sessions: [{ date: '2026-08-01' }, { date: '2026-09-30' }],
+    });
+    assert.equal(onDay(festival, TODAY), false);
+    assert.equal(onDay(festival, '2026-09-30'), true);
   });
 
-  test('skips an event with no picture: a photoless channel post is ignored', () => {
-    const picked = pickPost([compact({ id: 'bare', startDate: '2026-08-26' }), withImage({ id: 'shown' })], today, []);
-    assert.equal(picked?.id, 'shown');
-  });
-
-  test('will not post something that has already happened', () => {
-    assert.equal(pickPost([withImage({ id: 'past', startDate: '2026-08-01' })], today, []), undefined);
-  });
-
-  test('will not post something months away — the channel is about what is on', () => {
-    assert.equal(pickPost([withImage({ id: 'far', startDate: '2027-01-01' })], today, []), undefined);
-  });
-
-  test('nothing to say is an answer, not a placeholder post', () => {
-    assert.equal(pickPost([], today, []), undefined);
-  });
-
-  test('skips an event enrichment never described — a bare listing is a poor post', () => {
-    const bare = withImage({ id: 'bare', descriptions: { en: '', it: '', ru: '' } });
-    assert.equal(pickPost([bare], today, []), undefined);
+  test('a single-date event is on that date and no other', () => {
+    assert.equal(onDay(event(), TODAY), true);
+    assert.equal(onDay(event(), '2026-08-26'), false);
   });
 });
 
-describe('renderPost', () => {
-  test('leads with the title, says when and where, and links to our page', () => {
-    const post = renderPost(withImage({ venue: 'Teatro Carlo Felice', city: 'genova' }), 'it');
-    assert.ok(post.caption.includes('Concerto di Ferragosto'));
-    assert.ok(post.caption.includes('Teatro Carlo Felice'));
-    assert.equal(post.photo, 'https://s1.ticketm.net/1.jpg');
-    assert.equal(post.url, 'https://dovego.it/it/event/aaaabbbbcccc/');
+describe('pickDigest', () => {
+  test('takes what is on today', () => {
+    const picked = pickDigest([event({ id: 'today' }), event({ id: 'later', startDate: '2026-09-09' })], TODAY, []);
+    assert.deepEqual(picked.map((one) => one.id), ['today']);
   });
 
-  test('escapes markup in a scraped title rather than sending broken HTML', () => {
-    const post = renderPost(withImage({ title: 'Rock & <Roll>' }), 'it');
-    assert.ok(post.caption.includes('Rock &amp; &lt;Roll&gt;'));
+  test('caps each city, so one big city cannot fill the post', () => {
+    const picked = pickDigest([...many(6, { city: 'milano' }), ...many(2, { city: 'genova' })], TODAY, []);
+    assert.equal(picked.filter((one) => one.ct === 'milano').length, 3);
+    assert.equal(picked.filter((one) => one.ct === 'genova').length, 2);
   });
 
-  test('stays inside the caption limit Telegram enforces on a photo', () => {
-    const long = 'x '.repeat(900);
-    const post = renderPost(withImage({ descriptions: { en: long, it: long, ru: long } }), 'it');
-    assert.ok(post.caption.length <= 1024, `caption was ${post.caption.length}`);
+  test('opens with the city that has the most on', () => {
+    const picked = pickDigest([...many(1, { city: 'genova' }), ...many(3, { city: 'milano' })], TODAY, []);
+    assert.equal(picked[0]?.ct, 'milano');
   });
 
-  test('the link counts against that limit — it is part of the caption', () => {
-    // It was appended after the body had been clipped to fit, and Telegram
-    // refused the whole post: "message caption is too long".
-    const long = 'parola '.repeat(400);
-    const post = renderPost(
-      withImage({
-        title: 'Un titolo abbastanza lungo per contare qualcosa nel budget',
-        venue: 'Teatro Comunale di Un Posto Con Un Nome Lungo',
-        descriptions: { en: long, it: long, ru: long },
-      }),
-      'it',
-    );
-    assert.ok(post.caption.includes(post.url), 'the link has to be in the caption');
-    assert.ok(post.caption.length <= 1024, `caption was ${post.caption.length}`);
+  test('caps the whole digest as well', () => {
+    const cities = ['genova', 'milano', 'torino', 'roma', 'napoli', 'bari'];
+    const picked = pickDigest(cities.flatMap((city) => many(3, { city })), TODAY, []);
+    assert.equal(picked.length, 12);
   });
 
-  test('a description that leaves no room still yields a postable caption', () => {
-    const post = renderPost(
-      withImage({ title: 'T'.repeat(900), descriptions: { en: 'x', it: 'x', ru: 'x' } }),
-      'it',
-    );
-    assert.ok(post.caption.includes(post.url));
+  test('never repeats what has already gone out', () => {
+    // A months-long exhibition is on every day of its run; saying so daily is
+    // what gets a channel muted.
+    const picked = pickDigest(many(3, { city: 'genova' }), TODAY, ['id0genova']);
+    assert.equal(picked.length, 2);
+  });
+
+  test('skips an event enrichment never described, and one with no city', () => {
+    const bare = event({ id: 'bare', descriptions: { en: '', it: '', ru: '' } });
+    const nowhere = event({ id: 'nowhere', city: undefined });
+    assert.deepEqual(pickDigest([bare, nowhere], TODAY, []), []);
+  });
+
+  test('orders a city by time of day, then by title', () => {
+    const evening = event({ id: 'evening', time: '21:00' });
+    const morning = event({ id: 'morning', time: '09:00' });
+    assert.deepEqual(pickDigest([evening, morning], TODAY, []).map((one) => one.id), ['morning', 'evening']);
+  });
+});
+
+describe('digestHeading', () => {
+  test('names the day in the channel’s own language', () => {
+    assert.equal(digestHeading(TODAY, 'it'), 'Cosa fare oggi — 25 agosto');
+    assert.equal(digestHeading(TODAY, 'en'), "What's on today — 25 August");
+  });
+
+  test('a date it cannot read still yields a heading', () => {
+    assert.equal(digestHeading('not-a-date', 'it'), 'Cosa fare oggi');
+  });
+});
+
+describe('renderDigest', () => {
+  const digest = renderDigest(
+    [event({ id: 'aaaabbbbcccc', time: '21:00', venue: 'Teatro Carlo Felice' }), event({ id: 'b', city: 'milano' })],
+    'it',
+    TODAY,
+  );
+
+  test('heads the post with the day', () => {
+    assert.ok(digest.startsWith('📅 <b>Cosa fare oggi — 25 agosto</b>'));
+  });
+
+  test('groups by city, under the city’s real name', () => {
+    assert.ok(digest.includes('<b>Genova</b>'));
+    assert.ok(digest.includes('<b>Milano</b>'));
+  });
+
+  test('every event is a link to its own page', () => {
+    assert.ok(digest.includes('<a href="https://dovego.it/it/event/aaaabbbbcccc/">'));
+  });
+
+  test('says when and where, when the corpus knows', () => {
+    assert.ok(digest.includes('21:00 · Teatro Carlo Felice'));
+  });
+
+  test('closes with the way through to everything else', () => {
+    assert.ok(digest.includes('<a href="https://dovego.it/it/">Tutti gli eventi di oggi</a>'));
+  });
+
+  test('escapes a scraped title rather than sending broken HTML', () => {
+    const broken = renderDigest([event({ title: 'Rock & <Roll>' })], 'it', TODAY);
+    assert.ok(broken.includes('Rock &amp; &lt;Roll&gt;'));
+  });
+
+  test('fits in one message', () => {
+    const cities = ['genova', 'milano', 'torino', 'roma'];
+    const full = renderDigest(cities.flatMap((city) => many(3, { city })), 'it', TODAY);
+    assert.ok(full.length <= 4096, `digest was ${full.length}`);
+  });
+});
+
+describe('eventUrl', () => {
+  test('English at the root, the others under a prefix', () => {
+    assert.equal(eventUrl('abc', 'en'), 'https://dovego.it/event/abc/');
+    assert.equal(eventUrl('abc', 'it'), 'https://dovego.it/it/event/abc/');
   });
 });
 
 describe('rememberPosted', () => {
   test('keeps the newest ids and forgets the oldest, so the key cannot grow forever', () => {
-    const kept = rememberPosted(['a', 'b', 'c'], 'd', 3);
-    assert.deepEqual(kept, ['b', 'c', 'd']);
+    assert.deepEqual(rememberPosted(['a', 'b', 'c'], 'd', 3), ['b', 'c', 'd']);
   });
 
   test('does not record the same id twice', () => {
@@ -137,14 +176,16 @@ describe('rememberPosted', () => {
 });
 
 describe('postDaily', () => {
-  const index = [withImage({ id: 'aaaabbbbcccc', startDate: '2026-08-27' })];
-  const today = '2026-08-25';
+  // Two cities: four events survive the per-city cap of three.
+  const index = [...many(3, { city: 'genova' }), ...many(1, { city: 'milano' })];
 
   // Typed as the real bindings rather than cast into them, so a signature
   // change breaks the double instead of being papered over.
   const kv = (seed: Readonly<Record<string, string>>) => {
     const store = new Map(Object.entries(seed));
     const binding: KvLike = {
+      // `null` because Cloudflare's KV returns it for a missing key, and the
+      // double has to satisfy the same contract as the real binding.
       get: async (key) => store.get(key) ?? null,
       put: async (key, value) => {
         store.set(key, value);
@@ -166,116 +207,59 @@ describe('postDaily', () => {
     CHANNEL_CHAT_ID: channel,
   });
 
+  const accepting = (seen: { body?: unknown }): FetchFn => async (_input, init) => {
+    seen.body = JSON.parse(String(init?.body ?? '{}'));
+    return new Response(JSON.stringify({ ok: true, result: { message_id: 7 } }), { status: 200 });
+  };
+
   test('says nothing at all when no channel is configured', async () => {
     const { binding } = kv({});
-    assert.deepEqual(await postDaily(env('', binding), index, today, 10), { kind: 'not-due' });
+    assert.deepEqual(await postDaily(env('', binding), index, TODAY, 10), { kind: 'not-due' });
   });
 
   test('posts at the hour it was told, and not at another one', async () => {
     const { binding } = kv({});
-    assert.deepEqual(await postDaily(env('@dovego', binding), index, today, 9), { kind: 'not-due' });
+    assert.deepEqual(await postDaily(env('@dovegoit', binding), index, TODAY, 9), { kind: 'not-due' });
   });
 
-  test('sends a photo, links to the site, and remembers what it sent', async () => {
+  test('a day with too little on gets no post', async () => {
+    const { binding } = kv({});
+    const result = await postDaily(env('@dovegoit', binding), many(1, { city: 'genova' }), TODAY, 10);
+    assert.deepEqual(result, { kind: 'nothing-to-say', found: 1 });
+  });
+
+  test('sends the digest and remembers every event in it', async () => {
     const { binding, store } = kv({});
-    const sent: Readonly<{ url: string; body: unknown }>[] = [];
-    const fetchFn: FetchFn = async (input, init) => {
-      sent.push({ url: String(input), body: JSON.parse(String(init?.body ?? '{}')) });
-      return new Response(JSON.stringify({ ok: true, result: { message_id: 7 } }), { status: 200 });
-    };
-    const result = await postDaily(env('@dovego', binding), index, today, 10, fetchFn);
-    assert.deepEqual(result, { kind: 'posted', id: 'aaaabbbbcccc', messageId: 7 });
-    assert.ok(sent[0]?.url.endsWith('/sendPhoto'));
-    const body = sent[0]?.body;
-    assert.equal(readProp(body, 'chat_id'), '@dovego');
-    assert.ok(String(readProp(body, 'caption')).includes('https://dovego.it/it/event/aaaabbbbcccc/'));
-    assert.equal(store.get('channel:posted'), '["aaaabbbbcccc"]');
+    const seen: { body?: unknown } = {};
+    const result = await postDaily(env('@dovegoit', binding), index, TODAY, 10, accepting(seen));
+    assert.deepEqual(result, { kind: 'posted', events: 4, messageId: 7 });
+    assert.equal(readProp(seen.body, 'chat_id'), '@dovegoit');
+    assert.equal(JSON.parse(store.get('channel:posted') ?? '[]').length, 4);
   });
 
-  test('the picture is served by us, not fetched by Telegram from the source', async () => {
-    // Telegram fetches the URL itself and a source CDN is free to refuse it —
-    // which is exactly how the first real post failed.
-    const { binding } = kv({ 'indexnow-unused': '' });
-    const sent: unknown[] = [];
-    const fetchFn: FetchFn = async (_input, init) => {
-      sent.push(JSON.parse(String(init?.body ?? '{}')));
-      return new Response(JSON.stringify({ ok: true, result: { message_id: 7 } }), { status: 200 });
-    };
-    await postDaily(env('@dovego', binding), index, today, 10, fetchFn);
-    const photo = String(readProp(sent[0], 'photo'));
-    assert.ok(photo.startsWith('https://dovego.it/cdn-cgi/image/'), photo);
-    assert.ok(photo.includes('width=1200,height=630'));
+  test('asks Telegram to preview the first event, large and above the text', async () => {
+    // That is where the post gets its picture: the page's own og:image, which
+    // is already our crop on our own origin.
+    const { binding } = kv({});
+    const seen: { body?: unknown } = {};
+    await postDaily(env('@dovegoit', binding), index, TODAY, 10, accepting(seen));
+    const preview = readProp(seen.body, 'link_preview_options');
+    assert.equal(readProp(preview, 'url'), 'https://dovego.it/it/event/id0genova/');
+    assert.equal(readProp(preview, 'prefer_large_media'), true);
+    assert.equal(readProp(preview, 'show_above_text'), true);
   });
 
-  test('a refused send is reported and NOT struck off the list', async () => {
+  test('a refused send is reported and nothing is struck off', async () => {
     // The first live post reported success while the channel stayed empty: the
-    // send had failed and the event was recorded as said, so it never came back.
+    // send had failed and the events were recorded as said, so they never
+    // came back.
     const { binding, store } = kv({});
     const refusing: FetchFn = async () =>
-      new Response(JSON.stringify({ ok: false, description: 'Bad Request: wrong file identifier' }), {
-        status: 400,
-      });
-    const result = await postDaily(env('@dovego', binding), index, today, 10, refusing);
+      new Response(JSON.stringify({ ok: false, description: 'Bad Request: chat not found' }), { status: 400 });
+    const result = await postDaily(env('@dovegoit', binding), index, TODAY, 10, refusing);
     assert.equal(readProp(result, 'kind'), 'failed');
-    assert.ok(String(readProp(result, 'error')).includes('wrong file identifier'));
+    assert.ok(String(readProp(result, 'error')).includes('chat not found'));
     assert.equal(store.get('channel:posted'), undefined);
-  });
-
-  test('does not repeat itself the next day', async () => {
-    const { binding } = kv({ 'channel:posted': '["aaaabbbbcccc"]' });
-    assert.deepEqual(await postDaily(env('@dovego', binding), index, today, 10), { kind: 'nothing-to-say' });
-  });
-});
-
-describe('channelPhotoUrl', () => {
-  test('routes a source image through our own crop', () => {
-    const url = channelPhotoUrl('https://s1.ticketm.net/dam/a/1b2/3.jpg');
-    assert.ok(url.startsWith('https://dovego.it/cdn-cgi/image/width=1200,height=630,fit=cover'));
-    assert.ok(url.includes('/img/'));
-    // Path-safe: no slash or plus can survive into a URL path segment.
-    assert.match(url.split('/img/')[1] ?? '', /^[A-Za-z0-9_-]+$/);
-  });
-
-  test('an upload already on our origin needs no proxy hop', () => {
-    assert.equal(
-      channelPhotoUrl('/uploads/ab/cd.jpg'),
-      'https://dovego.it/cdn-cgi/image/width=1200,height=630,fit=cover,quality=82,format=jpeg/uploads/ab/cd.jpg',
-    );
-  });
-});
-
-describe('leadOf', () => {
-  const article = [
-    'La mostra presenta vent’anni di alta moda.',
-    '',
-    '## [programme] Programma',
-    '- Collezioni dal 2005 al 2025',
-    '',
-    '## [getting-there] Dove si trova',
-    'Armani/Silos, Milano.',
-  ].join('\n');
-
-  test('keeps the lead and drops the article', () => {
-    // The first channel post carried "## [programme] Programma" into a public
-    // feed: Telegram renders no Markdown at all.
-    assert.equal(leadOf(article), 'La mostra presenta vent’anni di alta moda.');
-  });
-
-  test('a description that is only a lead survives whole', () => {
-    assert.equal(leadOf('Un concerto sul mare.'), 'Un concerto sul mare.');
-  });
-
-  test('a lead of several sentences keeps them all, on one line', () => {
-    assert.equal(leadOf('Uno.\nDue.\n\n## [when] Quando\nOggi.'), 'Uno. Due.');
-  });
-
-  test('a description that opens straight into a section has no lead to take', () => {
-    // Degenerate, but it must not put a raw heading in the post.
-    assert.equal(leadOf('## [when] Quando\nOggi.'), '');
-  });
-
-  test('nothing in, nothing out', () => {
-    assert.equal(leadOf(''), '');
   });
 });
 
@@ -284,9 +268,7 @@ describe('deletePost', () => {
     new Response(JSON.stringify(body), { status });
 
   test('reports success when Telegram accepted it', async () => {
-    assert.deepEqual(await deletePost('t', '@dovegoit', 3, answering({ ok: true, result: true })), {
-      ok: true,
-    });
+    assert.deepEqual(await deletePost('t', '@dovegoit', 3, answering({ ok: true, result: true })), { ok: true });
   });
 
   test('reports why it could not, rather than pretending', async () => {
