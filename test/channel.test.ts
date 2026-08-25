@@ -363,7 +363,9 @@ describe('renderDigest and the venue that is not one', () => {
   });
 
   test('an event with neither a time nor a venue is still a line', () => {
-    const digest = renderDigest([event({ venue: undefined })], 'it', TODAY);
+    // The key is absent, not undefined: exactOptionalPropertyTypes.
+    const { venue: _venue, ...noVenue } = base;
+    const digest = renderDigest([toCompact(noVenue)], 'it', TODAY);
     assert.ok(digest.includes('Concerto di Ferragosto'));
   });
 });
