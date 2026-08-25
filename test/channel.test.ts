@@ -9,6 +9,7 @@ import { rememberPosted } from '../src/channel/remember-posted.ts';
 import { postDaily } from '../src/channel/post-daily.ts';
 import { channelPhotoUrl } from '../src/channel/photo-url.ts';
 import { leadOf } from '../src/channel/lead-of.ts';
+import { deletePost } from '../src/channel/delete-post.ts';
 import { readProp } from '../src/util/json.ts';
 import type { Env } from '../src/config.ts';
 import type { KvLike } from '../src/pipeline/store.ts';
@@ -275,5 +276,34 @@ describe('leadOf', () => {
 
   test('nothing in, nothing out', () => {
     assert.equal(leadOf(''), '');
+  });
+});
+
+describe('deletePost', () => {
+  const answering = (body: unknown, status = 200): FetchFn => async () =>
+    new Response(JSON.stringify(body), { status });
+
+  test('reports success when Telegram accepted it', async () => {
+    assert.deepEqual(await deletePost('t', '@dovegoit', 3, answering({ ok: true, result: true })), {
+      ok: true,
+    });
+  });
+
+  test('reports why it could not, rather than pretending', async () => {
+    const result = await deletePost(
+      't',
+      '@dovegoit',
+      3,
+      answering({ ok: false, description: 'Bad Request: message to delete not found' }, 400),
+    );
+    assert.equal(result.ok, false);
+    assert.ok(result.error?.includes('not found'));
+  });
+
+  test('a transport failure is an answer too', async () => {
+    const throwing: FetchFn = async () => {
+      throw new Error('network down');
+    };
+    assert.equal((await deletePost('t', '@dovegoit', 3, throwing)).ok, false);
   });
 });

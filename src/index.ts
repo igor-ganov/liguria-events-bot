@@ -27,6 +27,7 @@ import type { TranslationKey } from './i18n.ts';
 import { detectLanguage, makeAnswer, makePlan } from './llm/answer.ts';
 import { placeIndex } from './domain/places.ts';
 import { archivedSample } from './health/archived-sample.ts';
+import { deletePost } from './channel/delete-post.ts';
 import { postDaily } from './channel/post-daily.ts';
 import { pingIndexNow } from './indexnow/ping-index-now.ts';
 import { healthAlert } from './health/health-alert.ts';
@@ -1052,6 +1053,17 @@ const worker = {
         const index = await readIndex(env.EVENTS);
         const posted = await postDaily(env, index, romeDate(Date.now()), channelHourOf(env));
         return Response.json({ channel: posted });
+      }
+      // Take a post back down: a bad crop, a description that read badly, a
+      // test post left in a public channel. Doing it by hand in Telegram is
+      // not how an operator should undo something the worker did.
+      if (url.searchParams.get('force') === 'channel-delete') {
+        const messageId = Number(url.searchParams.get('id') ?? '');
+        const chat = env.CHANNEL_CHAT_ID ?? '';
+        if (chat === '' || !Number.isInteger(messageId)) {
+          return Response.json({ error: 'need a channel and an integer id' }, { status: 400 });
+        }
+        return Response.json({ deleted: await deletePost(env.BOT_TOKEN, chat, messageId) });
       }
       // Backfill multi-source gallery photos onto events merged before the
       // per-source-image era: for each altLink without an image, fetch that
