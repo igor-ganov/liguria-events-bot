@@ -797,7 +797,7 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
   }));
   // Bing, Yandex and Seznam hear about a new page the hour it exists. Google
   // does not take part — the sitemap is still how it finds out.
-  const indexNow = await pingIndexNow(env, index).catch((error: unknown) => ({
+  const indexNow = await pingIndexNow(env, index, nowMs).catch((error: unknown) => ({
     error: String(error),
   }));
   const userIds = await listUserIds(env.EVENTS);
@@ -1064,13 +1064,13 @@ const worker = {
         if (chat === '' || !Number.isInteger(messageId)) {
           return Response.json({ error: 'need a channel and an integer id' }, { status: 400 });
         }
+        return Response.json({ deleted: await deletePost(env.BOT_TOKEN, chat, messageId) });
+      }
       // Apply the bot's and the channel's own descriptions from the repo, in
       // every language it speaks. Profile copy typed into BotFather lives in
       // one place nobody can review and no deploy can restore.
       if (url.searchParams.get('force') === 'identity') {
         return Response.json(await applyIdentity(env));
-      }
-        return Response.json({ deleted: await deletePost(env.BOT_TOKEN, chat, messageId) });
       }
       // Backfill multi-source gallery photos onto events merged before the
       // per-source-image era: for each altLink without an image, fetch that

@@ -76,6 +76,7 @@ describe('indexNowBody', () => {
 });
 
 describe('pingIndexNow', () => {
+  const NOW = 1_800_000_000_000;
   const index = [compact({ id: 'aaaabbbbcccc', addedAt: 150 })];
 
   const kv = (seed: Readonly<Record<string, string>>) => {
@@ -112,7 +113,7 @@ describe('pingIndexNow', () => {
     // first attempt was answered 429, which would then repeat hourly for ever.
     const { binding, store } = kv({});
     const seen: { body?: unknown } = {};
-    const result = await pingIndexNow(env('k123', binding), index, answering(200, seen));
+    const result = await pingIndexNow(env('k123', binding), index, NOW, answering(200, seen));
     assert.deepEqual(result, { kind: 'primed', from: 150 });
     assert.equal(seen.body, undefined);
     assert.equal(store.get('indexnow:watermark'), '150');
@@ -120,26 +121,26 @@ describe('pingIndexNow', () => {
 
   test('an empty corpus on the first run primes at zero rather than -Infinity', async () => {
     const { binding, store } = kv({});
-    await pingIndexNow(env('k123', binding), [], answering(200, {}));
+    await pingIndexNow(env('k123', binding), [], NOW, answering(200, {}));
     assert.equal(store.get('indexnow:watermark'), '0');
   });
 
   test('with no key configured it does nothing at all', async () => {
     const { binding } = kv({});
-    assert.deepEqual(await pingIndexNow(env('', binding), index), { kind: 'off' });
+    assert.deepEqual(await pingIndexNow(env('', binding), index, NOW), { kind: 'off' });
   });
 
   test('submits every locale of a new event and remembers how far it got', async () => {
     const { binding, store } = kv({ 'indexnow:watermark': '100' });
     const seen: { body?: unknown } = {};
-    const result = await pingIndexNow(env('k123', binding), index, answering(200, seen));
+    const result = await pingIndexNow(env('k123', binding), index, NOW, answering(200, seen));
     assert.deepEqual(result, { kind: 'submitted', urls: 3, status: 200 });
     assert.equal(store.get('indexnow:watermark'), '150');
   });
 
   test('says nothing twice about the same event', async () => {
     const { binding } = kv({ 'indexnow:watermark': '150' });
-    assert.deepEqual(await pingIndexNow(env('k123', binding), index), { kind: 'nothing-new' });
+    assert.deepEqual(await pingIndexNow(env('k123', binding), index, NOW), { kind: 'nothing-new' });
   });
 
   test('a refused batch is retried, not silently lost', async () => {
@@ -147,8 +148,70 @@ describe('pingIndexNow', () => {
     // rejection would drop those URLs for good.
     const { binding, store } = kv({ 'indexnow:watermark': '100' });
     const seen: { body?: unknown } = {};
-    const result = await pingIndexNow(env('k123', binding), index, answering(422, seen));
+    const result = await pingIndexNow(env('k123', binding), index, NOW, answering(422, seen));
     assert.equal(readProp(result, 'kind'), 'refused');
     assert.equal(store.get('indexnow:watermark'), '100');
+  });
+});
+
+describe('pingIndexNow backs off', () => {
+  const NOW = 1_800_000_000_000;
+  const index = [compact({ id: 'aaaabbbbcccc', addedAt: 150 })];
+
+  const kv = (seed: Readonly<Record<string, string>>) => {
+    const store = new Map(Object.entries(seed));
+    const binding: KvLike = {
+      // `null` because Cloudflare's KV answers a missing key with it, and the
+      // double has to satisfy the same contract as the real binding.
+      get: async (key) => store.get(key) ?? null,
+      put: async (key, value) => {
+        store.set(key, value);
+      },
+      delete: async (key) => {
+        store.delete(key);
+      },
+      list: async () => ({ keys: [], list_complete: true }),
+    };
+    return { store, binding };
+  };
+
+  const env = (binding: KvLike): Env => ({
+    EVENTS: binding,
+    AI: { run: async () => ({}) },
+    BOT_TOKEN: '',
+    WEBHOOK_SECRET: '',
+    OWNER_CHAT_ID: '',
+    INDEXNOW_KEY: 'k123',
+  });
+
+  const answering = (status: number): FetchFn => async () => new Response('', { status });
+
+  test('202 is acceptance — a key nobody has read yet gets exactly that', async () => {
+    const { binding, store } = kv({ 'indexnow:watermark': '100' });
+    const result = await pingIndexNow(env(binding), index, NOW, answering(202));
+    assert.equal(readProp(result, 'kind'), 'submitted');
+    assert.equal(store.get('indexnow:watermark'), '150');
+  });
+
+  test('a 429 stops the hourly retry that keeps a throttled host throttled', async () => {
+    const { binding, store } = kv({ 'indexnow:watermark': '100' });
+    const result = await pingIndexNow(env(binding), index, NOW, answering(429));
+    assert.equal(readProp(result, 'kind'), 'throttled');
+    assert.equal(Number(store.get('indexnow:retry-after')), NOW + 6 * 60 * 60 * 1000);
+    assert.equal(store.get('indexnow:watermark'), '100');
+  });
+
+  test('while cooling off it does not even ask', async () => {
+    const { binding } = kv({ 'indexnow:watermark': '100', 'indexnow:retry-after': String(NOW + 1000) });
+    const refusing: FetchFn = async () => {
+      throw new Error('should not have been called');
+    };
+    assert.equal(readProp(await pingIndexNow(env(binding), index, NOW, refusing), 'kind'), 'cooling-off');
+  });
+
+  test('once the cooldown has passed it tries again', async () => {
+    const { binding } = kv({ 'indexnow:watermark': '100', 'indexnow:retry-after': String(NOW - 1) });
+    const result = await pingIndexNow(env(binding), index, NOW, answering(200));
+    assert.equal(readProp(result, 'kind'), 'submitted');
   });
 });
