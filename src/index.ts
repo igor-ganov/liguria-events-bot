@@ -3,7 +3,7 @@
  * `fetch()` is the authenticated Telegram webhook; `scheduled()` dispatches
  * the Rome-local hour to collection, reminders and digest pushes.
  */
-import { isOperator } from './config.ts';
+import { channelHourOf, isOperator } from './config.ts';
 import type { Env } from './config.ts';
 import {
   isCategory,
@@ -1043,6 +1043,15 @@ const worker = {
         );
         await writeIndex(env.EVENTS, index);
         return Response.json({ rebuilt: index.length, records: records.length, repaired: repaired.length });
+      }
+      // Post to the channel now instead of waiting for CHANNEL_HOUR. The daily
+      // gate is what keeps the channel to one post; being able to reach it on
+      // demand is what makes it operable — to check a deploy, or to say
+      // something the moment it is worth saying.
+      if (url.searchParams.get('force') === 'channel') {
+        const index = await readIndex(env.EVENTS);
+        const posted = await postDaily(env, index, romeDate(Date.now()), channelHourOf(env));
+        return Response.json({ channel: posted });
       }
       // Backfill multi-source gallery photos onto events merged before the
       // per-source-image era: for each altLink without an image, fetch that

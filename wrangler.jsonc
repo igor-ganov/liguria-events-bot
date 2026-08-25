@@ -30,11 +30,10 @@
     "TG_CHANNELS": "[\"aluhaevents\"]",
     // How many visitgenoa listing pages to fetch per collection run.
     "SOURCE_PAGES": "3",
-    // Public channel the bot broadcasts one event a day to. EMPTY = no
-    // broadcast at all. To switch it on: create the channel, add the bot as an
-    // administrator with "post messages", then put its @username here and
-    // redeploy. Nothing else is needed.
-    "CHANNEL_CHAT_ID": "",
+    // Public channel the bot broadcasts one event a day to (t.me/dovegoit).
+    // EMPTY switches the broadcast off entirely. The bot must be an
+    // administrator of the channel with "post messages".
+    "CHANNEL_CHAT_ID": "@dovegoit",
     // The channel's own language — its readers are in Italy.
     "CHANNEL_LANG": "it",
     // Rome hour the daily post goes out at.
