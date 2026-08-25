@@ -1,4 +1,5 @@
 import { CATEGORY_EMOJI, escapeHtml, formatDateSpan } from '../delivery/render.ts';
+import { leadOf } from './lead-of.ts';
 import { titleOf } from '../domain/event.ts';
 import type { CompactEvent } from '../domain/event.ts';
 import type { Lang } from '../domain/event.ts';
@@ -30,7 +31,7 @@ export const renderPost = (event: CompactEvent, lang: Lang): ChannelPost => {
   const where = [event.v, event.ct].filter((part) => part !== undefined).at(0) ?? '';
   const head = `${emoji} <b>${escapeHtml(titleOf(event, lang))}</b>`;
   const when = `📅 ${escapeHtml(formatDateSpan(event))}${where === '' ? '' : ` · 📍 ${escapeHtml(where)}`}`;
-  const body = escapeHtml(event.d?.[lang] ?? '');
+  const body = escapeHtml(leadOf(event.d?.[lang] ?? ''));
   const url = eventUrl(event.id, lang);
   // The link is part of the caption, so it has to be part of the budget. It
   // was appended after the body had been clipped to fit, and Telegram refused

@@ -8,6 +8,7 @@ import { renderPost } from '../src/channel/render-post.ts';
 import { rememberPosted } from '../src/channel/remember-posted.ts';
 import { postDaily } from '../src/channel/post-daily.ts';
 import { channelPhotoUrl } from '../src/channel/photo-url.ts';
+import { leadOf } from '../src/channel/lead-of.ts';
 import { readProp } from '../src/util/json.ts';
 import type { Env } from '../src/config.ts';
 import type { KvLike } from '../src/pipeline/store.ts';
@@ -239,5 +240,40 @@ describe('channelPhotoUrl', () => {
       channelPhotoUrl('/uploads/ab/cd.jpg'),
       'https://dovego.it/cdn-cgi/image/width=1200,height=630,fit=cover,quality=82,format=jpeg/uploads/ab/cd.jpg',
     );
+  });
+});
+
+describe('leadOf', () => {
+  const article = [
+    'La mostra presenta vent’anni di alta moda.',
+    '',
+    '## [programme] Programma',
+    '- Collezioni dal 2005 al 2025',
+    '',
+    '## [getting-there] Dove si trova',
+    'Armani/Silos, Milano.',
+  ].join('\n');
+
+  test('keeps the lead and drops the article', () => {
+    // The first channel post carried "## [programme] Programma" into a public
+    // feed: Telegram renders no Markdown at all.
+    assert.equal(leadOf(article), 'La mostra presenta vent’anni di alta moda.');
+  });
+
+  test('a description that is only a lead survives whole', () => {
+    assert.equal(leadOf('Un concerto sul mare.'), 'Un concerto sul mare.');
+  });
+
+  test('a lead of several sentences keeps them all, on one line', () => {
+    assert.equal(leadOf('Uno.\nDue.\n\n## [when] Quando\nOggi.'), 'Uno. Due.');
+  });
+
+  test('a description that opens straight into a section has no lead to take', () => {
+    // Degenerate, but it must not put a raw heading in the post.
+    assert.equal(leadOf('## [when] Quando\nOggi.'), '');
+  });
+
+  test('nothing in, nothing out', () => {
+    assert.equal(leadOf(''), '');
   });
 });
