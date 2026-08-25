@@ -3,15 +3,18 @@ import { describe, test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { makeBot, sendLong } from '../src/delivery/bot-api.ts';
 import { parseJson, readProp } from '../src/util/json.ts';
+import type { FetchFn } from '../src/util/http.ts';
 
 type Call = Readonly<{ url: string; body: unknown }>;
 
-const makeCapture = (): Readonly<{ calls: Call[]; fetchFn: (input: string, init?: Readonly<{ body?: string }>) => Promise<Response> }> => {
+// Typed as the real FetchFn rather than a narrower shape of its own, so
+// widening the contract breaks the double instead of drifting from it.
+const makeCapture = (): Readonly<{ calls: Call[]; fetchFn: FetchFn }> => {
   const calls: Call[] = [];
   return {
     calls,
     fetchFn: async (input, init) => {
-      calls.push({ url: input, body: parseJson(init?.body ?? '') });
+      calls.push({ url: input, body: parseJson(String(init?.body ?? '')) });
       return new Response(JSON.stringify({ ok: true, result: { message_id: 42 } }));
     },
   };

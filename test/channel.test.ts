@@ -97,7 +97,9 @@ describe('pickDigest', () => {
 
   test('skips an event enrichment never described, and one with no city', () => {
     const bare = event({ id: 'bare', descriptions: { en: '', it: '', ru: '' } });
-    const nowhere = event({ id: 'nowhere', city: undefined });
+    // A record with no city at all: the key is absent, not undefined.
+    const { city: _city, ...noCity } = base;
+    const nowhere = toCompact({ ...noCity, id: 'nowhere' });
     assert.deepEqual(pickDigest([bare, nowhere], TODAY, []), []);
   });
 
