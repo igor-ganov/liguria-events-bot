@@ -1,5 +1,6 @@
 import { channelHourOf } from '../config.ts';
-import { makeBot } from '../delivery/bot-api.ts';
+import { channelPhotoUrl } from './photo-url.ts';
+import { postPhoto } from './post-photo.ts';
 import { pickPost } from './pick-post.ts';
 import { rememberPosted } from './remember-posted.ts';
 import { renderPost } from './render-post.ts';
@@ -40,8 +41,17 @@ export const postDaily = async (
   const wanted = env.CHANNEL_LANG ?? 'it';
   const lang = isLang(wanted) ? wanted : 'it';
   const post = renderPost(event, lang);
-  const bot = makeBot(env.BOT_TOKEN, chat, fetchFn);
-  const messageId = await bot.sendPhoto(post.photo, `${post.caption}\n\n${post.url}`);
+  const sent = await postPhoto(
+    env.BOT_TOKEN,
+    chat,
+    channelPhotoUrl(post.photo),
+    `${post.caption}\n\n${post.url}`,
+    fetchFn,
+  );
+  // Remember only what was actually said. Recording a failed send as posted
+  // is how the first channel post vanished: the run reported success, the
+  // event was struck off, and the channel stayed empty.
+  if (!sent.ok) return { kind: 'failed', id: event.id, error: sent.error };
   await env.EVENTS.put(POSTED_KEY, JSON.stringify(rememberPosted(posted, event.id, MEMORY)));
-  return { kind: 'posted', id: event.id, messageId };
+  return { kind: 'posted', id: event.id, messageId: sent.messageId };
 };

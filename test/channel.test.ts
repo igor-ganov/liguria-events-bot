@@ -7,6 +7,7 @@ import { pickPost } from '../src/channel/pick-post.ts';
 import { renderPost } from '../src/channel/render-post.ts';
 import { rememberPosted } from '../src/channel/remember-posted.ts';
 import { postDaily } from '../src/channel/post-daily.ts';
+import { channelPhotoUrl } from '../src/channel/photo-url.ts';
 import { readProp } from '../src/util/json.ts';
 import type { Env } from '../src/config.ts';
 import type { KvLike } from '../src/pipeline/store.ts';
@@ -154,7 +155,7 @@ describe('postDaily', () => {
     const sent: Readonly<{ url: string; body: unknown }>[] = [];
     const fetchFn: FetchFn = async (input, init) => {
       sent.push({ url: String(input), body: JSON.parse(String(init?.body ?? '{}')) });
-      return new Response(JSON.stringify({ result: { message_id: 7 } }), { status: 200 });
+      return new Response(JSON.stringify({ ok: true, result: { message_id: 7 } }), { status: 200 });
     };
     const result = await postDaily(env('@dovego', binding), index, today, 10, fetchFn);
     assert.deepEqual(result, { kind: 'posted', id: 'aaaabbbbcccc', messageId: 7 });
@@ -165,8 +166,54 @@ describe('postDaily', () => {
     assert.equal(store.get('channel:posted'), '["aaaabbbbcccc"]');
   });
 
+  test('the picture is served by us, not fetched by Telegram from the source', async () => {
+    // Telegram fetches the URL itself and a source CDN is free to refuse it —
+    // which is exactly how the first real post failed.
+    const { binding } = kv({ 'indexnow-unused': '' });
+    const sent: unknown[] = [];
+    const fetchFn: FetchFn = async (_input, init) => {
+      sent.push(JSON.parse(String(init?.body ?? '{}')));
+      return new Response(JSON.stringify({ ok: true, result: { message_id: 7 } }), { status: 200 });
+    };
+    await postDaily(env('@dovego', binding), index, today, 10, fetchFn);
+    const photo = String(readProp(sent[0], 'photo'));
+    assert.ok(photo.startsWith('https://dovego.it/cdn-cgi/image/'), photo);
+    assert.ok(photo.includes('width=1200,height=630'));
+  });
+
+  test('a refused send is reported and NOT struck off the list', async () => {
+    // The first live post reported success while the channel stayed empty: the
+    // send had failed and the event was recorded as said, so it never came back.
+    const { binding, store } = kv({});
+    const refusing: FetchFn = async () =>
+      new Response(JSON.stringify({ ok: false, description: 'Bad Request: wrong file identifier' }), {
+        status: 400,
+      });
+    const result = await postDaily(env('@dovego', binding), index, today, 10, refusing);
+    assert.equal(readProp(result, 'kind'), 'failed');
+    assert.ok(String(readProp(result, 'error')).includes('wrong file identifier'));
+    assert.equal(store.get('channel:posted'), undefined);
+  });
+
   test('does not repeat itself the next day', async () => {
     const { binding } = kv({ 'channel:posted': '["aaaabbbbcccc"]' });
     assert.deepEqual(await postDaily(env('@dovego', binding), index, today, 10), { kind: 'nothing-to-say' });
+  });
+});
+
+describe('channelPhotoUrl', () => {
+  test('routes a source image through our own crop', () => {
+    const url = channelPhotoUrl('https://s1.ticketm.net/dam/a/1b2/3.jpg');
+    assert.ok(url.startsWith('https://dovego.it/cdn-cgi/image/width=1200,height=630,fit=cover'));
+    assert.ok(url.includes('/img/'));
+    // Path-safe: no slash or plus can survive into a URL path segment.
+    assert.match(url.split('/img/')[1] ?? '', /^[A-Za-z0-9_-]+$/);
+  });
+
+  test('an upload already on our origin needs no proxy hop', () => {
+    assert.equal(
+      channelPhotoUrl('/uploads/ab/cd.jpg'),
+      'https://dovego.it/cdn-cgi/image/width=1200,height=630,fit=cover,quality=82,format=jpeg/uploads/ab/cd.jpg',
+    );
   });
 });
