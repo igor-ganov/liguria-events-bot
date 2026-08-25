@@ -42,6 +42,11 @@ export type GeocodeSummary = Readonly<{
   resolved: number;
   cleared: number;
   missed: number;
+  /** Why the lookups that produced nothing produced nothing, counted by
+   *  reason. A provider that refuses us and a place that genuinely is not in
+   *  OpenStreetMap were indistinguishable — both were simply "missed" — and
+   *  the geocoder resolved nothing at all for weeks without saying so. */
+  reasons?: Readonly<Record<string, number>>;
   durationMs: number;
 }>;
 
@@ -104,6 +109,15 @@ const viewbox = (centre: Point): Record<string, string> => ({
   bounded: '1',
 });
 
+/** Why a lookup came back empty, so the run log can tell a refusal from an
+ *  address nobody has mapped. */
+export const lastGeocodeReasons: { reasons: Record<string, number> } = { reasons: {} };
+
+const note = (reason: string): undefined => {
+  lastGeocodeReasons.reasons[reason] = (lastGeocodeReasons.reasons[reason] ?? 0) + 1;
+  return undefined;
+};
+
 const query = async (
   fetchFn: typeof fetch,
   params: Record<string, string>,
@@ -113,9 +127,11 @@ const query = async (
     const response = await fetchFn(`${ENDPOINT}?${search.toString()}`, {
       headers: { 'user-agent': USER_AGENT },
     });
-    return response.ok ? parsePoint(await response.json()) : undefined;
-  } catch {
-    return undefined;
+    if (!response.ok) return note(`http-${response.status}`);
+    const point = parsePoint(await response.json());
+    return point ?? note('no-match');
+  } catch (error: unknown) {
+    return note(String(error).includes('timeout') ? 'timeout' : 'transport');
   }
 };
 
@@ -222,6 +238,7 @@ const applyPoint = async (
 
 export const runGeocode = async (deps: GeocodeDeps): Promise<GeocodeSummary> => {
   const startedAt = deps.now();
+  lastGeocodeReasons.reasons = {};
   const index = await readIndex(deps.kv);
   const jobs = pendingJobs(index);
   const hadPoint = new Set(index.filter((event) => event.g !== undefined).map((e) => e.id));
@@ -256,6 +273,9 @@ export const runGeocode = async (deps: GeocodeDeps): Promise<GeocodeSummary> => 
     resolved,
     cleared,
     missed,
+    ...(Object.keys(lastGeocodeReasons.reasons).length === 0
+      ? {}
+      : { reasons: { ...lastGeocodeReasons.reasons } }),
     durationMs: deps.now() - startedAt,
   };
 };
