@@ -41,7 +41,10 @@ export type GeocodeSummary = Readonly<{
   pending: number;
   resolved: number;
   cleared: number;
+  /** Tried this run and found nothing. */
   missed: number;
+  /** Skipped: a miss cached from an earlier run, not retried until it expires. */
+  known: number;
   /** Why the lookups that produced nothing produced nothing, counted by
    *  reason. A provider that refuses us and a place that genuinely is not in
    *  OpenStreetMap were indistinguishable — both were simply "missed" — and
@@ -201,13 +204,16 @@ export const pendingJobs = (index: readonly CompactEvent[]): readonly Job[] => {
   return [...byAddress.values()];
 };
 
-const resolveJob = async (deps: GeocodeDeps, job: Job): Promise<Point | undefined> => {
+type Resolution = Readonly<{ point?: Point; cached: boolean }>;
+
+const resolveJob = async (deps: GeocodeDeps, job: Job): Promise<Resolution> => {
   const key = addressKey(job.city, job.address);
-  const cachedValue = await deps.kv.get(key);
+  const cachedValue = (await deps.kv.get(key)) ?? undefined;
   // A miss is cached as '' as well, so an unplaceable venue is not retried on
   // every run for the rest of its life.
-  if (cachedValue !== null) {
-    return cachedValue === '' ? undefined : (JSON.parse(cachedValue) as Point);
+  if (cachedValue !== undefined) {
+    const point = cachedValue === '' ? undefined : (JSON.parse(cachedValue) as Point);
+    return point === undefined ? { cached: true } : { point, cached: true };
   }
   const point = await lookup(deps.fetchFn, job.address, job.city);
   // A hit is cached indefinitely; a MISS only for a week, so an improved lookup
@@ -218,7 +224,7 @@ const resolveJob = async (deps: GeocodeDeps, job: Job): Promise<Point | undefine
     point === undefined ? { expirationTtl: 7 * 24 * 3600 } : undefined,
   );
   await sleep(RATE_MS);
-  return point;
+  return point === undefined ? { cached: false } : { point, cached: false };
 };
 
 /** Write the point onto the record (or erase a wrong one) and return the fresh
@@ -245,16 +251,21 @@ export const runGeocode = async (deps: GeocodeDeps): Promise<GeocodeSummary> => 
   const patched = new Map<string, CompactEvent>();
   let resolved = 0;
   let missed = 0;
+  let known = 0;
 
   for (const job of jobs) {
     if (deps.now() - startedAt > deps.budgetMs) break;
-    const point = await resolveJob(deps, job);
+    const { point, cached } = await resolveJob(deps, job);
     for (const id of job.ids) {
       const next = await applyPoint(deps, id, point);
       if (next !== undefined) patched.set(id, next);
     }
-    if (point === undefined) missed += 1;
-    else resolved += 1;
+    // An address we tried this run and an address we gave up on days ago are
+    // not the same event. Counting them together made a geocoder that had
+    // nothing left to do look like one that could do nothing.
+    if (point !== undefined) resolved += 1;
+    else if (cached) known += 1;
+    else missed += 1;
   }
   // Only a point we actually took away counts as cleared — an event that never
   // had one has not lost anything.
@@ -273,6 +284,7 @@ export const runGeocode = async (deps: GeocodeDeps): Promise<GeocodeSummary> => 
     resolved,
     cleared,
     missed,
+    known,
     ...(Object.keys(lastGeocodeReasons.reasons).length === 0
       ? {}
       : { reasons: { ...lastGeocodeReasons.reasons } }),

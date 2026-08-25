@@ -160,3 +160,48 @@ describe('runGeocode', () => {
     assert.equal(summary.pending, 2);
   });
 });
+
+describe('runGeocode tells a fresh miss from a remembered one', () => {
+  // "missed: 38, resolved: 0" every hour read as a dead geocoder. It was not:
+  // all 38 were misses cached days earlier and never re-asked. A geocoder with
+  // nothing left to do must not look like one that can do nothing.
+  test('an address tried this run and not found counts as missed', async () => {
+    const { kv } = makeKv({
+      [indexKey]: JSON.stringify([event({ id: 'a', a: 'Nowhere at all, Genova' })]),
+      [recordKey('a')]: record('a'),
+    });
+    const fetchFn = async (): Promise<Response> => Response.json([]);
+    const summary = await runGeocode({ kv, fetchFn, now: () => 0, budgetMs: 10_000 });
+    assert.equal(summary.missed, 1);
+    assert.equal(summary.known, 0);
+  });
+
+  test('a miss remembered from an earlier run is known, not missed, and is not re-asked', async () => {
+    const { kv } = makeKv({
+      [indexKey]: JSON.stringify([event({ id: 'a', a: 'Nowhere at all, Genova' })]),
+      [recordKey('a')]: record('a'),
+      'geo5:genova:nowhere at all, genova': '',
+    });
+    const fetchFn = async (): Promise<Response> => {
+      throw new Error('should not have been asked');
+    };
+    const summary = await runGeocode({ kv, fetchFn, now: () => 0, budgetMs: 10_000 });
+    assert.equal(summary.known, 1);
+    assert.equal(summary.missed, 0);
+    assert.equal(summary.resolved, 0);
+  });
+
+  test('a hit remembered from an earlier run still counts as resolved', async () => {
+    const { kv } = makeKv({
+      [indexKey]: JSON.stringify([event({ id: 'a', a: 'Teatro della Tosse, Genova' })]),
+      [recordKey('a')]: record('a'),
+      'geo5:genova:teatro della tosse, genova': JSON.stringify({ lat: 44.41, lng: 8.93 }),
+    });
+    const fetchFn = async (): Promise<Response> => {
+      throw new Error('should not have been asked');
+    };
+    const summary = await runGeocode({ kv, fetchFn, now: () => 0, budgetMs: 10_000 });
+    assert.equal(summary.resolved, 1);
+    assert.equal(summary.known, 0);
+  });
+});
