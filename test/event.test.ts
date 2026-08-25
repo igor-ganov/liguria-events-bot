@@ -15,6 +15,7 @@ import {
   priceFrom,
   withDerivedSpan,
   toCompact,
+  startTime,
 } from '../src/domain/event.ts';
 import type { EventRecord, RawEvent, Session } from '../src/domain/event.ts';
 
@@ -324,5 +325,35 @@ describe('priceFrom', () => {
     assert.equal(paid.pr, 18.5);
     assert.equal(toCompact(record).pr, undefined);
     assert.equal(parseIndex(JSON.stringify([paid]))?.[0]?.pr, 18.5);
+  });
+});
+
+describe('startTime', () => {
+  // Both of these reached the live corpus and then the public channel: 18
+  // Ticketmaster listings printed as starting at midnight, and one event whose
+  // time was the literal word "unknown".
+  test('keeps a real clock time', () => {
+    assert.equal(startTime('21:00'), '21:00');
+    assert.equal(startTime('09:30'), '09:30');
+    assert.equal(startTime('23:59'), '23:59');
+  });
+
+  test('drops midnight — that is a date with no time, not an event at 00:00', () => {
+    assert.equal(startTime('00:00'), undefined);
+  });
+
+  test('drops anything that is not a clock at all', () => {
+    assert.equal(startTime('unknown'), undefined);
+    assert.equal(startTime('ore 21'), undefined);
+    assert.equal(startTime('25:00'), undefined);
+    assert.equal(startTime('9:00'), undefined);
+    assert.equal(startTime(''), undefined);
+    assert.equal(startTime(undefined), undefined);
+  });
+
+  test('the projection carries none of them into the corpus', () => {
+    assert.equal(toCompact({ ...record, time: '00:00' }).h, undefined);
+    assert.equal(toCompact({ ...record, time: 'unknown' }).h, undefined);
+    assert.equal(toCompact({ ...record, time: '21:00' }).h, '21:00');
   });
 });

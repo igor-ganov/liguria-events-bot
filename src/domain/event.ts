@@ -406,6 +406,20 @@ export const venueOf = (venue: string | undefined, address: string | undefined):
   return head === undefined || head === '' || /^gen[oa]va$/i.test(head) ? undefined : head;
 };
 
+const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * A start time the corpus should publish.
+ *
+ * Two things reach the record that are not one. A crawler once wrote the
+ * literal string "unknown", and Ticketmaster gives 00:00 for a listing that
+ * carries only a date — which the channel then prints as an event starting at
+ * midnight. Nobody announces a concert for 00:00; it is what a parser produces
+ * when it has no time, so absent is the honest projection.
+ */
+export const startTime = (time: string | undefined): string | undefined =>
+  time !== undefined && CLOCK.test(time) && time !== '00:00' ? time : undefined;
+
 export const toCompact = (event: EventRecord): CompactEvent => {
   const venue = venueOf(event.venue, event.address);
   const region = regionOf(event.city);
@@ -424,7 +438,7 @@ export const toCompact = (event: EventRecord): CompactEvent => {
   ...(event.lat === undefined || event.lng === undefined
     ? {}
     : { g: coordPair(event.lat, event.lng) }),
-  ...(event.time === undefined ? {} : { h: event.time }),
+  ...[startTime(event.time)].filter((h) => h !== undefined).map((h) => ({ h })).at(0),
   ...(event.durationMin === undefined ? {} : { du: event.durationMin }),
   // Derived at projection time from the price line the crawler already had, so
   // no re-enrichment is needed to fill it in.
