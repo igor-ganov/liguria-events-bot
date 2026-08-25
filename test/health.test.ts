@@ -8,6 +8,7 @@ import {
   httpSemanticsCheck,
   indexNowKeyCheck,
   ogImageCheck,
+  platformFeedCheck,
   robotsCheck,
   sitemapCheck,
 } from '../src/health/site-checks.ts';
@@ -387,5 +388,55 @@ describe('analyticsCheck', () => {
   test('a page without it fails, because a flat dashboard looks like no traffic', async () => {
     const check = await analyticsCheck(serving({ [`${base}/liguria/`]: { body: '<html></html>' } }), base);
     assert.equal(check.status, 'fail');
+  });
+});
+
+describe('platformFeedCheck', () => {
+  const base = 'https://dovego.it';
+  const feed = `${base}/api/events/published.json`;
+  const page = (id: string) => `${base}/event/${id}/`;
+  const indexable = '<html><head><title>x</title></head></html>';
+  const hidden = '<html><head><meta name="robots" content="noindex, nofollow"></head></html>';
+
+  test('an empty feed is an answer, not a failure', async () => {
+    const check = await platformFeedCheck(serving({ [feed]: { body: '[]' } }), base);
+    assert.equal(check.status, 'ok');
+  });
+
+  test('every sampled page indexable is what it wants', async () => {
+    const check = await platformFeedCheck(
+      serving({
+        [feed]: { body: JSON.stringify([{ id: 'aaa' }, { id: 'bbb' }]) },
+        [page('aaa')]: { body: indexable },
+        [page('bbb')]: { body: indexable },
+      }),
+      base,
+    );
+    assert.equal(check.status, 'ok');
+    assert.ok(check.detail.includes('2 sampled'));
+  });
+
+  test('a link-only event in the public feed is caught, and named', async () => {
+    // The one clause between a private invitation and a city feed.
+    const check = await platformFeedCheck(
+      serving({
+        [feed]: { body: JSON.stringify([{ id: 'aaa' }, { id: 'leaked' }]) },
+        [page('aaa')]: { body: indexable },
+        [page('leaked')]: { body: hidden },
+      }),
+      base,
+    );
+    assert.equal(check.status, 'fail');
+    assert.ok(check.detail.includes('leaked'));
+  });
+
+  test('a feed that will not answer is a failure, not an empty pass', async () => {
+    const check = await platformFeedCheck(serving({}), base);
+    assert.equal(check.status, 'fail');
+  });
+
+  test('a body that is not JSON does not throw the whole report', async () => {
+    const check = await platformFeedCheck(serving({ [feed]: { body: '<html>' } }), base);
+    assert.equal(check.status, 'ok');
   });
 });

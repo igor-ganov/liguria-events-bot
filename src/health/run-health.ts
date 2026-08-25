@@ -6,6 +6,7 @@ import {
   httpSemanticsCheck,
   indexNowKeyCheck,
   ogImageCheck,
+  platformFeedCheck,
   pastEventCheck,
   robotsCheck,
   sitemapCheck,
@@ -48,6 +49,7 @@ export const runHealth = async (deps: HealthDeps): Promise<HealthReport> => {
     ogImageCheck(deps.fetchFn, deps.origin, sample),
     indexNowKeyCheck(deps.fetchFn, deps.origin, deps.indexNowKey),
     analyticsCheck(deps.fetchFn, deps.origin),
+    platformFeedCheck(deps.fetchFn, deps.origin),
   ]);
   const checks = [
     ...remote,

@@ -1,6 +1,10 @@
 import { fetchStatus, fetchText } from './fetch-text.ts';
+import { asArray, asNonEmptyString, parseJson, readProp } from '../util/json.ts';
 import type { CheckResult } from './types.ts';
 import type { FetchFn } from '../collectors/types.ts';
+
+/** Enough to catch a leak without crawling the feed. */
+const SAMPLE = 5;
 
 const ok = (id: string, title: string, detail: string): CheckResult => ({ id, title, status: 'ok', detail });
 const bad = (id: string, title: string, detail: string): CheckResult => ({ id, title, status: 'fail', detail });
@@ -148,4 +152,36 @@ export const analyticsCheck = async (fetchFn: FetchFn, origin: string): Promise<
   if (status !== 200) return bad(id, title, `the page answered ${status}`);
   if (!body.includes('data-cf-beacon')) return bad(id, title, 'no beacon on the page — nothing is being counted');
   return ok(id, title, 'the beacon is on the page');
+};
+
+
+/**
+ * The gate between a private invitation and a public listing.
+ *
+ * A user's event reaches the feed through exactly one query, and the clause
+ * keeping a link-only one out of it is a single `AND visibility = 'public'`.
+ * One careless edit there would put somebody's party in a city feed and in
+ * Google, and nothing else would notice.
+ *
+ * Checked from the other side, which is the side that can be seen: every event
+ * the public feed offers must have a page that search engines are allowed to
+ * index. A link-only page declares `noindex`, so one appearing here is the
+ * contradiction worth catching.
+ */
+export const platformFeedCheck = async (fetchFn: FetchFn, origin: string): Promise<CheckResult> => {
+  const id = 'platform-feed';
+  const title = 'Nothing private reached the public feed';
+  const { status, body } = await fetchText(fetchFn, `${origin}/api/events/published.json`);
+  if (status !== 200) return bad(id, title, `the published feed answered ${status}`);
+  const events = asArray(parseJson(body)) ?? [];
+  if (events.length === 0) return ok(id, title, 'nothing published here yet');
+  const ids = events
+    .map((event) => asNonEmptyString(readProp(event, 'id')))
+    .filter((eventId): eventId is string => eventId !== undefined)
+    .slice(0, SAMPLE);
+  const pages = await Promise.all(ids.map((eventId) => fetchText(fetchFn, `${origin}/event/${eventId}/`)));
+  const leaked = ids.filter((_, i) => (pages[i]?.body ?? '').includes('name="robots"'));
+  return leaked.length === 0
+    ? ok(id, title, `${events.length} published, ${ids.length} sampled and all indexable`)
+    : bad(id, title, `these are in the feed but marked noindex: ${leaked.join(', ')}`);
 };
