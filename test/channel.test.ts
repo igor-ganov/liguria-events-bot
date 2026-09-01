@@ -138,7 +138,13 @@ describe('renderDigest', () => {
   });
 
   test('every event is a link to its own page', () => {
-    assert.ok(digest.includes('<a href="https://dovego.it/it/event/aaaabbbbcccc/">'));
+    // The address the page answers at: a bare id would post a link that 301s.
+    assert.ok(
+      digest.includes(
+        '<a href="https://dovego.it/it/event/concerto-di-ferragosto-teatro-carlo-felice-2026-08-25-aaaabbbbcccc/">',
+      ),
+      digest,
+    );
   });
 
   test('says when and where, when the corpus knows', () => {
@@ -163,8 +169,9 @@ describe('renderDigest', () => {
 
 describe('eventUrl', () => {
   test('English at the root, the others under a prefix', () => {
-    assert.equal(eventUrl('abc', 'en'), 'https://dovego.it/event/abc/');
-    assert.equal(eventUrl('abc', 'it'), 'https://dovego.it/it/event/abc/');
+    const event = { id: 'abc', t: 'Festa', s: '2026-08-20' };
+    assert.equal(eventUrl(event, 'en'), 'https://dovego.it/event/festa-2026-08-20-abc/');
+    assert.equal(eventUrl(event, 'it'), 'https://dovego.it/it/event/festa-2026-08-20-abc/');
   });
 });
 
@@ -247,7 +254,7 @@ describe('postDaily', () => {
     const seen: { body?: unknown } = {};
     await postDaily(env('@dovegoit', binding), index, TODAY, 10, accepting(seen));
     const preview = readProp(seen.body, 'link_preview_options');
-    assert.equal(readProp(preview, 'url'), 'https://dovego.it/it/event/id0genova/');
+    assert.equal(readProp(preview, 'url'), 'https://dovego.it/it/event/concerto-di-ferragosto-2026-08-25-id0genova/');
     assert.equal(readProp(preview, 'prefer_large_media'), true);
     assert.equal(readProp(preview, 'show_above_text'), true);
   });

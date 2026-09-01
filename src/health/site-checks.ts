@@ -1,3 +1,4 @@
+import { bad, ok } from './result.ts';
 import { fetchStatus, fetchText } from './fetch-text.ts';
 import { asArray, asNonEmptyString, parseJson, readProp } from '../util/json.ts';
 import type { CheckResult } from './types.ts';
@@ -5,9 +6,6 @@ import type { FetchFn } from '../collectors/types.ts';
 
 /** Enough to catch a leak without crawling the feed. */
 const SAMPLE = 5;
-
-const ok = (id: string, title: string, detail: string): CheckResult => ({ id, title, status: 'ok', detail });
-const bad = (id: string, title: string, detail: string): CheckResult => ({ id, title, status: 'fail', detail });
 
 /** The events sitemap: present, XML, populated, and dated. */
 export const sitemapCheck = async (fetchFn: FetchFn, origin: string): Promise<CheckResult> => {

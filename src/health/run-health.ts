@@ -1,3 +1,4 @@
+import { canonicalAddressCheck } from './canonical-address-check.ts';
 import { corpusChecks } from './corpus-checks.ts';
 import { eventMarkupCheck, hreflangCheck } from './markup-checks.ts';
 import { indexCheck, lastRunCheck } from './pipeline-checks.ts';
@@ -50,6 +51,7 @@ export const runHealth = async (deps: HealthDeps): Promise<HealthReport> => {
     indexNowKeyCheck(deps.fetchFn, deps.origin, deps.indexNowKey),
     analyticsCheck(deps.fetchFn, deps.origin),
     platformFeedCheck(deps.fetchFn, deps.origin),
+    canonicalAddressCheck(deps.fetchFn, deps.origin, deps.index.at(0)),
   ]);
   const checks = [
     ...remote,

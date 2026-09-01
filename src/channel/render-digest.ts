@@ -25,7 +25,7 @@ const detail = (event: CompactEvent): string =>
   [event.h, venueOf(event)].filter((part) => part !== undefined && part !== '').join(' · ');
 
 const line = (lang: Lang) => (event: CompactEvent): string => {
-  const title = `<a href="${eventUrl(event.id, lang)}">${escapeHtml(titleOf(event, lang))}</a>`;
+  const title = `<a href="${eventUrl(event, lang)}">${escapeHtml(titleOf(event, lang))}</a>`;
   const rest = detail(event);
   return `• ${title}${rest === '' ? '' : ` — ${escapeHtml(rest)}`}`;
 };

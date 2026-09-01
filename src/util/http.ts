@@ -9,5 +9,7 @@ export type FetchFn = (
      *  a URL, and it has to go through the same injectable fetch as the rest. */
     body?: string | FormData;
     signal?: AbortSignal;
+    /** 'manual' where a redirect is the answer being measured, not a detour. */
+    redirect?: 'follow' | 'manual';
   }>,
 ) => Promise<Response>;

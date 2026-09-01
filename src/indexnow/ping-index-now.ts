@@ -46,7 +46,7 @@ export const pingIndexNow = async (
   }
   const fresh = newSince(index, Number(stored));
   if (fresh.length === 0) return { kind: 'nothing-new' };
-  const body = indexNowBody(key, fresh.flatMap((event) => eventUrls(event.id)));
+  const body = indexNowBody(key, fresh.flatMap((event) => eventUrls(event)));
   const response = await fetchFn(ENDPOINT, {
     method: 'POST',
     headers: { 'content-type': 'application/json; charset=utf-8' },

@@ -52,7 +52,7 @@ export const postDaily = async (
     env.BOT_TOKEN,
     chat,
     renderDigest(events, lang, today),
-    eventUrl(events[0]?.id ?? '', lang),
+    eventUrl(events[0] ?? { id: '', t: '', s: '' }, lang),
     fetchFn,
   );
   // Remember only what was actually said. Recording a failed send as posted is

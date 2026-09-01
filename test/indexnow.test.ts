@@ -57,10 +57,12 @@ describe('newSince', () => {
 
 describe('eventUrls', () => {
   test('submits every locale the page is actually built in', () => {
-    assert.deepEqual(eventUrls('aaaabbbbcccc'), [
-      'https://dovego.it/event/aaaabbbbcccc/',
-      'https://dovego.it/it/event/aaaabbbbcccc/',
-      'https://dovego.it/ru/event/aaaabbbbcccc/',
+    // The address the page answers at, not a bare id that only redirects to it.
+    const event = { id: 'aaaabbbbcccc', t: 'Concerto in cortile', s: '2026-12-05', v: 'Palazzo Spinola' };
+    assert.deepEqual(eventUrls(event), [
+      'https://dovego.it/event/concerto-in-cortile-palazzo-spinola-2026-12-05-aaaabbbbcccc/',
+      'https://dovego.it/it/event/concerto-in-cortile-palazzo-spinola-2026-12-05-aaaabbbbcccc/',
+      'https://dovego.it/ru/event/concerto-in-cortile-palazzo-spinola-2026-12-05-aaaabbbbcccc/',
     ]);
   });
 });
