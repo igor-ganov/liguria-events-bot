@@ -23,6 +23,10 @@ export type Env = Readonly<{
   CHANNEL_LANG?: string;
   /** Rome hour the daily post goes out at. */
   CHANNEL_HOUR?: string;
+  /** pro-motion collector endpoint and this project's server token. Both
+   *  absent means the bot reports nothing, which is the default. */
+  PM_ENDPOINT?: string;
+  PM_TOKEN?: string;
   /** IndexNow key. The same value must be readable at
    *  https://dovego.it/<key>.txt, which is how the protocol proves ownership.
    *  Empty means no submissions are made. */
