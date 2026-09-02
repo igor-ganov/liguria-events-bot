@@ -73,6 +73,7 @@ import {
 } from './pipeline/windows.ts';
 import { fetchForecast } from './weather/open-meteo.ts';
 import { buildIcs, filterEvents, filterFromQuery, langFromQuery } from './calendar/ics.ts';
+import { track } from './analytics/track.ts';
 import { buildCollectDeps, buildGeocodeDeps, chatOf } from './wire.ts';
 import { runGeocode } from './pipeline/geocode.ts';
 import { CATEGORIES } from './domain/event.ts';
@@ -599,6 +600,13 @@ const handleCallback = async (env: Env, callback: unknown): Promise<void> => {
       callbackId,
       t(nowSaved ? 'saved.added' : 'saved.removed', lang),
     );
+    // Saving is the strongest intent this bot can observe: the user is not
+    // browsing any more, they are planning to go.
+    await track(env, {
+      event: 'save',
+      actor: String(userId),
+      props: { saved: String(nowSaved) },
+    });
     return;
   }
 
@@ -620,6 +628,16 @@ const handleCallback = async (env: Env, callback: unknown): Promise<void> => {
 
 // ───────────────────────────────────────────────────────────── webhook ──
 
+// Commands are the bot's page views: what people ask for is the only record of
+// what they came for. /start is kept as its own event because it is the moment
+// a stranger becomes a user, and a funnel needs that moment named.
+const trackCommand = async (env: Env, chatId: number, text: string): Promise<void> => {
+  const command = text.trim().split(/[\s@]/, 1)[0] ?? '';
+  const actor = String(chatId);
+  await track(env, { event: 'command', actor, props: { command } });
+  if (command === '/start') await track(env, { event: 'start', actor });
+};
+
 const handleUpdate = async (env: Env, update: unknown, origin = ''): Promise<void> => {
   const callback = readProp(update, 'callback_query');
   if (callback !== undefined) {
@@ -638,8 +656,10 @@ const handleUpdate = async (env: Env, update: unknown, origin = ''): Promise<voi
   const lang = uiLanguage(settings, hint);
   if (text.startsWith('/')) {
     await handleCommand(env, chatId, bot, settings, lang, text, origin);
+    await trackCommand(env, chatId, text);
   } else {
     await handleQuestion(env, bot, settings, text);
+    await track(env, { event: 'question', actor: String(chatId) });
   }
 };
 
@@ -807,6 +827,13 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
       await pushReminders(env, userId, index, today).catch(() => undefined);
     }
   }
+  // One line per tick about the pipeline itself: how many people the bot can
+  // reach and how large the catalogue behind it is. Both are numbers nobody
+  // thinks to look at until the day one of them falls.
+  await track(env, {
+    event: 'tick',
+    metrics: { users: userIds.length, indexed: index.length, hour },
+  });
   return { collect, geocode, health, channel, indexNow };
 };
 
