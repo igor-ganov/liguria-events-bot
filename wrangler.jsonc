@@ -22,6 +22,9 @@
   // back if a cron slot frees up and both paths work identically.
 
   "vars": {
+    // pro-motion collector. The token is a secret (wrangler secret put PM_TOKEN);
+    // with either missing the bot reports nothing.
+    "PM_ENDPOINT": "https://pm-collector.igor-ganov.workers.dev/e",
     // Telegram chat id of the operator (may run /collect, sees /status).
     "OWNER_CHAT_ID": "241140119",
     // JSON array of public Telegram channel usernames to also collect from.
