@@ -133,6 +133,46 @@ describe('runCollect', () => {
     assert.equal(index[0]?.x, true);
   });
 
+  test('two sites, one night out: merged without asking the judge', async () => {
+    // Both of these sat in the Liguria feed on 2026-09-10 as separate cards.
+    // They had been going to the judge for months and coming back "different",
+    // so the merge is no longer the model's to refuse: same town, same day,
+    // same minute, one title inside the other.
+    const kv = makeKvStub();
+    const visitgenoa = rawEvent({
+      title: 'Quasi notte bianca 2026',
+      startDate: '2026-09-12',
+      time: '18:00',
+      city: 'genova',
+      venue: 'Luoghi vari in città',
+      url: 'https://www.visitgenoa.it/en/node/27382',
+    });
+    const mentelocale = rawEvent({
+      title: 'Quasi Notte Bianca a Genova 2026 con musica, artisti di strada e street food',
+      startDate: '2026-09-12',
+      time: '18:00',
+      city: 'genova',
+      venue: 'Piazza delle Erbe',
+      url: 'https://www.mentelocale.it/genova/136209.htm',
+      source: 'mentelocale',
+    });
+    let asked = 0;
+    const summary = await runCollect({
+      ...makeDeps(kv, [okCollector([visitgenoa, mentelocale])]),
+      judgeSameEvent: async (pairs) => {
+        asked += pairs.length;
+        return [];
+      },
+    });
+    const index = await readIndex(kv);
+    assert.equal(index.length, 1);
+    assert.equal(asked, 0);
+    assert.deepEqual(index[0]?.l, [
+      { source: 'mentelocale', url: 'https://www.mentelocale.it/genova/136209.htm' },
+    ]);
+    if (summary.kind === 'done') assert.equal(summary.entry.fuzzyMerged, 1);
+  });
+
   test('fuzzy dedupe: LLM-confirmed pair merges, duplicate record dies (AC-1.9)', async () => {
     const kv = makeKvStub();
     const a = rawEvent({

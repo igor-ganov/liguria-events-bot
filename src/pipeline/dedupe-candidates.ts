@@ -51,6 +51,33 @@ const STOPWORDS = new Set([
   'biglietti',
   'notte',
   'danza',
+  // What a listing does, not which listing it is. A museum runs "Visita con
+  // Degustazione" and "Visita della Poesia" on one afternoon: they share
+  // "visita" and nothing else, and that one word scored them a perfect title
+  // match and filled the whole candidate cap with pairs of different tours.
+  'visita',
+  'visite',
+  'visitare',
+  'guidata',
+  'guidate',
+  'escursione',
+  'escursioni',
+  'passeggiata',
+  'itinerario',
+  'laboratorio',
+  'laboratori',
+  'aperitivo',
+  'aperitivi',
+  'incontro',
+  'incontri',
+  'presentazione',
+  'proiezione',
+  'esposizione',
+  'inaugurazione',
+  'bambini',
+  'famiglie',
+  'gratuito',
+  'gratuita',
   // venue words that travel inside titles
   'porto',
   'antico',
@@ -98,6 +125,22 @@ const contained = (a: ReadonlySet<string>, b: ReadonlySet<string>): boolean => {
   return small.size > 0 && [...small].every((token) => big.has(token));
 };
 
+/** Artwork identity, without the cache-buster the sources hang off it. */
+const artwork = (event: CompactEvent): string => (event.img ?? '').split('?')[0] ?? '';
+
+/**
+ * One photo, one town.
+ *
+ * A programme published as separate listings — a flag-raising, a blessing, the
+ * fireworks — shares no word between its titles, so nothing but the picture
+ * says they are one festival. Across towns the same picture means a tour, so
+ * the town has to match too. Where a venue reuses one poster for its whole
+ * season, dropSharedArtwork has already stripped all but the earliest, and
+ * this sees nothing.
+ */
+const samePoster = (a: CompactEvent, b: CompactEvent): boolean =>
+  artwork(a) !== '' && artwork(a) === artwork(b) && a.ct !== undefined && a.ct === b.ct;
+
 /**
  * Likelihood ranking: title similarity dominates, identical dates and a
  * shared venue reinforce. Long-running events overlap everything by date, so
@@ -111,7 +154,8 @@ export const pairScore = (a: CompactEvent, b: CompactEvent): number => {
     Number(a.s === b.s) * 2 +
     Number((a.e ?? a.s) === (b.e ?? b.s)) +
     Number(sameVenue(a, b)) +
-    Number(contained(ta, tb)) * 2
+    Number(contained(ta, tb)) * 2 +
+    Number(samePoster(a, b)) * 2
   );
 };
 
@@ -129,6 +173,54 @@ const sharesTitleToken = (a: ReadonlySet<string>, b: ReadonlySet<string>): boole
   [...a].some((token) => b.has(token));
 
 export type CandidatePair = Readonly<{ a: CompactEvent; b: CompactEvent; score: number }>;
+
+/** The words a place puts into a title. Castello D'Albertis runs a dozen
+ *  unrelated things and its name is in every one of their titles: shared with
+ *  the venue, a word says where, not what. */
+const placeWords = (event: CompactEvent): ReadonlySet<string> =>
+  new Set(
+    normalizeTitle(`${event.v ?? ''} ${event.ct ?? ''}`)
+      .split(' ')
+      .filter((word) => word.length >= 5),
+  );
+
+/** What a title says beyond where it happens. */
+const distinctive = (event: CompactEvent, place: ReadonlySet<string>): ReadonlySet<string> =>
+  new Set([...significantTokens(event.t)].filter((token) => !place.has(token)));
+
+/** Two shared words, because one is a coincidence: "aperitivo" is on four
+ *  listings a night in Genova. */
+const NAMED = 2;
+
+const sameHappening = (a: CompactEvent, b: CompactEvent): boolean => {
+  const place = new Set([...placeWords(a), ...placeWords(b)]);
+  const ta = distinctive(a, place);
+  const tb = distinctive(b, place);
+  const [small, big] = ta.size <= tb.size ? [ta, tb] : [tb, ta];
+  const shared = [...small].filter((token) => big.has(token));
+  return shared.length >= NAMED && shared.length === small.size;
+};
+
+/**
+ * Pairs certain enough to merge without asking anything.
+ *
+ * Same town, same day, same minute, and one title's own words entirely inside
+ * the other's: nothing else runs at that address at that minute under that
+ * name. The judge was asked about exactly these pairs for months and kept
+ * answering "different" — on a prompt that was never shown the hour or the
+ * city — so the reader got two cards for one night out. A model's caution is
+ * not a rule; this is a rule.
+ */
+export const certainDuplicates = (index: readonly CompactEvent[]): readonly CandidatePair[] =>
+  index.flatMap((a, i) =>
+    index
+      .slice(i + 1)
+      .filter((b) => a.ct !== undefined && a.ct === b.ct)
+      .filter((b) => a.s === b.s && a.h !== undefined && a.h === b.h)
+      .filter((b) => !alreadyLinked(a, b))
+      .filter((b) => sameHappening(a, b))
+      .map((b) => ({ a, b, score: Number.POSITIVE_INFINITY })),
+  );
 
 /**
  * Two index entries sharing a url ARE the same event with certainty — a
@@ -154,7 +246,7 @@ export const dedupeCandidates = (
     .flatMap((a, i) =>
       index
         .slice(i + 1)
-        .filter((b) => overlaps(a, b) && shares(a, b) && !alreadyLinked(a, b))
+        .filter((b) => overlaps(a, b) && (shares(a, b) || samePoster(a, b)) && !alreadyLinked(a, b))
         .map((b) => ({ a, b, score: pairScore(a, b) })),
     )
     .filter((pair) => pair.score >= THRESHOLD)

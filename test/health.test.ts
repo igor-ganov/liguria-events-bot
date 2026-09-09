@@ -80,6 +80,33 @@ describe('corpusChecks', () => {
     assert.equal(statusOf(corpusChecks([compact()]), 'description-cjk'), 'ok');
   });
 
+  test('one happening standing in the feed as two cards is caught', () => {
+    // What the reader sees is the only thing that counts, and they saw two
+    // cards for one night out. The merge is meant to have taken care of it
+    // before the index is served, so anything left here is a broken merge, not
+    // a hard case.
+    const twice = [
+      compact({
+        id: 'aaaabbbbcccc',
+        title: 'Quasi notte bianca 2026',
+        startDate: '2026-09-12',
+        time: '18:00',
+        city: 'genova',
+        url: 'https://www.visitgenoa.it/en/node/27382',
+      }),
+      compact({
+        id: 'ddddeeeeffff',
+        title: 'Quasi Notte Bianca a Genova 2026 con musica e street food',
+        startDate: '2026-09-12',
+        time: '18:00',
+        city: 'genova',
+        url: 'https://www.mentelocale.it/genova/136209.htm',
+      }),
+    ];
+    assert.equal(statusOf(corpusChecks(twice), 'feed-duplicates'), 'fail');
+    assert.equal(statusOf(corpusChecks([twice[0]!]), 'feed-duplicates'), 'ok');
+  });
+
   test('an event with nothing written about it is caught', () => {
     const empty = compact({ descriptions: { en: '', it: '', ru: '' } });
     assert.equal(statusOf(corpusChecks([empty]), 'description-present'), 'fail');

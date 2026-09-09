@@ -1,7 +1,11 @@
 // AC-1.9 — fuzzy cross-source dedupe: candidates, judge parsing, record merge.
 import { describe, test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { dedupeCandidates, significantTokens } from '../src/pipeline/dedupe-candidates.ts';
+import {
+  certainDuplicates,
+  dedupeCandidates,
+  significantTokens,
+} from '../src/pipeline/dedupe-candidates.ts';
 import { makeJudgeSameEvent } from '../src/llm/same-event.ts';
 import { mergeDuplicates } from '../src/domain/merge-duplicates.ts';
 import type { ChatFn } from '../src/llm/client.ts';
@@ -44,6 +48,34 @@ describe('significantTokens', () => {
   });
 });
 
+describe('the vocabulary a listing shares with every other listing', () => {
+  // A museum in Prato runs "Visita con Degustazione" and "Visita della Poesia"
+  // on the same afternoon. They shared one word — "visita" — and that word was
+  // the whole of both titles once the rest was filtered, which scored them 8.0
+  // and put eight such pairs at the top of a 60-pair cap. The real
+  // cross-source duplicates never got a judge call at all.
+  test('a guided tour is not a name', () => {
+    assert.deepEqual([...significantTokens('Visita con Degustazione')], []);
+    assert.deepEqual([...significantTokens('Visita guidata al Castello')].sort(), ['castello']);
+    assert.deepEqual([...significantTokens('Laboratorio per bambini')], []);
+    assert.deepEqual([...significantTokens('Aperitivo in mostra')], []);
+  });
+
+  test('what makes a listing itself survives', () => {
+    assert.deepEqual([...significantTokens('Aperitivo in mostra "Mimmo Rotella 1945-2005"')].sort(), [
+      'mimmo',
+      'rotella',
+    ]);
+  });
+
+  test('two tours of one museum on one afternoon are not a pair', () => {
+    const tour = (id: string, t: string) =>
+      compact({ id, t, s: '2026-09-12', h: '16:00', ct: 'prato', v: 'Museo Pecci', u: `https://x/${id}` });
+    assert.deepEqual(dedupeCandidates([tour('t1', 'Visita con Degustazione'), tour('t2', 'Visita della Poesia')]), []);
+    assert.deepEqual(certainDuplicates([tour('t1', 'Visita con Degustazione'), tour('t2', 'Visita della Poesia')]), []);
+  });
+});
+
 describe('dedupeCandidates', () => {
   test('pairs overlapping events sharing a significant token, skips unrelated', () => {
     const pairs = dedupeCandidates([fuoriA, fuoriB, unrelated]);
@@ -71,9 +103,126 @@ describe('dedupeCandidates', () => {
     const v2 = compact({ id: 'v2', t: 'Tosca', s: '2026-07-05', u: 'https://y/2', v: 'Teatro Carlo Felice' });
     assert.deepEqual(dedupeCandidates([v1, v2]), []);
   });
+  // What the reader photographed on 2026-09-07: four cards for the Sagra del
+  // Fuoco di Recco — a flag-raising, a blessing, a vespers and the fireworks —
+  // under one photo, one body of text and one day. The titles of a programme
+  // share no word with each other, so the pre-filter could not see them at
+  // all, and nothing was ever asked about them.
+  test('one poster, one town, one day: a programme is at least worth asking about', () => {
+    const poster = 'https://www.mentelocale.it/repository/contenuti/horizontal/131_half.jpg?rand=99';
+    const row = (id: string, t: string, h: string) =>
+      compact({ id, t, s: '2026-09-07', h, ct: 'genova', img: poster, u: `https://x/${id}` });
+    const pairs = dedupeCandidates([
+      row('p1', 'Alzabandiera del Comitato e dei sette Quartieri', '21:00'),
+      row('p2', 'Benedizione dei bambini e omaggio floreale alla Madonna', '10:00'),
+    ]);
+    assert.equal(pairs.length, 1);
+  });
+
+  test('a tour poster in another town is a different night', () => {
+    // Gianni Morandi plays ten cities off one press photo. Same image, and
+    // nothing else the same.
+    const poster = 'https://ticketmaster/x_TABLET_LANDSCAPE_LARGE_16_9.jpg';
+    const rimini = compact({ id: 't1', t: 'Gianni Morandi', s: '2026-09-10', ct: 'rimini', img: poster, u: 'https://x/1' });
+    const brindisi = compact({ id: 't2', t: 'Gianni Morandi', s: '2026-09-12', ct: 'brindisi', img: poster, u: 'https://x/2' });
+    assert.deepEqual(dedupeCandidates([rimini, brindisi]), []);
+  });
+
   test('caps the output', () => {
     assert.equal(dedupeCandidates([fuoriA, fuoriB], 0).length, 0);
     assert.equal(dedupeCandidates([fuoriA, fuoriB]).length, 1);
+  });
+});
+
+// Every record below was read out of the live corpus on 2026-09-10, where all
+// four sat in the Liguria feed as separate cards.
+describe('certainDuplicates', () => {
+  const quasiVisit = compact({
+    id: 'q1',
+    t: 'Quasi notte bianca 2026',
+    s: '2026-09-12',
+    h: '18:00',
+    ct: 'genova',
+    v: 'Luoghi vari in città',
+    u: 'https://www.visitgenoa.it/en/node/27382',
+  });
+  const quasiMente = compact({
+    id: 'q2',
+    t: 'Quasi Notte Bianca a Genova 2026 con musica, artisti di strada e street food',
+    s: '2026-09-12',
+    h: '18:00',
+    ct: 'genova',
+    v: 'Piazza delle Erbe',
+    u: 'https://www.mentelocale.it/genova/136209-quasi-notte-bianca-a-genova-2026.htm',
+  });
+  const rotellaMente = compact({
+    id: 'r1',
+    t: 'Aperitivo e dj set con visita guidata alla mostra su Mimmo Rotella',
+    s: '2026-09-09',
+    h: '18:30',
+    ct: 'genova',
+    v: 'Palazzo Ducale',
+    u: 'https://www.mentelocale.it/genova/136187-aperitivo-e-dj-set.htm',
+  });
+  const rotellaDucale = compact({
+    id: 'r2',
+    t: 'Aperitivo in mostra "Mimmo Rotella 1945-2005"',
+    s: '2026-09-09',
+    h: '18:30',
+    ct: 'genova',
+    u: 'https://palazzoducale.genova.it/evento/aperitivo-in-mostra-mimmo-rotella-1945-2005/',
+  });
+
+  test('one happening listed by two sites at the same hour needs no judge', () => {
+    // Both pairs reached the judge for months and both came back "different" —
+    // on a prompt that was shown neither the hour nor the city. A model's
+    // caution is not a rule, and this is the rule: same town, same day, same
+    // minute, one title inside the other.
+    const pairs = certainDuplicates([quasiVisit, quasiMente, rotellaMente, rotellaDucale]);
+    assert.deepEqual(
+      pairs.map((pair) => [pair.a.id, pair.b.id]),
+      [
+        ['q1', 'q2'],
+        ['r1', 'r2'],
+      ],
+    );
+  });
+
+  test('a venue named in both titles is the venue talking, not the event', () => {
+    // Castello D'Albertis runs a dozen unrelated things; its name inside both
+    // titles is the only thing they share, and merging on it would delete a
+    // real event.
+    const secret = compact({
+      id: 'c1',
+      t: "I passaggi segreti di Castello D'Albertis",
+      s: '2026-09-12',
+      h: '18:00',
+      ct: 'genova',
+      v: "Castello D'Albertis",
+      u: 'https://x/1',
+    });
+    const yoga = compact({
+      id: 'c2',
+      t: "Yoga d'estate a Castello D'Albertis",
+      s: '2026-09-12',
+      h: '18:00',
+      ct: 'genova',
+      v: "Castello D'Albertis",
+      u: 'https://y/2',
+    });
+    assert.deepEqual(certainDuplicates([secret, yoga]), []);
+  });
+
+  test('the same name on another day is another occurrence', () => {
+    const later = { ...quasiMente, id: 'q3', s: '2026-09-13' };
+    assert.deepEqual(certainDuplicates([quasiVisit, later]), []);
+  });
+
+  test('an unstated hour is not a match', () => {
+    // Two listings that both omit the time say nothing about each other.
+    const { h: _a, ...visitNoHour } = quasiVisit;
+    const { h: _b, ...menteNoHour } = quasiMente;
+    assert.deepEqual(certainDuplicates([visitNoHour, menteNoHour]), []);
   });
 });
 
@@ -88,6 +237,45 @@ describe('makeJudgeSameEvent', () => {
     assert.equal(confirmed.length, 1);
     assert.equal(confirmed[0]?.b.id, 'b');
   });
+  test('the judge is shown what makes a duplicate obvious', async () => {
+    // It used to be handed a title, a date range and a venue. Two sites
+    // describing one night out differ in exactly those three and agree on
+    // everything it was never shown: the hour, the town, the photo and the
+    // opening line of the text.
+    const sent: string[] = [];
+    const chat: ChatFn = async (_system, user) => {
+      sent.push(user);
+      return JSON.stringify({ pairs: [] });
+    };
+    const a = compact({
+      id: 'j1',
+      t: 'Quasi notte bianca 2026',
+      s: '2026-09-12',
+      h: '18:00',
+      ct: 'genova',
+      u: 'https://www.visitgenoa.it/en/node/27382',
+      img: 'https://visitgenoa/poster.jpg',
+      d: { en: 'The Quasi Notte Bianca event returns for its second edition.', it: '', ru: '' },
+    });
+    const b = compact({
+      id: 'j2',
+      t: 'Quasi Notte Bianca a Genova 2026 con musica',
+      s: '2026-09-12',
+      h: '18:00',
+      ct: 'genova',
+      u: 'https://www.mentelocale.it/genova/136209.htm',
+      img: 'https://visitgenoa/poster.jpg',
+      d: { en: 'The Quasi Notte Bianca event returns to Genova for its second edition.', it: '', ru: '' },
+    });
+    await makeJudgeSameEvent(chat)([{ a, b, score: 6 }]);
+    const payload = sent.join('');
+    assert.match(payload, /18:00/);
+    assert.match(payload, /genova/);
+    assert.match(payload, /second edition/);
+    assert.match(payload, /"poster":\s*"same"/);
+    assert.match(payload, /visitgenoa\.it/);
+  });
+
   test('a failing chat confirms nothing (conservative)', async () => {
     const chat: ChatFn = async () => {
       throw new Error('down');

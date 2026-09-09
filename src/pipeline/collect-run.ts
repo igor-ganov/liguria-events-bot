@@ -18,7 +18,7 @@ import { mergeDuplicates, orderByAge } from '../domain/merge-duplicates.ts';
 import type { Collector, FetchFn, RawPost } from '../collectors/types.ts';
 import { ENRICH_VERSION, lastEnrichFailures } from '../llm/enrich.ts';
 import type { Enrichment, PendingEnrich } from '../llm/enrich.ts';
-import { dedupeCandidates, urlDuplicates } from './dedupe-candidates.ts';
+import { certainDuplicates, dedupeCandidates, urlDuplicates } from './dedupe-candidates.ts';
 import { dropSharedArtwork } from './shared-artwork.ts';
 import type { CandidatePair } from './dedupe-candidates.ts';
 import {
@@ -209,13 +209,17 @@ const mergeFuzzyDuplicates = async (
 ): Promise<FuzzyOutcome> => {
   const dropped = new Set<string>();
   const replacements = new Map<string, CompactEvent>();
+  // Two kinds need no judge: a shared url (the same record's alias) and the
+  // same name, town, day and minute. Asking about those wasted a call and,
+  // for months, got the wrong answer back.
+  const certain = [...urlDuplicates(index), ...certainDuplicates(index)];
+  const settled = new Set(certain.flatMap((pair) => [pair.a.id, pair.b.id]));
   const candidates = dedupeCandidates(index).filter(
-    (pair) => !dropped.has(pair.a.id) && !dropped.has(pair.b.id),
+    (pair) => !settled.has(pair.a.id) && !settled.has(pair.b.id),
   );
   const judged =
     candidates.length === 0 ? [] : await deps.judgeSameEvent(candidates).catch(() => []);
-  // Shared-url pairs are certain duplicates — no judge needed.
-  const confirmed = [...urlDuplicates(index), ...judged];
+  const confirmed = [...certain, ...judged];
   for (const pair of confirmed) {
     if (dropped.has(pair.a.id) || dropped.has(pair.b.id)) continue;
     const recordA = await readEventRecord(deps.kv, pair.a.id);

@@ -1,3 +1,4 @@
+import { certainDuplicates } from '../pipeline/dedupe-candidates.ts';
 import { hasCjk } from '../domain/event.ts';
 import type { CheckResult } from './types.ts';
 import type { CompactEvent } from '../domain/event.ts';
@@ -40,6 +41,12 @@ export const corpusChecks = (index: readonly CompactEvent[]): readonly CheckResu
         })
         .map((event) => event.id),
       'events with a repeated session',
+    ),
+    verdict(
+      'feed-duplicates',
+      'One happening is one card',
+      certainDuplicates(index).map((pair) => `${pair.a.id}+${pair.b.id}`),
+      'pairs left in the feed that are the same event',
     ),
     verdict(
       'description-cjk',
