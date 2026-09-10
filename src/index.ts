@@ -44,6 +44,7 @@ import { dueReminders, readSaved, toggleSaved, writeSaved } from './pipeline/sav
 import {
   digestDueWindow,
   readSettings,
+  settingsStored,
   toggleCategory,
   uiLanguage,
   writeSettings,
@@ -273,7 +274,7 @@ const listCommand = async (
 ): Promise<void> => {
   const index = eventsInPlace(await readIndex(env.EVENTS), place);
   const today = romeDate(Date.now());
-  await sendLong(bot, renderList(headerKey, select(index, today), lang));
+  await sendLong(bot, renderList(headerKey, select(index, today), lang, place === '' ? '' : placeLabel(place, lang)));
 };
 
 const planCommand = async (
@@ -353,6 +354,18 @@ const handleCommand = async (
   const command = text.trim().split(/[\s@]/, 1)[0] ?? '';
   switch (command) {
     case '/start':
+      await bot.sendMessage(t('help.text', lang));
+      // A first visit ends on the one question the bot cannot guess and every
+      // list depends on. Skipped for somebody who has already answered it:
+      // asking again would read as the bot having forgotten them.
+      await Promise.all(
+        [await settingsStored(env.EVENTS, userId)]
+          .filter((answered) => !answered)
+          .map(() =>
+            bot.sendMessage(t('start.where', lang), { keyboard: regionKeyboard(lang, BACK) }),
+          ),
+      );
+      return;
     case '/help':
       await bot.sendMessage(t('help.text', lang));
       return;

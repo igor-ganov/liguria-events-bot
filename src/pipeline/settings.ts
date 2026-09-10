@@ -66,6 +66,12 @@ export const readSettings = async (kv: KvLike, userId: number): Promise<Settings
   return raw === null ? DEFAULT_SETTINGS : parseSettings(raw);
 };
 
+/** Whether this person has ever answered anything. "Everywhere" is a real
+ *  answer and looks identical to never having been asked, so a first-run
+ *  question has to read the record rather than the value. */
+export const settingsStored = async (kv: KvLike, userId: number): Promise<boolean> =>
+  (await kv.get(settingsKey(userId))) !== null;
+
 export const writeSettings = async (
   kv: KvLike,
   userId: number,

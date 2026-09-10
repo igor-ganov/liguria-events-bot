@@ -182,8 +182,10 @@ describe('update routing', () => {
     } finally {
       capture.restore();
     }
+    // Two messages on a first run: the help, and the one question every list
+    // depends on — see 'the first /start' below.
     const messages = capture.sent.filter((call) => call.url.includes('sendMessage'));
-    assert.equal(messages.length, 1);
+    assert.equal(messages.length, 2);
     assert.ok(messages[0]?.text.includes('/today'));
     assert.equal(await env.EVENTS.get('user:5:chat'), '5');
   });
@@ -302,5 +304,37 @@ describe('the place setting (US-7)', () => {
     assert.equal(readProp(parseJson((await env.EVENTS.get('user:5:settings')) ?? ''), 'place'), 'city:genova');
     const edits = capture.sent.filter((call) => call.url.includes('editMessageText'));
     assert.ok(edits.at(-1)?.text.includes('Liguria'), edits.at(-1)?.text);
+  });
+});
+
+describe('the first /start', () => {
+  const start = { message: { chat: { id: 5 }, from: { id: 5 }, text: '/start' } };
+
+  test('asks where the reader is, once', async () => {
+    const env = makeEnv();
+    const first = captureTelegram();
+    try {
+      await handleUpdate(env, start);
+    } finally {
+      first.restore();
+    }
+    const asked = first.sent.filter((call) => call.url.includes('sendMessage'));
+    assert.equal(asked.length, 2);
+    assert.ok(asked[1]?.text.includes('/settings'), asked[1]?.text);
+  });
+
+  test('and never again, even for somebody who answered "everywhere"', async () => {
+    // "All of Italy" is a real answer and is stored as an empty place, which
+    // is what an unanswered question looks like. Asking again would read as
+    // the bot having forgotten them.
+    const env = makeEnv();
+    await env.EVENTS.put('user:5:settings', JSON.stringify({ place: '' }));
+    const again = captureTelegram();
+    try {
+      await handleUpdate(env, start);
+    } finally {
+      again.restore();
+    }
+    assert.equal(again.sent.filter((call) => call.url.includes('sendMessage')).length, 1);
   });
 });

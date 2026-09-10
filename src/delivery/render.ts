@@ -67,14 +67,19 @@ export const renderGrouped = (events: readonly CompactEvent[], lang: Language): 
         ];
   }).join('\n\n');
 
+/** `where` is the reader's place, already spelled: it goes on the END of the
+ *  heading rather than inside it. "Today in <city>" needs the city in a
+ *  grammatical case in two of our three languages, and each city would decline
+ *  differently; " · Genova" needs no case at all. */
 export const renderList = (
   headerKey: TranslationKey,
   events: readonly CompactEvent[],
   lang: Language,
+  where = '',
 ): string =>
   events.length === 0
     ? t('empty.window', lang)
-    : `<b>${t(headerKey, lang)}</b>\n\n${renderGrouped(events, lang)}`;
+    : `<b>${t(headerKey, lang, { where: where === '' ? '' : ` · ${where}` })}</b>\n\n${renderGrouped(events, lang)}`;
 
 /** Rich single-event card (AC-6.1). */
 export const renderCard = (event: EventRecord, lang: Language): string => {
