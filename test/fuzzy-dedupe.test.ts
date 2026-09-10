@@ -48,6 +48,41 @@ describe('significantTokens', () => {
   });
 });
 
+describe('a word that half the city uses is not a name', () => {
+  // Measured on the live corpus: of 172 pairs above the threshold, the top of
+  // the list was "MILANO CUP" against "TORNEI CLUB MILANO", ten JAZZMI
+  // concerts against each other, and every event at Castello D'Albertis
+  // against every other. What they share is a town, a season and a venue —
+  // words that appear in dozens of titles and name none of them.
+  const many = (n: number, make: (index: number) => string) =>
+    Array.from({ length: n }, (_, index) =>
+      compact({
+        id: `m${index}`,
+        t: make(index),
+        s: '2026-11-08',
+        ct: 'milano',
+        u: `https://x/m${index}`,
+      }),
+    );
+
+  test('a festival brand on twenty concerts stops counting as evidence', () => {
+    const nights = many(20, (index) => `Concerto ${index} | JAZZMI 2026`);
+    assert.deepEqual(dedupeCandidates(nights), []);
+  });
+
+  test('a word two events share is still evidence', () => {
+    // The same shape, but the word is theirs: two sources on one sagra.
+    const pair = [
+      ...many(18, (index) => `Concerto ${index} | JAZZMI 2026`),
+      compact({ id: 'f1', t: 'Sagra del Fagiolo a Lamon', s: '2026-11-08', ct: 'belluno', u: 'https://x/f1' }),
+      compact({ id: 'f2', t: 'A Tavola nel Feltrino: il Fagiolo', s: '2026-11-08', ct: 'belluno', u: 'https://x/f2' }),
+    ];
+    const found = dedupeCandidates(pair);
+    assert.equal(found.length, 1);
+    assert.deepEqual([found[0]?.a.id, found[0]?.b.id], ['f1', 'f2']);
+  });
+});
+
 describe('the vocabulary a listing shares with every other listing', () => {
   // A museum in Prato runs "Visita con Degustazione" and "Visita della Poesia"
   // on the same afternoon. They shared one word — "visita" — and that word was
@@ -126,6 +161,22 @@ describe('dedupeCandidates', () => {
     const rimini = compact({ id: 't1', t: 'Gianni Morandi', s: '2026-09-10', ct: 'rimini', img: poster, u: 'https://x/1' });
     const brindisi = compact({ id: 't2', t: 'Gianni Morandi', s: '2026-09-12', ct: 'brindisi', img: poster, u: 'https://x/2' });
     assert.deepEqual(dedupeCandidates([rimini, brindisi]), []);
+  });
+
+  test('two towns are two events, however alike the names', () => {
+    // Oktoberfest is held in Genova and in Padova on the same weekend, and a
+    // tour plays a different town every night. One happening does not move.
+    const beer = (id: string, ct: string) =>
+      compact({ id, t: `Oktoberfest ${ct}`, s: '2026-09-19', ct, u: `https://x/${id}` });
+    assert.deepEqual(dedupeCandidates([beer('o1', 'genova'), beer('o2', 'padova')]), []);
+  });
+
+  test('but a missing town does not block a pair', () => {
+    // The geocoder does not place everything, and our gap must not become a
+    // reason to keep two listings of one evening apart.
+    const placed = compact({ id: 'p1', t: 'Oktoberfest Genova 2026', s: '2026-09-19', ct: 'genova', u: 'https://x/p1' });
+    const { ct: _ct, ...unplaced } = compact({ id: 'p2', t: 'Oktoberfest a Genova', s: '2026-09-19', ct: 'genova', u: 'https://x/p2' });
+    assert.equal(dedupeCandidates([placed, unplaced]).length, 1);
   });
 
   test('caps the output', () => {

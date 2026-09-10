@@ -98,6 +98,13 @@ export const significantTokens = (title: string): ReadonlySet<string> =>
 const overlaps = (a: CompactEvent, b: CompactEvent): boolean =>
   a.s <= (b.e ?? b.s) && b.s <= (a.e ?? a.s);
 
+/** One happening does not move: an Oktoberfest in Genova and one in Padova on
+ *  the same weekend are two, and so is a tour on consecutive nights. A town we
+ *  failed to work out is not evidence of anything, so an unplaced event still
+ *  pairs — our own gap must not keep two listings of one evening apart. */
+const twoTowns = (a: CompactEvent, b: CompactEvent): boolean =>
+  a.ct !== undefined && b.ct !== undefined && a.ct !== b.ct;
+
 const jaccard = (a: ReadonlySet<string>, b: ReadonlySet<string>): number => {
   const shared = [...a].filter((token) => b.has(token)).length;
   const union = new Set([...a, ...b]).size;
@@ -146,9 +153,14 @@ const samePoster = (a: CompactEvent, b: CompactEvent): boolean =>
  * shared venue reinforce. Long-running events overlap everything by date, so
  * date terms alone can never reach the threshold.
  */
-export const pairScore = (a: CompactEvent, b: CompactEvent): number => {
-  const ta = significantTokens(a.t);
-  const tb = significantTokens(b.t);
+export const pairScore = (
+  a: CompactEvent,
+  b: CompactEvent,
+  aTokens?: ReadonlySet<string>,
+  bTokens?: ReadonlySet<string>,
+): number => {
+  const ta = aTokens ?? significantTokens(a.t);
+  const tb = bTokens ?? significantTokens(b.t);
   return (
     jaccard(ta, tb) * 4 +
     Number(a.s === b.s) * 2 +
@@ -173,6 +185,29 @@ const sharesTitleToken = (a: ReadonlySet<string>, b: ReadonlySet<string>): boole
   [...a].some((token) => b.has(token));
 
 export type CandidatePair = Readonly<{ a: CompactEvent; b: CompactEvent; score: number }>;
+
+/** Past this many events, a word is describing the town, the season or the
+ *  venue rather than the event. Measured on the live corpus: at four, the
+ *  candidate list stops being led by "MILANO CUP" against "TORNEI CLUB
+ *  MILANO", and a sagra named twice by two sources still pairs. */
+const CROWD = 4;
+
+/**
+ * The words too many listings share to mean anything.
+ *
+ * A festival brand is on twenty concerts, a town name is in every title from
+ * that town, a venue's name is in every event it hosts. Each of those scored a
+ * perfect title match between events that have nothing to do with each other,
+ * and those pairs led the candidate list — the judge spent its calls on them
+ * while the real cross-source duplicates waited behind.
+ */
+export const crowdedTokens = (index: readonly CompactEvent[]): ReadonlySet<string> => {
+  const seen = new Map<string, number>();
+  for (const event of index) {
+    for (const token of significantTokens(event.t)) seen.set(token, (seen.get(token) ?? 0) + 1);
+  }
+  return new Set([...seen].filter(([, count]) => count > CROWD).map(([token]) => token));
+};
 
 /** The words a place puts into a title. Castello D'Albertis runs a dozen
  *  unrelated things and its name is in every one of their titles: shared with
@@ -239,15 +274,24 @@ export const dedupeCandidates = (
   index: readonly CompactEvent[],
   cap = 60,
 ): readonly CandidatePair[] => {
-  const tokens = new Map(index.map((event) => [event.id, significantTokens(event.t)]));
+  const crowded = crowdedTokens(index);
+  const tokens = new Map(
+    index.map((event) => [
+      event.id,
+      new Set([...significantTokens(event.t)].filter((token) => !crowded.has(token))),
+    ]),
+  );
   const shares = (a: CompactEvent, b: CompactEvent): boolean =>
     sharesTitleToken(tokens.get(a.id) ?? new Set(), tokens.get(b.id) ?? new Set());
   return index
     .flatMap((a, i) =>
       index
         .slice(i + 1)
-        .filter((b) => overlaps(a, b) && (shares(a, b) || samePoster(a, b)) && !alreadyLinked(a, b))
-        .map((b) => ({ a, b, score: pairScore(a, b) })),
+        .filter(
+          (b) =>
+            overlaps(a, b) && !twoTowns(a, b) && (shares(a, b) || samePoster(a, b)) && !alreadyLinked(a, b),
+        )
+        .map((b) => ({ a, b, score: pairScore(a, b, tokens.get(a.id), tokens.get(b.id)) })),
     )
     .filter((pair) => pair.score >= THRESHOLD)
     .toSorted((x, y) => y.score - x.score)
