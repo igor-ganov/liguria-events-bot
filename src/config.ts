@@ -11,6 +11,12 @@ export type Env = Readonly<{
   BOT_TOKEN: string;
   WEBHOOK_SECRET: string;
   OWNER_CHAT_ID: string;
+  /** Web Push: the private half signs the request, the public half is what the
+   *  browser subscribed with, and the contact is what a push service shows if
+   *  it needs to tell somebody their sender is misbehaving. */
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_PUBLIC_KEY?: string;
+  PUSH_CONTACT?: string;
   GEMINI_API_KEY?: string;
   /** Ticketmaster Discovery consumer key — absent means the collector sits out. */
   TICKETMASTER_KEY?: string;

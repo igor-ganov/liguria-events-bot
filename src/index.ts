@@ -7,6 +7,7 @@ import { channelHourOf, isOperator } from './config.ts';
 import type { Env } from './config.ts';
 import {
   isCategory,
+  isLang,
   parseLocalized,
   parseSessions,
   toCompact,
@@ -65,6 +66,10 @@ import {
   writeEventRecord,
   writeIndex,
 } from './pipeline/store.ts';
+import { digestNotice } from './push/digest-notice.ts';
+import { dropSubscription, readSubscriptions, writeSubscription } from './push/push-store.ts';
+import { pushableSubscription } from './push/subscription.ts';
+import { sendPush } from './push/send-push.ts';
 import { pickSurprise } from './pipeline/surprise.ts';
 import { listUserIds, rememberUserChat } from './pipeline/users.ts';
 import {
@@ -756,6 +761,10 @@ const serveCalendar = async (env: Env, url: URL): Promise<Response> => {
 /** Public JSON corpus for the static-site build (public-calendar AC-4.x). */
 const SITE_ORIGIN = 'https://dovego.it';
 
+// The app is the site, served from the same origin, so this is not a wildcard
+// for the world's benefit — it is for the service worker on dovego.it.
+const CORS: Readonly<Record<string, string>> = { 'access-control-allow-origin': SITE_ORIGIN };
+
 /** Run every check against the live site and the stored corpus. */
 const healthReport = async (env: Env) => {
   const [index, runLog] = await Promise.all([readIndex(env.EVENTS), readRunLog(env.EVENTS)]);
@@ -870,6 +879,40 @@ const watchHealth = async (env: Env): Promise<unknown> => {
   return { status: report.status, changed: message !== undefined };
 };
 
+const DEAD = new Set([404, 410]);
+
+/**
+ * Wake the devices whose hour this is.
+ *
+ * Nothing is carried in the message: the service worker fetches /digest.json
+ * when it wakes, so what a reader sees is what is on today rather than what
+ * was on when the send started. A subscription the push service has thrown
+ * away answers 404 or 410 and is dropped — a dead endpoint retried every
+ * morning is a send that fails forever.
+ */
+const pushDigests = async (env: Env, nowMs: number, hour: number): Promise<unknown> => {
+  const key = env.VAPID_PRIVATE_KEY ?? '';
+  const subs = (await readSubscriptions(env.EVENTS)).filter((sub) => sub.hour === hour);
+  const sent = await Promise.all(
+    [key]
+      .filter((value) => value !== '')
+      .flatMap(() =>
+        subs.map(async (sub) => {
+          const status = await sendPush(
+            sub.endpoint,
+            JSON.parse(key),
+            env.VAPID_PUBLIC_KEY ?? '',
+            `mailto:${env.PUSH_CONTACT ?? 'hello@dovego.it'}`,
+            nowMs,
+          ).catch(() => 0);
+          await Promise.all([status].filter((code) => DEAD.has(code)).map(() => dropSubscription(env.EVENTS, sub.endpoint)));
+          return status;
+        }),
+      ),
+  );
+  return { woken: sent.filter((status) => status >= 200 && status < 300).length, of: subs.length };
+};
+
 const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
   const hour = romeHour(nowMs);
   const today = romeDate(nowMs);
@@ -885,6 +928,7 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
   // alert repeated hourly is an alert nobody reads.
   const health = await watchHealth(env).catch((error: unknown) => ({ error: String(error) }));
 
+  const pushed = await pushDigests(env, nowMs, hour).catch((error: unknown) => ({ error: String(error) }));
   const index = await readIndex(env.EVENTS);
   // The public channel: one post a day, silent when there is nothing worth
   // saying. Five private subscribers is not an audience.
@@ -908,7 +952,7 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
   // through the /events.json probe, so it is not sent twice.
   await track(env, { event: 'tick' });
   await track(env, reading('users', userIds.length));
-  return { collect, geocode, health, channel, indexNow };
+  return { collect, geocode, health, channel, indexNow, pushed };
 };
 
 // ─────────────────────────────────────────────────────────────── export ──
@@ -953,6 +997,47 @@ const worker = {
     // The site's own vital signs, computed rather than assumed. Public: it
     // reports on public URLs and holds nothing a visitor could not check by
     // hand — and a status page nobody can reach is a status page nobody reads.
+
+    // A device asking to be woken once a day. No account behind it: the app
+    // has no sign-in, and the push endpoint is the only identity there is.
+    if (url.pathname === '/push/subscribe' && request.method === 'POST') {
+      const body: unknown = await request.json().catch(() => undefined);
+      const stored = await Promise.all(
+        [pushableSubscription(body)]
+          .filter((one) => one !== undefined)
+          .map(async (one) => {
+            await writeSubscription(env.EVENTS, one);
+            return one;
+          }),
+      );
+      return Response.json(
+        { ok: stored.length === 1 },
+        { status: stored.length === 1 ? 200 : 400, headers: CORS },
+      );
+    }
+    if (url.pathname === '/push/unsubscribe' && request.method === 'POST') {
+      const body: unknown = await request.json().catch(() => undefined);
+      const endpoint = asNonEmptyString(readProp(body, 'endpoint')) ?? '';
+      await Promise.all([endpoint].filter((one) => one !== '').map((one) => dropSubscription(env.EVENTS, one)));
+      return Response.json({ ok: true }, { headers: CORS });
+    }
+    // What the service worker fetches when a push wakes it: the words to show,
+    // read at that moment rather than encrypted into the message an hour
+    // earlier.
+    if (url.pathname === '/digest.json' && request.method === 'GET') {
+      const place = url.searchParams.get('place') ?? '';
+      const lang = url.searchParams.get('lang') ?? 'en';
+      const index = eventsInPlace(await readIndex(env.EVENTS), isPlace(place) ? place : '');
+      const today = romeDate(Date.now());
+      const notice = digestNotice(
+        eventsInWindow(index, todayWindow(today)),
+        isPlace(place) ? place : '',
+        isLang(lang) ? lang : 'en',
+        SITE_ORIGIN,
+      );
+      return Response.json(notice ?? {}, { headers: { ...CORS, 'cache-control': 'public, max-age=600' } });
+    }
+
     if (url.pathname === '/health' && request.method === 'GET') {
       return Response.json(await healthReport(env), {
         headers: { 'cache-control': 'public, max-age=120' },
