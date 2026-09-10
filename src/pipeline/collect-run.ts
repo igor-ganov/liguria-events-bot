@@ -19,15 +19,18 @@ import type { Collector, FetchFn, RawPost } from '../collectors/types.ts';
 import { ENRICH_VERSION, lastEnrichFailures } from '../llm/enrich.ts';
 import type { Enrichment, PendingEnrich } from '../llm/enrich.ts';
 import { certainDuplicates, dedupeCandidates, urlDuplicates } from './dedupe-candidates.ts';
+import { mergedArchive } from './archive-index.ts';
 import { dropSharedArtwork } from './shared-artwork.ts';
 import type { CandidatePair } from './dedupe-candidates.ts';
 import {
   acquireLock,
   appendRunLog,
   eventKey,
+  readArchiveIndex,
   readEventRecord,
   readIndex,
   releaseLock,
+  writeArchiveIndex,
   writeEventRecord,
   writeIndex,
 } from './store.ts';
@@ -416,7 +419,15 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
     );
     for (const id of blockedIds) compactById.delete(id);
     for (const record of written.values()) compactById.set(record.id, toCompact(record));
-    const prunedIndex = pruneIndex([...compactById.values()], today);
+    const allCompact = [...compactById.values()];
+    const prunedIndex = pruneIndex(allCompact, today);
+    // What left the feed today joins the archive: the page stays either way,
+    // but nothing listed it, so a crawler that had found it forgot it.
+    const leaving = allCompact.filter((event) => !prunedIndex.includes(event));
+    await writeArchiveIndex(
+      deps.kv,
+      mergedArchive(await readArchiveIndex(deps.kv), leaving),
+    );
 
     // Fuzzy cross-source dedupe (AC-1.9): sources title the same event
     // differently, so the exact-id dedupe misses them. Cheap candidate

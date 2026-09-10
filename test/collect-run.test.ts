@@ -7,6 +7,7 @@ import { acquireLock, readEventRecord, readIndex } from '../src/pipeline/store.t
 import { eventIdOf } from '../src/domain/event.ts';
 import type { RawEvent } from '../src/domain/event.ts';
 import type { Collector } from '../src/collectors/types.ts';
+import { asArray, parseJson, readProp } from '../src/util/json.ts';
 import type { Enrichment } from '../src/llm/enrich.ts';
 import { makeKvStub } from './kv-stub.ts';
 import type { KvStub } from './kv-stub.ts';
@@ -131,6 +132,26 @@ describe('runCollect', () => {
     assert.equal(stored?.unusual, true); // gem flag flows through retry (AC-2.6)
     const index = await readIndex(kv);
     assert.equal(index[0]?.x, true);
+  });
+
+  test('an event that has been and gone joins the archive', async () => {
+    // The page keeps working either way — the record has a second copy that
+    // never expires — but nothing listed those pages, so a crawler that had
+    // found one forgot it. The archive is that list.
+    const kv = makeKvStub();
+    const soon = rawEvent({ title: 'Sagra di Ieri', startDate: '2026-07-10' });
+    const later = rawEvent({ title: 'Concerto di Domani', startDate: '2099-08-05', url: 'https://example.org/f' });
+    await runCollect(makeDeps(kv, [okCollector([soon, later])]));
+    // A month on, the sagra has been and gone. The source no longer lists it,
+    // which is exactly how an event leaves in life.
+    const august = { ...makeDeps(kv, [okCollector([later])]), now: () => Date.parse('2026-08-01T10:00:00Z') };
+    await runCollect(august);
+
+    const archive = parseJson((await kv.get('archive:index')) ?? '');
+    const titles = (asArray(archive) ?? []).map((entry) => readProp(entry, 't'));
+    assert.deepEqual(titles, ['Sagra di Ieri']);
+    // And the index the site reads keeps only what is still to come.
+    assert.deepEqual((await readIndex(kv)).map((event) => event.t), ['Concerto di Domani']);
   });
 
   test('two sites, one night out: merged without asking the judge', async () => {

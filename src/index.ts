@@ -51,6 +51,7 @@ import type { Language, Settings } from './pipeline/settings.ts';
 import {
   appendRunLog,
   eventKey,
+  readArchiveIndex,
   readAllRecords,
   readAnyEventRecord,
   readEventRecord,
@@ -890,6 +891,21 @@ const worker = {
 
     if (url.pathname === '/events.json' && request.method === 'GET') {
       return serveEventsJson(env, url);
+    }
+
+    // Everything that has been and gone. The pages never went away — the
+    // records have a copy that does not expire — but nothing listed them, so
+    // a crawler that had found one forgot it. The sitemap reads this.
+    if (url.pathname === '/archive.json' && request.method === 'GET') {
+      return Response.json(
+        { generatedAt: new Date().toISOString(), events: await readArchiveIndex(env.EVENTS) },
+        {
+          headers: {
+            'cache-control': 'public, max-age=3600',
+            'access-control-allow-origin': '*',
+          },
+        },
+      );
     }
 
     // The site's own vital signs, computed rather than assumed. Public: it

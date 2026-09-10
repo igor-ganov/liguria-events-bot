@@ -5,7 +5,8 @@
  */
 import { parseEventRecord, parseIndex } from '../domain/event.ts';
 import type { CompactEvent, EventRecord } from '../domain/event.ts';
-import { asArray, parseJson } from '../util/json.ts';
+import { asArray, asNonEmptyString, asNumber, parseJson, readProp } from '../util/json.ts';
+import type { ArchiveEntry } from './archive-index.ts';
 
 export type KvListResult = Readonly<{
   keys: readonly Readonly<{ name: string }>[];
@@ -62,6 +63,31 @@ export const readAllRecords = async (kv: KvLike): Promise<readonly EventRecord[]
   return records.flatMap((record) => (record === undefined ? [] : [record]));
 };
 
+const ARCHIVE_INDEX_KEY = 'archive:index';
+
+/** Everything that has left the feed: one value, read by the sitemap so the
+ *  pages a crawler found once keep being offered to it. */
+export const readArchiveIndex = async (kv: KvLike): Promise<readonly ArchiveEntry[]> => {
+  const raw = await kv.get(ARCHIVE_INDEX_KEY);
+  const parsed = raw === null ? undefined : parseJson(raw);
+  return (asArray(parsed) ?? []).flatMap((value) => {
+    const id = asNonEmptyString(readProp(value, 'id'));
+    const t = asNonEmptyString(readProp(value, 't'));
+    const s = asNonEmptyString(readProp(value, 's'));
+    const v = asNonEmptyString(readProp(value, 'v'));
+    const e = asNonEmptyString(readProp(value, 'e'));
+    const cr = asNumber(readProp(value, 'cr'));
+    return id === undefined || t === undefined || s === undefined
+      ? []
+      : [{ id, t, s, ...(v === undefined ? {} : { v }), ...(e === undefined ? {} : { e }), ...(cr === undefined ? {} : { cr }) }];
+  });
+};
+
+export const writeArchiveIndex = async (
+  kv: KvLike,
+  entries: readonly ArchiveEntry[],
+): Promise<void> => kv.put(ARCHIVE_INDEX_KEY, JSON.stringify(entries));
+
 export const writeIndex = async (
   kv: KvLike,
   index: readonly CompactEvent[],
@@ -97,14 +123,12 @@ export const recordTtlSeconds = (event: EventRecord, nowMs: number): number => {
 // the page is kept alive by a second copy that nothing but the single-event
 // lookup ever reads. Before this, three days after an event its page 404'd, and
 // Search Console had counted 15 806 of those.
-const ARCHIVE_DAYS = 400;
-
-/** Seconds until the archived copy expires: over a year past the event. */
-export const archiveTtlSeconds = (event: EventRecord, nowMs: number): number => {
-  const lastDay = event.endDate ?? event.startDate;
-  const expiresAtMs = Date.parse(`${lastDay}T23:59:59Z`) + ARCHIVE_DAYS * DAY_SECONDS * 1000;
-  return Math.max(3600, Math.floor((expiresAtMs - nowMs) / 1000));
-};
+//
+// The second copy no longer expires either. It used to go after 400 days,
+// which only moved the same failure a year out: a page that was written,
+// indexed and linked to would still end as a 410, and every event this site
+// has ever published is the site's own body of work — the short, specific
+// pages it exists to make. They stay.
 
 export const writeEventRecord = async (
   kv: KvLike,
@@ -113,7 +137,7 @@ export const writeEventRecord = async (
 ): Promise<void> => {
   const body = JSON.stringify(event);
   await kv.put(eventKey(event.id), body, { expirationTtl: recordTtlSeconds(event, nowMs) });
-  await kv.put(archiveKey(event.id), body, { expirationTtl: archiveTtlSeconds(event, nowMs) });
+  await kv.put(archiveKey(event.id), body);
 };
 
 /** A record by id, falling back to the archive once the working copy has gone —

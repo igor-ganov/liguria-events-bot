@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import {
   acquireLock,
   appendRunLog,
-  archiveTtlSeconds,
   readAnyEventRecord,
   readEventRecord,
   readIndex,
@@ -50,13 +49,15 @@ describe('store', () => {
     assert.ok(ttl !== undefined && ttl > 13 * 86_400 && ttl < 16 * 86_400);
   });
 
-  test('the archived copy outlives the event by more than a year', async () => {
+  test('the archived copy does not expire at all', async () => {
+    // It used to go after 400 days, which only moved the failure a year out:
+    // a page that had been written, indexed and linked to still ended as a
+    // 410. The working copy still expires — that keeps the key scan small.
     const kv = makeKvStub();
     const nowMs = Date.parse('2026-07-01T00:00:00Z');
     await writeEventRecord(kv, record, nowMs);
-    const ttl = kv.ttls.get(`archive:${record.id}`);
-    assert.ok(ttl !== undefined && ttl > 380 * 86_400);
-    assert.ok(archiveTtlSeconds(record, nowMs) > (kv.ttls.get(`event:${record.id}`) ?? 0));
+    assert.equal(kv.ttls.get(`archive:${record.id}`), undefined);
+    assert.ok((kv.ttls.get(`event:${record.id}`) ?? 0) > 0);
   });
 
   test('a record whose working copy expired is still found in the archive', async () => {
