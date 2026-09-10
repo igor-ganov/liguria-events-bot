@@ -36,6 +36,7 @@ import { postDaily } from './channel/post-daily.ts';
 import { pingIndexNow } from './indexnow/ping-index-now.ts';
 import { healthAlert } from './health/health-alert.ts';
 import { runHealth } from './health/run-health.ts';
+import { mergedArchive } from './pipeline/archive-index.ts';
 import { runCollect } from './pipeline/collect-run.ts';
 import type { RunSummary } from './pipeline/collect-run.ts';
 import { romeDate, romeHour } from './pipeline/clock.ts';
@@ -51,6 +52,7 @@ import type { Language, Settings } from './pipeline/settings.ts';
 import {
   appendRunLog,
   eventKey,
+  readAllArchived,
   readArchiveIndex,
   readAllRecords,
   readAnyEventRecord,
@@ -58,6 +60,7 @@ import {
   readEventRecords,
   readIndex,
   readRunLog,
+  writeArchiveIndex,
   writeEventRecord,
   writeIndex,
 } from './pipeline/store.ts';
@@ -1199,6 +1202,18 @@ const worker = {
         } catch (error) {
           return Response.json({ error: String(error) }, { status: 500 });
         }
+      }
+      // One-off repair: the archive list started empty, and the months that
+      // ended before it existed are only in the stored records.
+      if (url.searchParams.get('force') === 'archive-rebuild') {
+        const stored = await readAllArchived(env.EVENTS);
+        const today = romeDate(Date.now());
+        const past = stored
+          .map(toCompact)
+          .filter((event) => (event.e ?? event.s) < today);
+        const rebuilt = mergedArchive(await readArchiveIndex(env.EVENTS), past);
+        await writeArchiveIndex(env.EVENTS, rebuilt);
+        return Response.json({ scanned: stored.length, archived: rebuilt.length });
       }
       if (url.searchParams.get('force') === 'collect') {
         try {

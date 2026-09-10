@@ -88,6 +88,26 @@ export const writeArchiveIndex = async (
   entries: readonly ArchiveEntry[],
 ): Promise<void> => kv.put(ARCHIVE_INDEX_KEY, JSON.stringify(entries));
 
+/** Every archived record, by scanning `archive:` keys. The list is normally
+ *  appended to as events leave the feed; this rebuilds it from what is stored,
+ *  for the months that ended before there was a list. */
+export const readAllArchived = async (kv: KvLike): Promise<readonly EventRecord[]> => {
+  const ids: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await kv.list({
+      prefix: 'archive:',
+      ...(cursor === undefined ? {} : { cursor }),
+    });
+    for (const key of page.keys) ids.push(key.name.slice('archive:'.length));
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor !== undefined);
+  const records = await Promise.all(
+    ids.filter((id) => id !== 'index').map(async (id) => parseEventRecord((await kv.get(archiveKey(id))) ?? '')),
+  );
+  return records.flatMap((record) => (record === undefined ? [] : [record]));
+};
+
 export const writeIndex = async (
   kv: KvLike,
   index: readonly CompactEvent[],
