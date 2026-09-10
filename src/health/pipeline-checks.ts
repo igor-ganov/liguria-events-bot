@@ -29,7 +29,13 @@ export const lastRunCheck = (entries: readonly unknown[], nowMs: number): readon
     {
       id: 'enrich-health',
       title: 'Enrichment is succeeding more than it fails',
-      status: failed > okCount && failed > 3 ? 'fail' : failed > 0 ? 'warn' : 'ok',
+      // A model call that fails is retried on the next run, and the retry
+      // succeeds: what the corpus ends up with is checked by
+      // description-present, which is the outcome and the thing to act on.
+      // Warning on a single retryable failure meant /health carried a
+      // permanent warn, and a status that is always yellow is a status nobody
+      // reads. A fifth of a batch failing is a real signal; one call is not.
+      status: failed > okCount && failed > 3 ? 'fail' : failed > Math.max(3, okCount / 5) ? 'warn' : 'ok',
       detail: `${okCount} enriched, ${failed} failed on the last run${worst === '' ? '' : ` (${worst})`}`,
     },
   ];

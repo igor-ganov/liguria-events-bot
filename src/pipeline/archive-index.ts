@@ -14,6 +14,9 @@ export type ArchiveEntry = Readonly<{
   v?: string;
   s: string;
   e?: string;
+  /** The town, so the site can tell one town's patron feast from another's
+   *  when it looks for other editions of the same event. */
+  ct?: string;
   cr?: number;
 }>;
 
@@ -23,6 +26,7 @@ export const archiveEntry = (event: CompactEvent): ArchiveEntry => ({
   ...(event.v === undefined ? {} : { v: event.v }),
   s: event.s,
   ...(event.e === undefined ? {} : { e: event.e }),
+  ...(event.ct === undefined ? {} : { ct: event.ct }),
   ...(event.cr === undefined ? {} : { cr: event.cr }),
 });
 

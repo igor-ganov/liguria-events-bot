@@ -76,10 +76,21 @@ export const readArchiveIndex = async (kv: KvLike): Promise<readonly ArchiveEntr
     const s = asNonEmptyString(readProp(value, 's'));
     const v = asNonEmptyString(readProp(value, 'v'));
     const e = asNonEmptyString(readProp(value, 'e'));
+    const ct = asNonEmptyString(readProp(value, 'ct'));
     const cr = asNumber(readProp(value, 'cr'));
     return id === undefined || t === undefined || s === undefined
       ? []
-      : [{ id, t, s, ...(v === undefined ? {} : { v }), ...(e === undefined ? {} : { e }), ...(cr === undefined ? {} : { cr }) }];
+      : [
+          {
+            id,
+            t,
+            s,
+            ...(v === undefined ? {} : { v }),
+            ...(e === undefined ? {} : { e }),
+            ...(ct === undefined ? {} : { ct }),
+            ...(cr === undefined ? {} : { cr }),
+          },
+        ];
   });
 };
 

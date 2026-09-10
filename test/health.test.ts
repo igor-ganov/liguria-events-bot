@@ -205,6 +205,17 @@ describe('pipeline checks', () => {
     assert.equal(statusOf(lastRunCheck(entry, now), 'enrich-health'), 'fail');
   });
 
+  test('one call failing out of two dozen is not worth a colour', () => {
+    // A failed call is retried on the next run and the retry succeeds; what
+    // the corpus ends up with is description-present's business. /health
+    // carried a permanent warn over this, and a status that is always yellow
+    // is a status nobody reads.
+    const run = (ok: number, failed: number) => [{ at: Math.floor(now / 1000), enrichedOk: ok, enrichFailed: failed }];
+    assert.equal(statusOf(lastRunCheck(run(22, 2), now), 'enrich-health'), 'ok');
+    assert.equal(statusOf(lastRunCheck(run(20, 6), now), 'enrich-health'), 'warn');
+    assert.equal(statusOf(lastRunCheck(run(24, 0), now), 'enrich-health'), 'ok');
+  });
+
   test('an empty index is a failure — the site would have nothing to show', () => {
     assert.equal(statusOf(indexCheck([], '2026-08-20'), 'index-size'), 'fail');
     assert.equal(statusOf(indexCheck([compact()], '2026-08-20'), 'index-size'), 'warn');

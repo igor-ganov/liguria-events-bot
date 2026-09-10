@@ -23,12 +23,13 @@ describe('archiveEntry', () => {
     // The list is one KV value and it only ever grows, so it carries what a
     // sitemap needs to spell the URL — not the descriptions, which are three
     // languages of prose per event and would fill it in a season.
-    assert.deepEqual(archiveEntry({ ...event('a', '2026-08-01'), e: '2026-08-03' }), {
+    assert.deepEqual(archiveEntry({ ...event('a', '2026-08-01'), e: '2026-08-03', ct: 'genova' }), {
       id: 'a',
       t: 'Event a',
       v: 'Teatro di Prova',
       s: '2026-08-01',
       e: '2026-08-03',
+      ct: 'genova',
       cr: 1_700_000_000,
     });
   });
