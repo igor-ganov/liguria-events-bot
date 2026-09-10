@@ -5,6 +5,7 @@
  */
 import { isCategory, isLang } from '../domain/event.ts';
 import type { Category, Lang } from '../domain/event.ts';
+import { isPlace } from './place-filter.ts';
 import type { KvLike } from './store.ts';
 import { tomorrowWindow, weekendWindow } from './windows.ts';
 import type { DateWindow } from './windows.ts';
@@ -21,6 +22,8 @@ export type Settings = Readonly<{
   digest: DigestMode;
   digestHour: number;
   categories: readonly Category[];
+  /** `city:<slug>`, `region:<slug>`, or '' for the whole country. */
+  place: string;
 }>;
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -28,6 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
   digest: 'off',
   digestHour: 9,
   categories: [],
+  place: '',
 };
 
 const settingsKey = (userId: number): string => `user:${userId}:settings`;
@@ -44,6 +48,7 @@ export const parseSettings = (text: string): Settings => {
   const digest = readProp(value, 'digest');
   const digestHour = asNumber(readProp(value, 'digestHour'));
   const categories = (asArray(readProp(value, 'categories')) ?? []).filter(isCategory);
+  const place = readProp(value, 'place');
   return {
     language: isLanguageChoice(language) ? language : DEFAULT_SETTINGS.language,
     digest: isDigestMode(digest) ? digest : DEFAULT_SETTINGS.digest,
@@ -52,6 +57,7 @@ export const parseSettings = (text: string): Settings => {
         ? digestHour
         : DEFAULT_SETTINGS.digestHour,
     categories,
+    place: isPlace(place) ? place : DEFAULT_SETTINGS.place,
   };
 };
 

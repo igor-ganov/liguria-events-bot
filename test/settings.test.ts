@@ -17,7 +17,7 @@ describe('settings persistence', () => {
   test('defaults for unknown users, round-trip after write (AC-7.2)', async () => {
     const kv = makeKvStub();
     assert.deepEqual(await readSettings(kv, 1), DEFAULT_SETTINGS);
-    const next: Settings = { language: 'ru', digest: 'daily', digestHour: 8, categories: ['music'] };
+    const next: Settings = { language: 'ru', digest: 'daily', digestHour: 8, categories: ['music'], place: 'city:genova' };
     await writeSettings(kv, 1, next);
     assert.deepEqual(await readSettings(kv, 1), next);
   });
@@ -60,5 +60,27 @@ describe('digestDueWindow (AC-5.1)', () => {
       from: '2026-07-04',
       to: '2026-07-05',
     });
+  });
+});
+
+describe('place', () => {
+  test('a city, a region, or everywhere', () => {
+    assert.equal(parseSettings('{"place":"city:genova"}').place, 'city:genova');
+    assert.equal(parseSettings('{"place":"region:liguria"}').place, 'region:liguria');
+    assert.equal(parseSettings('{}').place, '');
+  });
+
+  test('a place that is not on the map degrades to everywhere', () => {
+    // The slug list is the same one the crawler files events under, so a
+    // stored value that names nothing would silently empty every list.
+    ['city:atlantis', 'region:mordor', 'genova', 'city:', 'nonsense'].forEach((stored) => {
+      assert.equal(parseSettings(`{"place":"${stored}"}`).place, '', stored);
+    });
+  });
+
+  test('it survives a round trip', async () => {
+    const kv = makeKvStub();
+    await writeSettings(kv, 7, { ...DEFAULT_SETTINGS, place: 'city:torino' });
+    assert.equal((await readSettings(kv, 7)).place, 'city:torino');
   });
 });

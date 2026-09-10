@@ -15,6 +15,9 @@ import {
 import type { Category, CompactEvent, EventRecord, SourceLink } from './domain/event.ts';
 import { makeBot, sendLong } from './delivery/bot-api.ts';
 import type { Bot, Keyboard } from './delivery/bot-api.ts';
+import { cityKeyboard, regionKeyboard } from './delivery/place-keyboards.ts';
+import { eventsInPlace, isPlace } from './pipeline/place-filter.ts';
+import { placeLabel } from './delivery/place-label.ts';
 import {
   CATEGORY_EMOJI,
   categoryLabel,
@@ -116,7 +119,7 @@ const sendSurprise = async (
   excludeId?: string,
   editMessageId?: number,
 ): Promise<void> => {
-  const index = await readIndex(env.EVENTS);
+  const index = eventsInPlace(await readIndex(env.EVENTS), settings.place);
   const today = romeDate(Date.now());
   const pick = pickSurprise(
     index,
@@ -157,6 +160,7 @@ const settingsSummary = (settings: Settings, lang: Language): string => {
     t('settings.digest', lang, { value: t(digestKey, lang) }),
     t('settings.hour', lang, { value: settings.digestHour }),
     t('settings.categories', lang, { value: categoriesValue }),
+    t('settings.place', lang, { value: placeLabel(settings.place, lang) }),
   ].join('\n');
 };
 
@@ -165,6 +169,7 @@ const settingsMainKeyboard = (lang: Language): Keyboard => [
   [{ text: t('settings.pick_digest', lang), callbackData: 'set:dig' }],
   [{ text: t('settings.pick_hour', lang), callbackData: 'set:hour' }],
   [{ text: t('settings.pick_categories', lang), callbackData: 'set:cat' }],
+  [{ text: t('settings.pick_place_button', lang), callbackData: 'set:place' }],
 ];
 
 const BACK = 'set:main';
@@ -260,8 +265,9 @@ const listCommand = async (
   lang: Language,
   headerKey: TranslationKey,
   select: (index: readonly CompactEvent[], today: string) => readonly CompactEvent[],
+  place = '',
 ): Promise<void> => {
-  const index = await readIndex(env.EVENTS);
+  const index = eventsInPlace(await readIndex(env.EVENTS), place);
   const today = romeDate(Date.now());
   await sendLong(bot, renderList(headerKey, select(index, today), lang));
 };
@@ -274,7 +280,7 @@ const planCommand = async (
 ): Promise<void> => {
   const statusId = await bot.sendMessage(t('plan.thinking', lang));
   try {
-    const index = await readIndex(env.EVENTS);
+    const index = eventsInPlace(await readIndex(env.EVENTS), settings.place);
     const today = romeDate(Date.now());
     const window = weekendWindow(today);
     const compacts = eventsInWindow(index, window);
@@ -347,31 +353,41 @@ const handleCommand = async (
       await bot.sendMessage(t('help.text', lang));
       return;
     case '/today':
-      await listCommand(env, bot, lang, 'header.today', (index, today) =>
-        eventsInWindow(index, todayWindow(today)),
+      await listCommand(
+        env, bot, lang, 'header.today',
+        (index, today) => eventsInWindow(index, todayWindow(today)),
+        settings.place,
       );
       return;
     case '/tomorrow':
-      await listCommand(env, bot, lang, 'header.tomorrow', (index, today) =>
-        eventsInWindow(index, tomorrowWindow(today)),
+      await listCommand(
+        env, bot, lang, 'header.tomorrow',
+        (index, today) => eventsInWindow(index, tomorrowWindow(today)),
+        settings.place,
       );
       return;
     case '/tonight':
-      await listCommand(env, bot, lang, 'header.tonight', tonightEvents);
+      await listCommand(env, bot, lang, 'header.tonight', tonightEvents, settings.place);
       return;
     case '/weekend':
-      await listCommand(env, bot, lang, 'header.weekend', (index, today) =>
-        eventsInWindow(index, weekendWindow(today)),
+      await listCommand(
+        env, bot, lang, 'header.weekend',
+        (index, today) => eventsInWindow(index, weekendWindow(today)),
+        settings.place,
       );
       return;
     case '/free':
-      await listCommand(env, bot, lang, 'header.free', (index, today) =>
-        freeEvents(index, today),
+      await listCommand(
+        env, bot, lang, 'header.free',
+        (index, today) => freeEvents(index, today),
+        settings.place,
       );
       return;
     case '/gems':
-      await listCommand(env, bot, lang, 'header.gems', (index, today) =>
-        gemEvents(index, today),
+      await listCommand(
+        env, bot, lang, 'header.gems',
+        (index, today) => gemEvents(index, today),
+        settings.place,
       );
       return;
     case '/categories': {
@@ -438,7 +454,9 @@ const handleQuestion = async (
   const uiLang = forced ?? detectLanguage(question);
   await bot.sendTyping();
   try {
-    const index = await readIndex(env.EVENTS);
+    // The reader's place decides what the model may answer from: a question
+    // asked in Genova must not be answered with a market in Bari.
+    const index = eventsInPlace(await readIndex(env.EVENTS), settings.place);
     const today = romeDate(Date.now());
     const compacts = eventsInWindow(index, upcomingWindow(today, QA_CORPUS_DAYS));
     const events = await readEventRecords(
@@ -470,9 +488,21 @@ const handleSettingsCallback = async (
   const settings = await readSettings(env.EVENTS, userId);
   const lang = uiLanguage(settings, hint);
 
-  const rerender = async (next: Settings, view: 'main' | 'lang' | 'dig' | 'hour' | 'cat'): Promise<void> => {
+  // `place` is the region list; `cities:<region>` is one region opened.
+  const rerender = async (next: Settings, view: string): Promise<void> => {
     const nextLang = uiLanguage(next, hint);
-    if (view === 'main') {
+    if (view.startsWith('cities:')) {
+      const region = view.slice(7);
+      await bot.editMessageText(
+        messageId,
+        t('settings.pick_city', nextLang, { value: placeLabel(`region:${region}`, nextLang) }),
+        { keyboard: cityKeyboard(region, nextLang) },
+      );
+    } else if (view === 'place') {
+      await bot.editMessageText(messageId, t('settings.pick_place', nextLang), {
+        keyboard: regionKeyboard(nextLang, BACK),
+      });
+    } else if (view === 'main') {
       await bot.editMessageText(messageId, settingsSummary(next, nextLang), {
         keyboard: settingsMainKeyboard(nextLang),
       });
@@ -495,9 +525,37 @@ const handleSettingsCallback = async (
     }
   };
 
-  if (payload === 'main' || payload === 'lang' || payload === 'dig' || payload === 'hour' || payload === 'cat') {
+  if (
+    payload === 'main' ||
+    payload === 'lang' ||
+    payload === 'dig' ||
+    payload === 'hour' ||
+    payload === 'cat' ||
+    payload === 'place'
+  ) {
     await bot.answerCallback(callbackId, '');
     await rerender(settings, payload);
+    return;
+  }
+  // Opening a region is a view, not a choice: a reader browsing towns has not
+  // decided anything yet, and saving on the way in would change what the bot
+  // shows them mid-tap.
+  if (payload.startsWith('place:r:')) {
+    await bot.answerCallback(callbackId, '');
+    await rerender(settings, `cities:${payload.slice(8)}`);
+    return;
+  }
+  if (payload.startsWith('place:')) {
+    const chosen = payload.slice(6);
+    const place = chosen === 'all' ? '' : chosen.replace(/^rg:/, 'region:').replace(/^c:/, 'city:');
+    if (!isPlace(place)) {
+      await bot.answerCallback(callbackId, t('cb.unknown', lang));
+      return;
+    }
+    const next: Settings = { ...settings, place };
+    await writeSettings(env.EVENTS, userId, next);
+    await bot.answerCallback(callbackId, t('settings.saved_toast', lang));
+    await rerender(next, 'main');
     return;
   }
   if (payload.startsWith('lang:')) {
@@ -574,7 +632,7 @@ const handleCallback = async (env: Env, callback: unknown): Promise<void> => {
       return;
     }
     await bot.answerCallback(callbackId, '');
-    const index = await readIndex(env.EVENTS);
+    const index = eventsInPlace(await readIndex(env.EVENTS), settings.place);
     const today = romeDate(Date.now());
     const events = categoryEvents(index, category, today);
     const header = t('header.category', lang, {
@@ -704,7 +762,7 @@ const pushDigest = async (
   const settings = await readSettings(env.EVENTS, userId);
   const window = digestDueWindow(settings, today, hour);
   if (window === undefined) return;
-  const events = eventsInWindow(index, window).filter(
+  const events = eventsInWindow(eventsInPlace(index, settings.place), window).filter(
     (event) =>
       settings.categories.length === 0 ||
       event.c.some((category) => settings.categories.includes(category)),

@@ -236,3 +236,71 @@ describe('update routing', () => {
     assert.equal(messages[0]?.text, 'llm reply');
   });
 });
+
+describe('the place setting (US-7)', () => {
+  test('/today answers for the chosen city, not for the country', async () => {
+    // Every list the bot produced was Italy-wide: a reader in Genova was told
+    // about a market in Bari. The setting is what makes the bot usable to a
+    // person who lives somewhere.
+    const env = makeEnv();
+    await env.EVENTS.put(
+      'events:index',
+      JSON.stringify([
+        // A run wide enough to cover whatever day the suite runs on: this is
+        // about place, and a date-dependent fixture would fail every autumn.
+        { id: 'g', t: 'Concerto in Genova', s: '2026-01-01', e: '2030-12-31', c: ['music'], u: 'https://x/g', ct: 'genova', rg: 'liguria' },
+        { id: 'b', t: 'Mercato a Bari', s: '2026-01-01', e: '2030-12-31', c: ['market'], u: 'https://x/b', ct: 'bari', rg: 'puglia' },
+      ]),
+    );
+    await env.EVENTS.put('user:5:settings', JSON.stringify({ place: 'city:genova' }));
+
+    const capture = captureTelegram();
+    try {
+      await handleUpdate(env, { message: { chat: { id: 5 }, from: { id: 5 }, text: '/today' } });
+    } finally {
+      capture.restore();
+    }
+    const text = capture.sent.filter((call) => call.url.includes('sendMessage')).map((call) => call.text).join('\n');
+    assert.ok(text.includes('Genova'), text);
+    assert.ok(!text.includes('Bari'), text);
+  });
+
+  test('picking a city from the keyboard stores it', async () => {
+    const env = makeEnv();
+    const capture = captureTelegram();
+    try {
+      await handleUpdate(env, {
+        callback_query: {
+          id: 'cb1',
+          data: 'set:place:c:torino',
+          from: { id: 5 },
+          message: { chat: { id: 5 }, message_id: 10 },
+        },
+      });
+    } finally {
+      capture.restore();
+    }
+    assert.equal(readProp(parseJson((await env.EVENTS.get('user:5:settings')) ?? ''), 'place'), 'city:torino');
+  });
+
+  test('a region opened is a view, and changes nothing until a choice is made', async () => {
+    const env = makeEnv();
+    await env.EVENTS.put('user:5:settings', JSON.stringify({ place: 'city:genova' }));
+    const capture = captureTelegram();
+    try {
+      await handleUpdate(env, {
+        callback_query: {
+          id: 'cb2',
+          data: 'set:place:r:liguria',
+          from: { id: 5 },
+          message: { chat: { id: 5 }, message_id: 10 },
+        },
+      });
+    } finally {
+      capture.restore();
+    }
+    assert.equal(readProp(parseJson((await env.EVENTS.get('user:5:settings')) ?? ''), 'place'), 'city:genova');
+    const edits = capture.sent.filter((call) => call.url.includes('editMessageText'));
+    assert.ok(edits.at(-1)?.text.includes('Liguria'), edits.at(-1)?.text);
+  });
+});
