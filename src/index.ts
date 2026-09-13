@@ -81,6 +81,7 @@ import {
 } from './pipeline/windows.ts';
 import { fetchForecast } from './weather/open-meteo.ts';
 import { buildIcs, filterEvents, filterFromQuery, langFromQuery } from './calendar/ics.ts';
+import { reading } from './analytics/reading.ts';
 import { track } from './analytics/track.ts';
 import { buildCollectDeps, buildGeocodeDeps, chatOf } from './wire.ts';
 import { runGeocode } from './pipeline/geocode.ts';
@@ -902,13 +903,11 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
       await pushReminders(env, userId, index, today).catch(() => undefined);
     }
   }
-  // One line per tick about the pipeline itself: how many people the bot can
-  // reach and how large the catalogue behind it is. Both are numbers nobody
-  // thinks to look at until the day one of them falls.
-  await track(env, {
-    event: 'tick',
-    metrics: { users: userIds.length, indexed: index.length, hour },
-  });
+  // A pulse per tick, and the number of people the bot can reach as a reading
+  // pro-motion keeps day by day. The catalogue's size already reaches it
+  // through the /events.json probe, so it is not sent twice.
+  await track(env, { event: 'tick' });
+  await track(env, reading('users', userIds.length));
   return { collect, geocode, health, channel, indexNow };
 };
 
