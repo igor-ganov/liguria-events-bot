@@ -139,17 +139,21 @@ export const indexNowKeyCheck = async (
  *
  * Cloudflare's automatic injection does not reach a response rendered by a
  * Worker, so the site collected 20 pageloads in the month after analytics was
- * switched on — a flat line in a dashboard nobody was reading, with nothing
- * anywhere to say the beacon had never been on the page. The tag is now in the
- * markup, and this is what notices if it leaves again.
+ * switched on. The Cloudflare tag added by hand fared no better: it reports to
+ * /cdn-cgi/rum on this origin, the Worker answers 404, the fallback is refused
+ * by CORS, and it recorded nothing at all. What counts visits now is the
+ * pro-motion beacon, so that is what this looks for — and for this project's
+ * id on it, since a tag copied from another site counts somebody else's.
  */
+const PM_BEACON = /<script[^>]*src="[^"]*\/pm\.js"[^>]*data-project="dovego-it"/;
+
 export const analyticsCheck = async (fetchFn: FetchFn, origin: string): Promise<CheckResult> => {
   const id = 'analytics-beacon';
   const title = 'Visits are actually being counted';
   const { status, body } = await fetchText(fetchFn, `${origin}/liguria/`);
   if (status !== 200) return bad(id, title, `the page answered ${status}`);
-  if (!body.includes('data-cf-beacon')) return bad(id, title, 'no beacon on the page — nothing is being counted');
-  return ok(id, title, 'the beacon is on the page');
+  if (!PM_BEACON.test(body)) return bad(id, title, 'no pro-motion beacon on the page — nothing is being counted');
+  return ok(id, title, 'the pro-motion beacon is on the page');
 };
 
 
