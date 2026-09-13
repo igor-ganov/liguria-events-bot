@@ -60,6 +60,24 @@ describe('track', () => {
     assert.equal(headers['x-pm-token'], 'tok');
     assert.equal(JSON.parse(String(seen.calls[0]?.init.body))['e'], 'start');
   });
+  test('goes through the service binding when there is one, not over the public hostname', async () => {
+    // A Worker fetching a workers.dev host on its own account gets its own
+    // router back; the collector is only reachable through the binding.
+    const seen = capture();
+    const bound: { url: string; body: string }[] = [];
+    const PM_COLLECTOR = {
+      fetch: async (url: string, init?: RequestInit) => {
+        bound.push({ url, body: String(init?.body) });
+        return new Response(undefined, { status: 204 });
+      },
+    };
+    await track(envWith({ PM_ENDPOINT: 'https://collector/e', PM_TOKEN: 'tok', PM_COLLECTOR }), { event: 'tick' });
+    assert.equal(seen.calls.length, 0);
+    assert.equal(bound.length, 1);
+    assert.equal(bound[0]?.url, 'https://collector/e');
+    assert.equal(JSON.parse(bound[0]?.body ?? '{}')['e'], 'tick');
+  });
+
   test('a collector that is down cannot break the bot', async () => {
     globalThis.fetch = (async () => {
       throw new Error('network down');
