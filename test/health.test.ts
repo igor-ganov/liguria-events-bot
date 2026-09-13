@@ -417,10 +417,24 @@ describe('indexNowKeyCheck', () => {
 describe('analyticsCheck', () => {
   const base = 'https://dovego.it';
 
-  test('the beacon on the page is the whole requirement', async () => {
-    const body = '<html><head><script data-cf-beacon=\'{"token":"x"}\'></script></head></html>';
+  const pm = '<script defer src="https://pm-collector.igor-ganov.workers.dev/pm.js" data-project="dovego-it"></script>';
+
+  test('the first-party beacon on the page, tagged with this project, is the whole requirement', async () => {
+    const body = `<html><head>${pm}</head></html>`;
     const check = await analyticsCheck(serving({ [`${base}/liguria/`]: { body } }), base);
     assert.equal(check.status, 'ok');
+  });
+
+  test('the Cloudflare beacon alone no longer counts: it never recorded a pageload here', async () => {
+    const body = '<html><head><script data-cf-beacon=\'{"token":"x"}\'></script></head></html>';
+    const check = await analyticsCheck(serving({ [`${base}/liguria/`]: { body } }), base);
+    assert.equal(check.status, 'fail');
+  });
+
+  test('the beacon for some other project does not count either', async () => {
+    const body = `<html><head>${pm.replace('dovego-it', 'someone-else')}</head></html>`;
+    const check = await analyticsCheck(serving({ [`${base}/liguria/`]: { body } }), base);
+    assert.equal(check.status, 'fail');
   });
 
   test('a page without it fails, because a flat dashboard looks like no traffic', async () => {
