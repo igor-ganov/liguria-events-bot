@@ -3,6 +3,7 @@ import { afterEach, describe, test } from 'bun:test';
 import assert from 'node:assert/strict';
 import type { Env } from '../src/config.ts';
 import { track } from '../src/analytics/track.ts';
+import { reading } from '../src/analytics/reading.ts';
 import { wire } from '../src/analytics/wire.ts';
 
 const realFetch = globalThis.fetch;
@@ -34,6 +35,15 @@ describe('wire', () => {
   });
   test('metrics ride in their own field', () => {
     assert.deepEqual(wire({ event: 'tick', metrics: { users: 5 } })['m'], { users: 5 });
+  });
+});
+
+describe('reading', () => {
+  test('names what is measured in kind and carries the number as value, the shape pro-motion stores', () => {
+    const body = wire(reading('users', 42));
+    assert.equal(body['e'], 'reading');
+    assert.deepEqual(body['x'], { kind: 'users', channel: 'telegram' });
+    assert.deepEqual(body['m'], { value: 42 });
   });
 });
 
