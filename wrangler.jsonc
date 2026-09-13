@@ -21,6 +21,10 @@
   // scheduled() handler stays wired — add {"triggers":{"crons":["0 * * * *"]}}
   // back if a cron slot frees up and both paths work identically.
 
+  // pro-motion collector, reached through a binding: it is on this same account,
+  // and a same-account workers.dev fetch comes back to this worker instead.
+  "services": [{ "binding": "PM_COLLECTOR", "service": "pm-collector" }],
+
   "vars": {
     // pro-motion collector. The token is a secret (wrangler secret put PM_TOKEN);
     // with either missing the bot reports nothing.

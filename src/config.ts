@@ -27,6 +27,11 @@ export type Env = Readonly<{
    *  absent means the bot reports nothing, which is the default. */
   PM_ENDPOINT?: string;
   PM_TOKEN?: string;
+  /** Service binding to pm-collector. The collector lives on this same
+   *  Cloudflare account, and a Worker fetching a workers.dev host on its own
+   *  account gets its own router back — so without the binding every report
+   *  quietly lands on this worker's 404. */
+  PM_COLLECTOR?: Readonly<{ fetch: (input: string, init?: RequestInit) => Promise<Response> }>;
   /** IndexNow key. The same value must be readable at
    *  https://dovego.it/<key>.txt, which is how the protocol proves ownership.
    *  Empty means no submissions are made. */
