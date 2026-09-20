@@ -1,6 +1,7 @@
 // Health checks: each of these guards a bug that actually shipped.
 import { describe, test } from 'bun:test';
 import assert from 'node:assert/strict';
+import { channelChecks } from '../src/health/channel-checks.ts';
 import { corpusChecks } from '../src/health/corpus-checks.ts';
 import { indexCheck, lastRunCheck } from '../src/health/pipeline-checks.ts';
 import {
@@ -490,5 +491,62 @@ describe('platformFeedCheck', () => {
   test('a body that is not JSON does not throw the whole report', async () => {
     const check = await platformFeedCheck(serving({ [feed]: { body: '<html>' } }), base);
     assert.equal(check.status, 'ok');
+  });
+});
+
+describe('channelChecks', () => {
+  const TODAY = '2026-08-25';
+
+  // Fixture data, not prose: the corpus is trilingual, so a record that stands
+  // in for one has to be.
+  const record: EventRecord = {
+    id: 'aaaabbbbcccc',
+    title: 'Concerto',
+    startDate: TODAY,
+    categories: ['music'],
+    descriptions: { en: 'A concert.', it: 'Un concerto.', ru: 'Концерт.' },
+    url: 'https://example.org/c',
+    source: 'mentelocale',
+    city: 'firenze',
+    enriched: true,
+    addedAt: 1,
+  };
+
+  const inFirenze = (count: number): readonly CompactEvent[] =>
+    Array.from({ length: count }, (_, i) => toCompact({ ...record, id: `id${i}` }));
+
+  const byId = (checks: readonly { id: string; status: string; detail: string }[], id: string) =>
+    checks.filter((check) => check.id === id)[0];
+
+  test('a registry that read cleanly is not a fault', () => {
+    const checks = channelChecks({ channels: [], problems: [] }, [], TODAY);
+    assert.equal(byId(checks, 'channel-registry')?.status, 'ok');
+  });
+
+  test('a mistyped region fails, because nothing else would ever show it', () => {
+    const checks = channelChecks({ channels: [], problems: ['unknown region "tuscany"'] }, [], TODAY);
+    assert.equal(byId(checks, 'channel-registry')?.status, 'fail');
+    assert.ok(byId(checks, 'channel-registry')?.detail.includes('tuscany'));
+  });
+
+  test('a region with a full day and no channel is a warning', () => {
+    const checks = channelChecks({ channels: [], problems: [] }, inFirenze(3), TODAY);
+    assert.equal(byId(checks, 'channel-coverage')?.status, 'warn');
+    assert.ok(byId(checks, 'channel-coverage')?.detail.includes('Toscana'));
+  });
+
+  test('a region with barely anything on is not a missed audience', () => {
+    // Silence in a quiet region is the system working, not a gap to fill.
+    const checks = channelChecks({ channels: [], problems: [] }, inFirenze(2), TODAY);
+    assert.equal(byId(checks, 'channel-coverage')?.status, 'ok');
+  });
+
+  test('a region that has its channel raises nothing', () => {
+    const registry = {
+      channels: [{ region: 'toscana', chat: '@tos', lang: 'it', hour: 10 } as const],
+      problems: [],
+    };
+    const checks = channelChecks(registry, inFirenze(5), TODAY);
+    assert.equal(byId(checks, 'channel-coverage')?.status, 'ok');
   });
 });

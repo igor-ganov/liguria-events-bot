@@ -2,7 +2,9 @@
  *  casting. Every external payload (Telegram updates, LLM output, KV values)
  *  is read through these guards. */
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+/** A JSON object and not an array — `typeof null` says 'object', which is the
+ *  whole reason this guard exists and why the check belongs in one place. */
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export const readProp = (value: unknown, key: string): unknown =>

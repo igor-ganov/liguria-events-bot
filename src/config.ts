@@ -23,8 +23,15 @@ export type Env = Readonly<{
   TG_CHANNELS?: string;
   SOURCE_PAGES?: string;
   /** Public channel the bot broadcasts to (@username or numeric id). Empty
-   *  means the broadcast sits out entirely — no channel, no posts. */
+   *  means the broadcast sits out entirely — no channel, no posts.
+   *  Superseded by CHANNEL_CHATS; still read as the whole-country entry so a
+   *  deploy needs no secret changed in the same breath. */
   CHANNEL_CHAT_ID?: string;
+  /** The channel registry, as JSON keyed by region slug (plus the reserved
+   *  `italia` for the whole country): `{"toscana":"@dovego_toscana",
+   *  "lazio":{"chat":"@dovego_lazio","hour":18}}`. A reader subscribes to
+   *  their own region and gets only their own region. */
+  CHANNEL_CHATS?: string;
   /** The channel's own language; its readers are in Italy. */
   CHANNEL_LANG?: string;
   /** Rome hour the daily post goes out at. */

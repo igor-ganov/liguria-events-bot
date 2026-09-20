@@ -33,7 +33,9 @@ import { placeIndex } from './domain/places.ts';
 import { archivedSample } from './health/archived-sample.ts';
 import { applyIdentity } from './channel/apply-identity.ts';
 import { deletePost } from './channel/delete-post.ts';
+import { channelsOf } from './channel/channels.ts';
 import { postDaily } from './channel/post-daily.ts';
+import { postNow } from './channel/post-now.ts';
 import { pingIndexNow } from './indexnow/ping-index-now.ts';
 import { healthAlert } from './health/health-alert.ts';
 import { runHealth } from './health/run-health.ts';
@@ -777,6 +779,7 @@ const healthReport = async (env: Env) => {
     // A record that expired before the archive existed: the case 410 is for.
     goneId: '1e6b4b74d225',
     indexNowKey: env.INDEXNOW_KEY ?? '',
+    registry: channelsOf(env),
     today: romeDate(Date.now()),
     nowMs: Date.now(),
   });
@@ -1253,17 +1256,21 @@ const worker = {
       // something the moment it is worth saying.
       if (url.searchParams.get('force') === 'channel') {
         const index = await readIndex(env.EVENTS);
-        const posted = await postDaily(env, index, romeDate(Date.now()), channelHourOf(env));
-        return Response.json({ channel: posted });
+        const region = url.searchParams.get('region') ?? '';
+        return Response.json({ channel: await postNow(env, index, romeDate(Date.now()), region) });
       }
       // Take a post back down: a bad crop, a description that read badly, a
       // test post left in a public channel. Doing it by hand in Telegram is
       // not how an operator should undo something the worker did.
       if (url.searchParams.get('force') === 'channel-delete') {
         const messageId = Number(url.searchParams.get('id') ?? '');
-        const chat = env.CHANNEL_CHAT_ID ?? '';
+        // A message id belongs to one chat, so with several channels the
+        // region is no longer optional: deleting id 7 from whichever channel
+        // happens to be first would take down somebody else's post.
+        const region = url.searchParams.get('region') ?? '';
+        const chat = channelsOf(env).channels.find((one) => one.region === region)?.chat ?? '';
         if (chat === '' || !Number.isInteger(messageId)) {
-          return Response.json({ error: 'need a channel and an integer id' }, { status: 400 });
+          return Response.json({ error: 'need a known region and an integer id' }, { status: 400 });
         }
         return Response.json({ deleted: await deletePost(env.BOT_TOKEN, chat, messageId) });
       }

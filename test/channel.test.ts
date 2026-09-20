@@ -9,7 +9,9 @@ import { digestHeading } from '../src/channel/digest-heading.ts';
 import { eventUrl } from '../src/channel/event-url.ts';
 import { onDay } from '../src/channel/on-day.ts';
 import { pickDigest } from '../src/channel/pick-digest.ts';
-import { postDaily } from '../src/channel/post-daily.ts';
+import { postChannel } from '../src/channel/post-channel.ts';
+import { postedKey } from '../src/channel/posted-key.ts';
+import { WHOLE_COUNTRY } from '../src/channel/channels.ts';
 import { rememberPosted } from '../src/channel/remember-posted.ts';
 import { renderDigest } from '../src/channel/render-digest.ts';
 import { readProp } from '../src/util/json.ts';
@@ -185,7 +187,7 @@ describe('rememberPosted', () => {
   });
 });
 
-describe('postDaily', () => {
+describe('postChannel', () => {
   // Two cities: four events survive the per-city cap of three.
   const index = [...many(3, { city: 'genova' }), ...many(1, { city: 'milano' })];
 
@@ -208,43 +210,34 @@ describe('postDaily', () => {
     return { store, binding };
   };
 
-  const env = (channel: string, binding: KvLike): Env => ({
+  const env = (binding: KvLike): Env => ({
     EVENTS: binding,
     AI: { run: async () => ({}) },
     BOT_TOKEN: 't',
     WEBHOOK_SECRET: '',
     OWNER_CHAT_ID: '',
-    CHANNEL_CHAT_ID: channel,
   });
+
+  const channel = { region: WHOLE_COUNTRY, chat: '@dovegoit', lang: 'it', hour: 10 } as const;
 
   const accepting = (seen: { body?: unknown }): FetchFn => async (_input, init) => {
     seen.body = JSON.parse(String(init?.body ?? '{}'));
     return new Response(JSON.stringify({ ok: true, result: { message_id: 7 } }), { status: 200 });
   };
 
-  test('says nothing at all when no channel is configured', async () => {
-    const { binding } = kv({});
-    assert.deepEqual(await postDaily(env('', binding), index, TODAY, 10), { kind: 'not-due' });
-  });
-
-  test('posts at the hour it was told, and not at another one', async () => {
-    const { binding } = kv({});
-    assert.deepEqual(await postDaily(env('@dovegoit', binding), index, TODAY, 9), { kind: 'not-due' });
-  });
-
   test('a day with too little on gets no post', async () => {
     const { binding } = kv({});
-    const result = await postDaily(env('@dovegoit', binding), many(1, { city: 'genova' }), TODAY, 10);
-    assert.deepEqual(result, { kind: 'nothing-to-say', found: 1 });
+    const result = await postChannel(env(binding), channel, many(1, { city: 'genova' }), TODAY);
+    assert.deepEqual(result, { region: WHOLE_COUNTRY, kind: 'nothing-to-say', found: 1 });
   });
 
   test('sends the digest and remembers every event in it', async () => {
     const { binding, store } = kv({});
     const seen: { body?: unknown } = {};
-    const result = await postDaily(env('@dovegoit', binding), index, TODAY, 10, accepting(seen));
-    assert.deepEqual(result, { kind: 'posted', events: 4, messageId: 7 });
+    const result = await postChannel(env(binding), channel, index, TODAY, accepting(seen));
+    assert.deepEqual(result, { region: WHOLE_COUNTRY, kind: 'posted', events: 4, messageId: 7 });
     assert.equal(readProp(seen.body, 'chat_id'), '@dovegoit');
-    assert.equal(JSON.parse(store.get('channel:posted') ?? '[]').length, 4);
+    assert.equal(JSON.parse(store.get(postedKey(WHOLE_COUNTRY)) ?? '[]').length, 4);
   });
 
   test('asks Telegram to preview the first event, large and above the text', async () => {
@@ -252,7 +245,7 @@ describe('postDaily', () => {
     // is already our crop on our own origin.
     const { binding } = kv({});
     const seen: { body?: unknown } = {};
-    await postDaily(env('@dovegoit', binding), index, TODAY, 10, accepting(seen));
+    await postChannel(env(binding), channel, index, TODAY, accepting(seen));
     const preview = readProp(seen.body, 'link_preview_options');
     assert.equal(readProp(preview, 'url'), 'https://dovego.it/it/event/concerto-di-ferragosto-2026-08-25-id0genova/');
     assert.equal(readProp(preview, 'prefer_large_media'), true);
@@ -266,10 +259,10 @@ describe('postDaily', () => {
     const { binding, store } = kv({});
     const refusing: FetchFn = async () =>
       new Response(JSON.stringify({ ok: false, description: 'Bad Request: chat not found' }), { status: 400 });
-    const result = await postDaily(env('@dovegoit', binding), index, TODAY, 10, refusing);
+    const result = await postChannel(env(binding), channel, index, TODAY, refusing);
     assert.equal(readProp(result, 'kind'), 'failed');
     assert.ok(String(readProp(result, 'error')).includes('chat not found'));
-    assert.equal(store.get('channel:posted'), undefined);
+    assert.equal(store.get(postedKey(WHOLE_COUNTRY)), undefined);
   });
 });
 

@@ -45,6 +45,7 @@ export const renderDigest = (
   events: readonly CompactEvent[],
   lang: Lang,
   today: string,
+  region?: string,
 ): string => {
   const cities = [...new Set(events.map((event) => event.ct ?? ''))];
   const grouped = cities.map((city) =>
@@ -52,7 +53,7 @@ export const renderDigest = (
   );
   const home = lang === 'en' ? `${SITE}/` : `${SITE}/${lang}/`;
   return [
-    `📅 <b>${escapeHtml(digestHeading(today, lang))}</b>`,
+    `📅 <b>${escapeHtml(digestHeading(today, lang, region))}</b>`,
     ...grouped,
     `<a href="${home}">${escapeHtml(MORE[lang])}</a>`,
   ].join('\n\n');

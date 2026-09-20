@@ -1,4 +1,5 @@
 import { canonicalAddressCheck } from './canonical-address-check.ts';
+import { channelChecks } from './channel-checks.ts';
 import { corpusChecks } from './corpus-checks.ts';
 import { eventMarkupCheck, hreflangCheck } from './markup-checks.ts';
 import { indexCheck, lastRunCheck } from './pipeline-checks.ts';
@@ -16,6 +17,7 @@ import { worstOf } from './types.ts';
 import type { CompactEvent } from '../domain/event.ts';
 import type { FetchFn } from '../collectors/types.ts';
 import type { HealthReport } from './types.ts';
+import type { Registry } from '../channel/channels.ts';
 
 export type HealthDeps = Readonly<{
   fetchFn: FetchFn;
@@ -28,6 +30,9 @@ export type HealthDeps = Readonly<{
   goneId: string | undefined;
   /** The IndexNow key, so the check can read it back off the site. */
   indexNowKey: string;
+  /** The channel registry, so a mistyped region shows up as a fault rather
+   *  than as a channel that is quietly never posted to. */
+  registry: Registry;
   today: string;
   nowMs: number;
 }>;
@@ -58,6 +63,7 @@ export const runHealth = async (deps: HealthDeps): Promise<HealthReport> => {
     ...indexCheck(deps.index, deps.today),
     ...corpusChecks(deps.index),
     ...lastRunCheck(deps.runLog, deps.nowMs),
+    ...channelChecks(deps.registry, deps.index, deps.today),
   ];
   return { at: Math.floor(deps.nowMs / 1000), status: worstOf(checks), checks };
 };
