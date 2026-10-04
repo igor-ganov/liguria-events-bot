@@ -119,7 +119,15 @@ export type DetailFields = Readonly<{
   time?: string;
   priceInfo?: string;
   rawDescription?: string;
+  /** The photographs in the page's own slider. Empty when the page was read
+   *  and had none; absent only when it was never read. */
+  photos?: readonly string[];
 }>;
+
+/** The image style visitgenoa serves content photographs in. Theme art and
+ *  category glyphs are served from elsewhere, which is how they are told apart. */
+const PHOTO_STYLE = '/styles/max_650x650/';
+const MAX_PHOTOS = 8;
 
 const TIME_PATTERN = /\bore\s+([01]?\d|2[0-3])[:.]([0-5]\d)\b|\b([01]?\d|2[0-3]):([0-5]\d)\b/;
 const PRICE_PATTERN =
@@ -130,6 +138,7 @@ export const parseDetailHtml = async (html: string): Promise<DetailFields> => {
   let body = '';
   let collecting = false;
   let venueAnchors = 0;
+  const photos: string[] = [];
   const collectText = (chunk: Readonly<{ text: string }>): void => {
     if (collecting && body.length < 6000) body += chunk.text;
   };
@@ -137,6 +146,14 @@ export const parseDetailHtml = async (html: string): Promise<DetailFields> => {
     .on('h2.title', {
       element: () => {
         collecting = true;
+      },
+    })
+    // Only the page's own slider: any other image belongs to the site or to
+    // another event, and a gallery with a stranger in it is worse than none.
+    .on('div.swiper-slide img', {
+      element: (element) => {
+        const src = element.getAttribute('src');
+        if (src !== null && src.includes(PHOTO_STYLE)) photos.push(new URL(src, BASE_URL).toString());
       },
     })
     .on('p', { text: collectText })
@@ -168,6 +185,7 @@ export const parseDetailHtml = async (html: string): Promise<DetailFields> => {
     ...(time === undefined ? {} : { time }),
     ...(priceInfo === undefined ? {} : { priceInfo }),
     ...(rawDescription === '' ? {} : { rawDescription }),
+    photos: [...new Set(photos)].slice(0, MAX_PHOTOS),
   };
 };
 

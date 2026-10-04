@@ -357,3 +357,34 @@ describe('startTime', () => {
     assert.equal(toCompact({ ...record, time: '21:00' }).h, '21:00');
   });
 });
+
+describe('photos: the gallery a source page carried', () => {
+  const photos = ['https://img.test/a.jpg', 'https://img.test/b.jpg'];
+
+  test('survive being stored and read back', () => {
+    assert.deepEqual(parseEventRecord(JSON.stringify({ ...record, photos }))?.photos, photos);
+  });
+
+  test('an empty list is kept: it means the page was read and had none', () => {
+    assert.deepEqual(parseEventRecord(JSON.stringify({ ...record, photos: [] }))?.photos, []);
+    assert.equal(parseEventRecord(JSON.stringify(record))?.photos, undefined);
+  });
+
+  test('reach the site as ph, and only when there are some', () => {
+    assert.deepEqual(toCompact({ ...record, photos }).ph, photos);
+    assert.equal(toCompact({ ...record, photos: [] }).ph, undefined);
+    assert.equal(toCompact(record).ph, undefined);
+  });
+
+  test('round-trip through the index', () => {
+    assert.deepEqual(parseIndex(JSON.stringify([toCompact({ ...record, photos })]))?.[0]?.ph, photos);
+  });
+
+  test('are filled by a later sighting, never overwritten by one', () => {
+    const raw = { title: record.title, startDate: record.startDate, url: record.url, source: record.source, photos };
+    assert.deepEqual(mergeEvent(record, raw).event.photos, photos);
+    assert.equal(mergeEvent(record, raw).changed, true);
+    const kept = mergeEvent({ ...record, photos: ['https://img.test/first.jpg'] }, raw).event.photos;
+    assert.deepEqual(kept, ['https://img.test/first.jpg']);
+  });
+});

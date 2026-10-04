@@ -133,6 +133,7 @@ const toRecord = (
     descriptions: enrichment?.descriptions ?? localized(raw.rawDescription ?? raw.title),
     url: raw.url,
     source: raw.source,
+    ...(raw.photos === undefined ? {} : { photos: raw.photos }),
     ...(raw.city === undefined ? {} : { city: raw.city }),
     ...(raw.lat === undefined || raw.lng === undefined ? {} : { lat: raw.lat, lng: raw.lng }),
     enriched: enrichment !== undefined,
@@ -186,6 +187,11 @@ const pendingOfRecord = (record: EventRecord): PendingEnrich => ({
 // Project a stored record back to a RawEvent so the detail fetchers can re-fetch
 // its source page. `rawDescription` is carried through so a fetcher skips any
 // record that already has a body (its per-source budget goes to the empty ones).
+/** The sources whose event pages carry a gallery of their own. A source is
+ *  added here only once its detail fetcher reads one: asking the others would
+ *  fetch a page per event per run and find nothing, forever. */
+const PHOTO_SOURCES: ReadonlySet<string> = new Set(['visitgenoa']);
+
 const rawFromRecord = (record: EventRecord): RawEvent => ({
   title: record.title,
   startDate: record.startDate,
@@ -284,17 +290,37 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       item,
       record: await readEventRecord(deps.kv, item.id),
     }));
+    // Catch up on photographs: events stored before galleries existed never
+    // had their page read for them. Only sources whose pages carry a gallery
+    // are asked, a few per run (each detail fetcher has its own budget), and a
+    // page that had none is marked with an empty list so it is not asked again.
+    const photoless = stored.flatMap(({ record }) =>
+      record === undefined || record.photos !== undefined || !PHOTO_SOURCES.has(record.source)
+        ? []
+        : [record],
+    );
+    const photoRead = await deps.details(photoless.map(rawFromRecord));
+    const photosById = new Map(
+      photoless.flatMap((record, i): readonly (readonly [string, readonly string[]])[] => {
+        const found = photoRead[i]?.photos;
+        return found === undefined ? [] : [[record.id, found]];
+      }),
+    );
+
     for (const { item, record } of stored) {
       if (record === undefined) continue;
       const merged = mergeEvent(record, item.raw);
       // A container's run follows its programme, re-derived on every sighting:
       // a record written before that rule (or by an older prompt) is repaired
       // here, with no LLM call and no version bump.
-      const event = withDerivedSpan(merged.event);
+      const caught = merged.event.photos === undefined ? photosById.get(item.id) : undefined;
+      const event = withDerivedSpan(
+        caught === undefined ? merged.event : { ...merged.event, photos: caught },
+      );
       const spanChanged =
         event.startDate !== record.startDate || event.endDate !== record.endDate;
       if (merged.changed) mergedIds.add(item.id);
-      if (merged.changed || spanChanged) {
+      if (merged.changed || spanChanged || caught !== undefined) {
         updatedRecords.push(event);
       }
       // Re-enrich when it never succeeded OR was written by an older prompt

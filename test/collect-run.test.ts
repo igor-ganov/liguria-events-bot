@@ -272,3 +272,53 @@ describe('runCollect', () => {
     assert.deepEqual(index[0]?.l, [{ source: 'tg:genova', url: 'https://example.org/tg' }]);
   });
 });
+
+// Events stored before galleries existed never had their page read for
+// photographs. They are caught up a few per run, and each one is marked as
+// read whether or not it had any, so the same page is not fetched forever.
+describe('runCollect: catching up on photographs', () => {
+  const photos = ['https://www.visitgenoa.it/a.jpg'];
+  const raw = rawEvent({ title: 'Old Show', categoryHint: 'theatre' });
+  const withPhotos = (seen: string[]): CollectDeps['details'] => async (events) =>
+    events.map((event) => {
+      seen.push(event.url);
+      return { ...event, photos };
+    });
+
+  test('a stored event that was never read for photographs gets them', async () => {
+    const kv = makeKvStub();
+    await runCollect(makeDeps(kv, [okCollector([raw])]));
+    const id = await eventIdOf('Old Show', '2026-07-10');
+    assert.equal((await readEventRecord(kv, id))?.photos, undefined);
+
+    const seen: string[] = [];
+    await runCollect({ ...makeDeps(kv, [okCollector([raw])]), details: withPhotos(seen) });
+    assert.deepEqual((await readEventRecord(kv, id))?.photos, photos);
+    assert.deepEqual((await readIndex(kv)).find((event) => event.id === id)?.ph, photos);
+  });
+
+  test('one already read is not fetched again', async () => {
+    const kv = makeKvStub();
+    // Enriched, so the only thing that could send it back to its page is the
+    // catch-up itself: an unenriched record is re-read for its text every run.
+    const id = await eventIdOf('Old Show', '2026-07-10');
+    const done = new Map<string, Enrichment>([
+      [id, { categories: ['theatre'], descriptions: { en: 'A show.', it: 'Uno spettacolo.', ru: 'A show.' }, unusual: false }],
+    ]);
+    await runCollect(makeDeps(kv, [okCollector([raw])], done));
+    const first: string[] = [];
+    await runCollect({ ...makeDeps(kv, [okCollector([raw])], done), details: withPhotos(first) });
+    assert.equal(first.filter((url) => url === raw.url).length, 1);
+    const second: string[] = [];
+    await runCollect({ ...makeDeps(kv, [okCollector([raw])], done), details: withPhotos(second) });
+    assert.equal(second.filter((url) => url === raw.url).length, 0);
+  });
+
+  test('a page with no photographs is marked read, with an empty list', async () => {
+    const kv = makeKvStub();
+    await runCollect(makeDeps(kv, [okCollector([raw])]));
+    const id = await eventIdOf('Old Show', '2026-07-10');
+    await runCollect({ ...makeDeps(kv, [okCollector([raw])]), details: async (events) => events.map((event) => ({ ...event, photos: [] })) });
+    assert.deepEqual((await readEventRecord(kv, id))?.photos, []);
+  });
+});

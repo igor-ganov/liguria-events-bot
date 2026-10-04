@@ -112,6 +112,9 @@ export type EventRecord = Readonly<{
   descriptions: LocalizedText;
   /** Poster/cover image from the source, when the listing exposes one. */
   image?: string;
+  /** The photographs the source page itself carried. An empty list means the
+   *  page was read and had none; absent means it was never read for them. */
+  photos?: readonly string[];
   /** Links from other sources that resighted this event (AC-1.8). */
   altLinks?: readonly SourceLink[];
   rawDescription?: string;
@@ -199,6 +202,8 @@ export type CompactEvent = Readonly<{
   k?: true;
   u: string;
   img?: string;
+  /** Photographs from the source page (ph = photos), beyond the cover. */
+  ph?: readonly string[];
   d?: LocalizedText;
   l?: readonly SourceLink[];
   x?: boolean;
@@ -234,6 +239,8 @@ export type RawEvent = Readonly<{
   lng?: number;
   categoryHint?: Category;
   image?: string;
+  /** Photographs found on the source page, when a detail fetcher read it. */
+  photos?: readonly string[];
   /** Links of other sources that saw this event in the same run (AC-1.8). */
   altLinks?: readonly SourceLink[];
 }>;
@@ -348,6 +355,10 @@ export const mergeEvent = (
     ...(existing.image === undefined && incoming.image !== undefined
       ? { image: incoming.image }
       : {}),
+    // Filled once, never overwritten: the first reading of the page stands.
+    ...(existing.photos === undefined && incoming.photos !== undefined
+      ? { photos: incoming.photos }
+      : {}),
     // A source that now hands us the venue's coordinates (JSON-LD geo, or a
     // fixed-venue collector) backfills them onto an event stored before we read
     // them — so a re-crawl fills the map without waiting on the geocoder.
@@ -371,6 +382,7 @@ export const mergeEvent = (
     event.priceInfo !== existing.priceInfo ||
     event.rawDescription !== existing.rawDescription ||
     event.image !== existing.image ||
+    event.photos !== existing.photos ||
     event.lat !== existing.lat ||
     event.lng !== existing.lng ||
     event.altLinks !== existing.altLinks;
@@ -454,6 +466,7 @@ export const toCompact = (event: EventRecord): CompactEvent => {
   ...(event.city === undefined ? {} : { ct: event.city }),
   ...(region === undefined ? {} : { rg: region }),
   ...(event.image === undefined ? {} : { img: event.image }),
+  ...(event.photos === undefined || event.photos.length === 0 ? {} : { ph: event.photos }),
   ...(event.descriptions.en === '' ? {} : { d: event.descriptions }),
   ...(event.altLinks === undefined || event.altLinks.length === 0
     ? {}
@@ -475,6 +488,14 @@ const parseCategories = (value: unknown): readonly Category[] => {
   const merged = [...many, ...fallback];
   return merged.length === 0 ? ['other'] : merged.slice(0, 3);
 };
+
+/** A list of non-empty strings, or undefined when the value is not a list at
+ *  all — the difference between "read, and there were none" and "never read". */
+const parseStrings = (value: unknown): readonly string[] | undefined =>
+  asArray(value)?.flatMap((item) => {
+    const text = asNonEmptyString(item);
+    return text === undefined ? [] : [text];
+  });
 
 const parseSourceLinks = (value: unknown): readonly SourceLink[] =>
   (asArray(value) ?? []).flatMap((item): readonly SourceLink[] => {
@@ -624,6 +645,7 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
   const free = asBoolean(readProp(value, 'free'));
   const unusual = asBoolean(readProp(value, 'unusual'));
   const image = asNonEmptyString(readProp(value, 'image'));
+  const photos = parseStrings(readProp(value, 'photos'));
   const city = asNonEmptyString(readProp(value, 'city'));
   const altLinks = parseSourceLinks(readProp(value, 'altLinks'));
   const titles = parseLocalized(readProp(value, 'titles'));
@@ -658,6 +680,7 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
     ...(free === undefined ? {} : { free }),
     ...(unusual === undefined ? {} : { unusual }),
     ...(image === undefined ? {} : { image }),
+    ...(photos === undefined ? {} : { photos }),
     ...(city === undefined ? {} : { city }),
     ...(sessions === undefined ? {} : { sessions }),
     ...(kind === undefined ? {} : { kind }),
@@ -695,6 +718,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
   const ct = asNonEmptyString(readProp(value, 'ct'));
   const rg = asNonEmptyString(readProp(value, 'rg'));
   const img = asNonEmptyString(readProp(value, 'img'));
+  const ph = parseStrings(readProp(value, 'ph'));
   const d = parseLocalized(readProp(value, 'd'), asNonEmptyString(readProp(value, 'd')));
   const tl = parseLocalized(readProp(value, 'tl'));
   const l = parseSourceLinks(readProp(value, 'l'));
@@ -723,6 +747,7 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
     ...(ct === undefined ? {} : { ct }),
     ...(rg === undefined ? {} : { rg }),
     ...(img === undefined ? {} : { img }),
+    ...(ph === undefined || ph.length === 0 ? {} : { ph }),
     ...(d === undefined ? {} : { d }),
     ...(l.length === 0 ? {} : { l }),
     ...(x === true ? { x: true } : {}),
