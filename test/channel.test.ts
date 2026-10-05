@@ -141,9 +141,11 @@ describe('renderDigest', () => {
 
   test('every event is a link to its own page', () => {
     // The address the page answers at: a bare id would post a link that 301s.
+    // Tagged, because an untagged click from the channel arrives as "direct"
+    // and the channel cannot then be judged on what it brought.
     assert.ok(
       digest.includes(
-        '<a href="https://dovego.it/it/event/concerto-di-ferragosto-teatro-carlo-felice-2026-08-25-aaaabbbbcccc/">',
+        '<a href="https://dovego.it/it/event/concerto-di-ferragosto-teatro-carlo-felice-2026-08-25-aaaabbbbcccc/?utm_source=telegram&utm_medium=social&utm_campaign=2026-08-channel">',
       ),
       digest,
     );
@@ -154,7 +156,10 @@ describe('renderDigest', () => {
   });
 
   test('closes with the way through to everything else', () => {
-    assert.ok(digest.includes('<a href="https://dovego.it/it/">Tutti gli eventi di oggi</a>'));
+    assert.ok(
+      digest.includes('<a href="https://dovego.it/it/?utm_source=telegram&utm_medium=social&utm_campaign=2026-08-channel">Tutti gli eventi di oggi</a>'),
+      digest,
+    );
   });
 
   test('escapes a scraped title rather than sending broken HTML', () => {
@@ -247,7 +252,10 @@ describe('postChannel', () => {
     const seen: { body?: unknown } = {};
     await postChannel(env(binding), channel, index, TODAY, accepting(seen));
     const preview = readProp(seen.body, 'link_preview_options');
-    assert.equal(readProp(preview, 'url'), 'https://dovego.it/it/event/concerto-di-ferragosto-2026-08-25-id0genova/');
+    assert.equal(
+      readProp(preview, 'url'),
+      'https://dovego.it/it/event/concerto-di-ferragosto-2026-08-25-id0genova/?utm_source=telegram&utm_medium=social&utm_campaign=2026-08-channel',
+    );
     assert.equal(readProp(preview, 'prefer_large_media'), true);
     assert.equal(readProp(preview, 'show_above_text'), true);
   });
