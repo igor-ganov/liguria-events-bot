@@ -69,6 +69,7 @@ import {
   writeIndex,
 } from './pipeline/store.ts';
 import { digestNotice } from './push/digest-notice.ts';
+import { taggedNotice } from './push/tagged-notice.ts';
 import { dropSubscription, readSubscriptions, writeSubscription } from './push/push-store.ts';
 import { pushableSubscription } from './push/subscription.ts';
 import { sendPush } from './push/send-push.ts';
@@ -1032,11 +1033,16 @@ const worker = {
       const lang = url.searchParams.get('lang') ?? 'en';
       const index = eventsInPlace(await readIndex(env.EVENTS), isPlace(place) ? place : '');
       const today = romeDate(Date.now());
-      const notice = digestNotice(
-        eventsInWindow(index, todayWindow(today)),
-        isPlace(place) ? place : '',
-        isLang(lang) ? lang : 'en',
-        SITE_ORIGIN,
+      // Tagged as it goes out: a push click carries no referrer, so without it
+      // the one channel whose audience we own reads as "direct".
+      const notice = taggedNotice(
+        digestNotice(
+          eventsInWindow(index, todayWindow(today)),
+          isPlace(place) ? place : '',
+          isLang(lang) ? lang : 'en',
+          SITE_ORIGIN,
+        ),
+        today,
       );
       return Response.json(notice ?? {}, { headers: { ...CORS, 'cache-control': 'public, max-age=600' } });
     }

@@ -1,7 +1,10 @@
+import { channelUtm } from '../links/channel-utm.ts';
 import { escapeHtml } from '../delivery/render.ts';
 import { cityNameOf, citySlug } from '../domain/city.ts';
 import { digestHeading } from './digest-heading.ts';
 import { eventUrl } from './event-url.ts';
+import { withUtm } from '../links/with-utm.ts';
+import type { Utm } from '../links/with-utm.ts';
 import { titleOf } from '../domain/event.ts';
 import type { CompactEvent, Lang } from '../domain/event.ts';
 
@@ -24,14 +27,14 @@ const venueOf = (event: CompactEvent): string | undefined => {
 const detail = (event: CompactEvent): string =>
   [event.h, venueOf(event)].filter((part) => part !== undefined && part !== '').join(' · ');
 
-const line = (lang: Lang) => (event: CompactEvent): string => {
-  const title = `<a href="${eventUrl(event, lang)}">${escapeHtml(titleOf(event, lang))}</a>`;
+const line = (lang: Lang, utm: Utm) => (event: CompactEvent): string => {
+  const title = `<a href="${withUtm(eventUrl(event, lang), utm)}">${escapeHtml(titleOf(event, lang))}</a>`;
   const rest = detail(event);
   return `• ${title}${rest === '' ? '' : ` — ${escapeHtml(rest)}`}`;
 };
 
-const section = (lang: Lang) => (city: string, events: readonly CompactEvent[]): string =>
-  [`<b>${escapeHtml(cityNameOf(city) ?? city)}</b>`, ...events.map(line(lang))].join('\n');
+const section = (lang: Lang, utm: Utm) => (city: string, events: readonly CompactEvent[]): string =>
+  [`<b>${escapeHtml(cityNameOf(city) ?? city)}</b>`, ...events.map(line(lang, utm))].join('\n');
 
 /**
  * The day's post: a few things worth doing, grouped by city, each one a link
@@ -48,10 +51,14 @@ export const renderDigest = (
   region?: string,
 ): string => {
   const cities = [...new Set(events.map((event) => event.ct ?? ''))];
+  // Tagged like every other link we send: the channel is the only surface that
+  // puts a link into the site on purpose, and untagged every click it earned
+  // arrived as "direct".
+  const utm = channelUtm(today);
   const grouped = cities.map((city) =>
-    section(lang)(city, events.filter((event) => (event.ct ?? '') === city)),
+    section(lang, utm)(city, events.filter((event) => (event.ct ?? '') === city)),
   );
-  const home = lang === 'en' ? `${SITE}/` : `${SITE}/${lang}/`;
+  const home = withUtm(lang === 'en' ? `${SITE}/` : `${SITE}/${lang}/`, utm);
   return [
     `📅 <b>${escapeHtml(digestHeading(today, lang, region))}</b>`,
     ...grouped,

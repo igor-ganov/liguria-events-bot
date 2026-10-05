@@ -1,4 +1,6 @@
+import { channelUtm } from '../links/channel-utm.ts';
 import { eventUrl } from './event-url.ts';
+import { withUtm } from '../links/with-utm.ts';
 import { inRegion } from './in-region.ts';
 import { pickDigest } from './pick-digest.ts';
 import { postText } from './post-text.ts';
@@ -49,7 +51,13 @@ export const postChannel = async (
   // og:image, which is already our 1200x630 crop on our own origin.
   const text = renderDigest(events, lang, today, regionLabel(region));
   const first = events[0] ?? { id: '', t: '', s: '' };
-  const sent = await postText(env.BOT_TOKEN, chat, text, eventUrl(first, lang), fetchFn);
+  const sent = await postText(
+    env.BOT_TOKEN,
+    chat,
+    text,
+    withUtm(eventUrl(first, lang), channelUtm(today)),
+    fetchFn,
+  );
   // Remember only what was actually said. Recording a failed send as posted is
   // how the first channel post vanished: the run reported success, the events
   // were struck off, and the channel stayed empty.
