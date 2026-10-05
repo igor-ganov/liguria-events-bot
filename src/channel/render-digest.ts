@@ -2,7 +2,7 @@ import { channelUtm } from '../links/channel-utm.ts';
 import { escapeHtml } from '../delivery/render.ts';
 import { cityNameOf, citySlug } from '../domain/city.ts';
 import { digestHeading } from './digest-heading.ts';
-import { eventUrl } from './event-url.ts';
+import { eventUrl } from '../links/event-url.ts';
 import { withUtm } from '../links/with-utm.ts';
 import type { Utm } from '../links/with-utm.ts';
 import { titleOf } from '../domain/event.ts';

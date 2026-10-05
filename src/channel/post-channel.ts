@@ -1,5 +1,5 @@
 import { channelUtm } from '../links/channel-utm.ts';
-import { eventUrl } from './event-url.ts';
+import { eventUrl } from '../links/event-url.ts';
 import { withUtm } from '../links/with-utm.ts';
 import { inRegion } from './in-region.ts';
 import { pickDigest } from './pick-digest.ts';

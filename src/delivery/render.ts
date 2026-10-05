@@ -2,7 +2,8 @@
  * Pure rendering (design §7): compact events → Telegram HTML. Splitting
  * respects entry boundaries (AC-3.7).
  */
-import { CATEGORIES, primaryCategory, titleOf } from '../domain/event.ts';
+import { CATEGORIES, primaryCategory, titleOf, toCompact } from '../domain/event.ts';
+import { siteLink } from '../links/site-link.ts';
 import type { Category, CompactEvent, EventRecord } from '../domain/event.ts';
 import { t } from '../i18n.ts';
 import type { TranslationKey } from '../i18n.ts';
@@ -52,7 +53,11 @@ export const renderEventLine = (event: CompactEvent, lang: Language): string => 
     ...(event.f === true ? ['free'] : []),
   ];
   const gem = event.x === true ? '💎 ' : '';
-  return `• ${gem}<a href="${event.u}">${escapeHtml(titleOf(event, lang))}</a> — ${parts.join(', ')}`;
+  // Our page, not the source. The bot used to hand a reader a list of links to
+  // comune and theatre websites: it sent its own readers away from the site it
+  // exists to fill, and Telegram brought one visit a week. The source is named
+  // on the page they land on, with its link.
+  return `• ${gem}<a href="${siteLink(event, lang)}">${escapeHtml(titleOf(event, lang))}</a> — ${parts.join(', ')}`;
 };
 
 /** Category-grouped digest body (AC-3.1); category order = taxonomy order. */
@@ -108,7 +113,10 @@ export const renderCard = (event: EventRecord, lang: Language): string => {
     '',
     escapeHtml(event.descriptions[lang]),
     '',
-    `<a href="${event.url}">→ ${escapeHtml(event.source)}</a>`,
+    // Our page first — it is the one with the dates, the map and everything
+    // else on that day — and the source after it, still named and still
+    // linked: it is how the event got here.
+    `<a href="${siteLink(toCompact(event), lang)}">→ dovego.it</a> · <a href="${event.url}">${escapeHtml(event.source)}</a>`,
   ];
   return lines.join('\n');
 };

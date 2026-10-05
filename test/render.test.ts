@@ -31,9 +31,14 @@ describe('escapeHtml', () => {
 });
 
 describe('renderEventLine', () => {
-  test('links the title, shows dates, venue, free flag', () => {
+  test('links the title to our page, shows dates, venue, free flag', () => {
+    // Our page, not the source. The bot used to hand its readers a list of
+    // links to comune and theatre websites — it sent them away from the site
+    // it exists to fill, and Telegram brought one visit a week.
     const line = renderEventLine(compact, 'en');
-    assert.ok(line.includes('<a href="https://example.org/1">'));
+    assert.ok(line.includes('<a href="https://dovego.it/event/'), line);
+    assert.ok(line.includes('utm_source=telegram'), line);
+    assert.ok(!line.includes('https://example.org/1'), line);
     assert.ok(line.includes('Concert &lt;live&gt; &amp; loud'));
     assert.ok(line.includes('04.07–05.07, 21:00'));
     assert.ok(line.includes('Porto Antico'));
@@ -81,7 +86,21 @@ describe('renderCard', () => {
     assert.ok(card.includes('📍 Porto Antico'));
     assert.ok(card.includes('💶 € 15,00'));
     assert.ok(card.includes('Electronic music by the sea.'));
-    assert.ok(card.includes('href="https://example.org/1"'));
+    // Our page first, and tagged: that is where the reader is taken.
+    assert.ok(card.includes('href="https://dovego.it/event/'), card);
+    assert.ok(card.includes('utm_campaign='), card);
+  });
+
+  test('still credits the source, and still links it', () => {
+    // The source is how the event got here and the page says so too; what
+    // changed is which of the two links the reader is offered first.
+    const card = renderCard(record, 'en');
+    assert.ok(card.includes('visitgenoa'), card);
+    assert.ok(card.includes('href="https://example.org/1"'), card);
+    assert.ok(
+      card.indexOf('dovego.it') < card.indexOf('https://example.org/1'),
+      'our page is offered before the source',
+    );
   });
 });
 
