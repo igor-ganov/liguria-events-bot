@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { applyIdentity } from '../src/channel/apply-identity.ts';
 import { deletePost } from '../src/channel/delete-post.ts';
 import { digestHeading } from '../src/channel/digest-heading.ts';
-import { eventUrl } from '../src/channel/event-url.ts';
+import { eventUrl } from '../src/links/event-url.ts';
 import { onDay } from '../src/channel/on-day.ts';
 import { pickDigest } from '../src/channel/pick-digest.ts';
 import { postChannel } from '../src/channel/post-channel.ts';

@@ -7,7 +7,8 @@
 import type { Category, CompactEvent, Lang } from '../domain/event.ts';
 import { descriptionOf, isCategory, isLang, primaryCategory, titleOf } from '../domain/event.ts';
 import { CATEGORY_EMOJI } from '../delivery/render.ts';
-import { addDays } from '../pipeline/clock.ts';
+import { addDays, romeDate } from '../pipeline/clock.ts';
+import { icsLink } from '../links/ics-link.ts';
 
 /** Feed language (AC-5.1): `?lang=it|ru`, default and unknown → en. */
 export const langFromQuery = (params: URLSearchParams): Lang => {
@@ -117,7 +118,7 @@ const CATEGORY_LABEL: Readonly<Record<Category, string>> = {
   other: 'Other',
 };
 
-const eventLines = (event: CompactEvent, stamp: string, lang: Lang): readonly string[] => {
+const eventLines = (event: CompactEvent, stamp: string, lang: Lang, today: string): readonly string[] => {
   const lastDay = event.e ?? event.s;
   const timing =
     event.h === undefined
@@ -135,6 +136,8 @@ const eventLines = (event: CompactEvent, stamp: string, lang: Lang): readonly st
     ...(summary === '' ? [] : [summary]),
     event.c.map((category) => CATEGORY_LABEL[category]).join('/'),
     ...(event.f === true ? ['free entry'] : []),
+    // The source, named rather than linked first: the entry's own URL is our
+    // page now, and the page credits the source with its link.
     event.u,
   ].join(' · ');
   return [
@@ -145,7 +148,7 @@ const eventLines = (event: CompactEvent, stamp: string, lang: Lang): readonly st
     `SUMMARY:${escapeIcsText(`${CATEGORY_EMOJI[primaryCategory(event.c)]} ${titleOf(event, lang)}`)}`,
     ...(event.v === undefined ? [] : [`LOCATION:${escapeIcsText(event.v)}`]),
     `DESCRIPTION:${escapeIcsText(description)}`,
-    `URL:${event.u}`,
+    `URL:${icsLink(event, lang, today)}`,
     `CATEGORIES:${event.c.map((category) => CATEGORY_LABEL[category].toUpperCase()).join(',')}`,
     'END:VEVENT',
   ];
@@ -157,6 +160,9 @@ export const buildIcs = (
   lang: Lang = 'en',
 ): string => {
   const stamp = dtStamp(nowMs);
+  // The campaign's month is the build's: a subscription fetched in October is
+  // an October subscription, whenever the reader opens one of its entries.
+  const today = romeDate(nowMs);
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -166,7 +172,7 @@ export const buildIcs = (
     'X-WR-CALNAME:Genoa Events',
     'X-WR-TIMEZONE:Europe/Rome',
     ...VTIMEZONE,
-    ...events.flatMap((event) => eventLines(event, stamp, lang)),
+    ...events.flatMap((event) => eventLines(event, stamp, lang, today)),
     'END:VCALENDAR',
   ];
   return `${lines.flatMap(foldIcsLine).join('\r\n')}\r\n`;
