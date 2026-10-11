@@ -24,8 +24,11 @@ const systemFor = (language: string): string =>
     'bullet lists, and the real newlines between them.',
     'Keep proper nouns (people, venues, works, cities) in their own form; do not',
     'invent, add or drop any fact. Translate nothing that is already a name.',
+    'When the input carries "sessions" — the titles of the programme, in order —',
+    'return "sessions" too: the same titles translated, the SAME number of items',
+    'in the SAME order. Omit it when the input has none.',
     'Respond with STRICT valid JSON only, no code fences:',
-    '{ "title": "<translated title>", "description": "<translated article>" }',
+    '{ "title": "<translated title>", "description": "<translated article>", "sessions": ["<translated programme title>", "..."] }',
   ].join('\n');
 
 /** What `makeTranslate` hands back: pick a language, then give it the source. */

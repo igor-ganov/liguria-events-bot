@@ -1,9 +1,22 @@
 import { hasCjk } from '../domain/event.ts';
-import { asNonEmptyString, readProp } from '../util/json.ts';
+import { asArray, asNonEmptyString, readProp } from '../util/json.ts';
 
 /** A translated pair. The title is optional: the pipeline falls back to the
  *  original when a model declines to translate a proper noun. */
-export type Translated = Readonly<{ title?: string; description: string }>;
+export type Translated = Readonly<{
+  title?: string;
+  description: string;
+  /** The titles of the programme, in the order they were handed over. */
+  sessions?: readonly string[];
+}>;
+
+const namesOf = (value: unknown): readonly string[] | undefined => {
+  const names = (asArray(value) ?? []).flatMap((one) => {
+    const name = asNonEmptyString(one)?.trim();
+    return name === undefined || name === '' ? [] : [name];
+  });
+  return names.length === 0 ? undefined : names;
+};
 
 export const parseTranslation = (value: unknown): Translated | undefined => {
   const description = asNonEmptyString(readProp(value, 'description'))?.trim();
@@ -12,5 +25,10 @@ export const parseTranslation = (value: unknown): Translated | undefined => {
   // The same guard the enrichment parser applies: a model that slips into
   // Chinese for one word must not reach the corpus.
   if (hasCjk({ en: description, it: title ?? '', ru: '' })) return undefined;
-  return title === undefined ? { description } : { title, description };
+  const sessions = namesOf(readProp(value, 'sessions'));
+  return {
+    description,
+    ...(title === undefined ? {} : { title }),
+    ...(sessions === undefined ? {} : { sessions }),
+  };
 };

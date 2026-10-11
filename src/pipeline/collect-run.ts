@@ -331,7 +331,13 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       if (
         !event.enriched ||
         (event.enrichVersion ?? 0) < ENRICH_VERSION ||
-        hasCjk(event.descriptions)
+        hasCjk(event.descriptions) ||
+        // A programme whose titles are still only as they were read. Found
+        // by what is missing rather than by a version bump, so the few
+        // events that have one are read again and the rest are not.
+        (event.sessions ?? []).some(
+          (session) => session.title !== undefined && session.titles === undefined,
+        )
       ) {
         retryRecords.push(event);
       }
