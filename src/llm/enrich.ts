@@ -239,13 +239,42 @@ export const lastEnrichFailures: { reasons: Readonly<Record<string, number>> } =
 /** Analysis plus its two translations, or nothing. All three are required: a
  *  record with an Italian description in English is worse than one more run
  *  without it, and "unenriched" is exactly how the retry is triggered. */
+// The titles of a programme in the three languages. A list that came back
+// the wrong length cannot be matched to its sessions, so it is not used: the
+// title stays as it was read, in every language, and the event is not asked
+// about again for it.
+const namedIn = (
+  sessions: readonly Session[],
+  it: readonly string[] | undefined,
+  ru: readonly string[] | undefined,
+): readonly Session[] => {
+  const count = sessions.filter((session) => session.title !== undefined).length;
+  const usable = (list: readonly string[] | undefined): readonly string[] =>
+    list?.length === count ? list : [];
+  const [italian, russian] = [usable(it), usable(ru)];
+  let named = 0;
+  return sessions.map((session) => {
+    if (session.title === undefined) return session;
+    const at = named++;
+    return {
+      ...session,
+      titles: { en: session.title, it: italian[at] ?? session.title, ru: russian[at] ?? session.title },
+    };
+  });
+};
+
 const localize = async (
   translate: Translate,
   analysis: Analysis,
 ): Promise<Enrichment | undefined> => {
-  const source = analysis.title === undefined
-    ? { description: analysis.description }
-    : { title: analysis.title, description: analysis.description };
+  const names = (analysis.sessions ?? []).flatMap((session) =>
+    session.title === undefined ? [] : [session.title],
+  );
+  const source = {
+    ...(analysis.title === undefined ? {} : { title: analysis.title }),
+    description: analysis.description,
+    ...(names.length === 0 ? {} : { sessions: names }),
+  };
   // One at a time on purpose. Every event in the run is already being enriched
   // concurrently; translating in parallel too would double the calls in flight
   // and push the Gemini fallback past its per-minute ceiling, turning a fix for
@@ -256,6 +285,9 @@ const localize = async (
   const { title, description, ...rest } = analysis;
   return {
     ...rest,
+    ...(analysis.sessions === undefined
+      ? {}
+      : { sessions: namedIn(analysis.sessions, it.sessions, ru.sessions) }),
     descriptions: { en: description, it: it.description, ru: ru.description },
     ...(title === undefined
       ? {}

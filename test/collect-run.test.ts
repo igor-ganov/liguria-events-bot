@@ -134,6 +134,30 @@ describe('runCollect', () => {
     assert.equal(index[0]?.x, true);
   });
 
+  test('a programme read before its titles were translated is read again, once', async () => {
+    const kv = makeKvStub();
+    const raw = rawEvent({ title: 'Festival' });
+    const id = await eventIdOf('Festival', '2026-07-10');
+    const read = (sessions: NonNullable<Enrichment['sessions']>): ReadonlyMap<string, Enrichment> =>
+      new Map([[id, { categories: ['music'], descriptions: { en: 'A.', it: 'A.', ru: 'A.' }, unusual: false, sessions } satisfies Enrichment]]);
+    // As the corpus holds it today: a title in English and nothing else.
+    await runCollect(makeDeps(kv, [okCollector([raw])], read([{ date: '2026-07-10', title: 'Round table' }])));
+
+    const asked: string[][] = [];
+    const counting = (answer: ReadonlyMap<string, Enrichment>): CollectDeps['enrich'] => async (events) => {
+      asked.push(events.map((event) => event.id));
+      return answer;
+    };
+    const named = read([{ date: '2026-07-10', title: 'Round table', titles: { en: 'Round table', it: 'Tavola rotonda', ru: 'Круглый стол' } }]);
+    await runCollect({ ...makeDeps(kv, [okCollector([raw])]), enrich: counting(named) });
+    assert.deepEqual(asked.flat(), [id]);
+    assert.equal((await readEventRecord(kv, id))?.sessions?.[0]?.titles?.it, 'Tavola rotonda');
+
+    // And with the titles in place, it is left alone.
+    await runCollect({ ...makeDeps(kv, [okCollector([raw])]), enrich: counting(named) });
+    assert.deepEqual(asked.flat(), [id]);
+  });
+
   test('an event that has been and gone joins the archive', async () => {
     // The page keeps working either way — the record has a second copy that
     // never expires — but nothing listed those pages, so a crawler that had

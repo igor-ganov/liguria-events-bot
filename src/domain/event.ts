@@ -80,6 +80,9 @@ export type Session = Readonly<{
   time?: string;
   /** What is on that night, when the programme names it. */
   title?: string;
+  /** That name in every language. Absent on a session read before titles were
+   *  translated, which is how such an event is found and read again. */
+  titles?: LocalizedText;
 }>;
 
 export type EventRecord = Readonly<{
@@ -583,11 +586,13 @@ export const parseSessions = (value: unknown): readonly Session[] | undefined =>
     if (date === undefined || !isIsoDate(date)) return [];
     const time = asNonEmptyString(readProp(item, 'time'));
     const title = asNonEmptyString(readProp(item, 'title'));
+    const titles = title === undefined ? undefined : parseLocalized(readProp(item, 'titles'));
     return [
       {
         date,
         ...(time !== undefined && TIME_RE.test(time) ? { time } : {}),
         ...(title === undefined ? {} : { title }),
+        ...(titles === undefined ? {} : { titles }),
       },
     ];
   });

@@ -84,6 +84,61 @@ describe('makeEnrichEvents', () => {
     });
   });
 
+  // A programme is read in English like everything else, and its titles were
+  // the one thing never translated: an Italian page listed its own festival's
+  // nights in English.
+  const programme = (translated: (language: string) => unknown): ChatFn => async (system, user) =>
+    system.startsWith('You translate')
+      ? JSON.stringify(translated(system.includes('Italian') ? 'it' : 'ru'))
+      : JSON.stringify({
+          events: [
+            {
+              id: 'one',
+              categories: ['music'],
+              description: 'A festival.',
+              kind: 'container',
+              sessions: [
+                { date: '2026-07-10', title: 'Round table' },
+                { date: '2026-07-11' },
+                { date: '2026-07-12', title: 'Closing concert' },
+              ],
+            },
+          ],
+        });
+
+  test('the titles of a programme are translated with the rest', async () => {
+    const chat = programme((language) => ({
+      description: 'Un festival.',
+      sessions: language === 'it' ? ['Tavola rotonda', 'Concerto finale'] : ['Круглый стол', 'Заключительный концерт'],
+    }));
+    const enriched = await makeEnrichEvents(chat)([{ id: 'one', title: 'X', dates: '2026-07-10' }]);
+    assert.deepEqual(enriched.get('one')?.sessions, [
+      { date: '2026-07-10', title: 'Round table', titles: { en: 'Round table', it: 'Tavola rotonda', ru: 'Круглый стол' } },
+      { date: '2026-07-11' },
+      { date: '2026-07-12', title: 'Closing concert', titles: { en: 'Closing concert', it: 'Concerto finale', ru: 'Заключительный концерт' } },
+    ]);
+  });
+
+  test('the translator is handed the titles, in order, and nothing else of the programme', async () => {
+    const asked: string[] = [];
+    const chat: ChatFn = async (system, user) => {
+      if (system.startsWith('You translate')) asked.push(user);
+      return programme(() => ({ description: 'Un festival.', sessions: ['a', 'b'] }))(system, user);
+    };
+    await makeEnrichEvents(chat)([{ id: 'one', title: 'X', dates: '2026-07-10' }]);
+    assert.deepEqual(JSON.parse(asked[0] ?? '{}').sessions, ['Round table', 'Closing concert']);
+  });
+
+  test('a list that came back the wrong length is not guessed at: the titles stay as read', async () => {
+    const chat = programme(() => ({ description: 'Un festival.', sessions: ['Tavola rotonda'] }));
+    const enriched = await makeEnrichEvents(chat)([{ id: 'one', title: 'X', dates: '2026-07-10' }]);
+    assert.deepEqual(enriched.get('one')?.sessions?.[2]?.titles, {
+      en: 'Closing concert',
+      it: 'Closing concert',
+      ru: 'Closing concert',
+    });
+  });
+
   test('a failing batch degrades to an empty map (AC-2.3)', async () => {
     const chat: ChatFn = async () => {
       throw new Error('llm down');
