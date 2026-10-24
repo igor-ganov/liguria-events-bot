@@ -175,9 +175,9 @@ describe('renderDigest', () => {
 });
 
 describe('eventUrl', () => {
-  test('English at the root, the others under a prefix', () => {
+  test('every language under its own prefix, English included', () => {
     const event = { id: 'abc', t: 'Festa', s: '2026-08-20' };
-    assert.equal(eventUrl(event, 'en'), 'https://dovego.it/event/festa-2026-08-20-abc/');
+    assert.equal(eventUrl(event, 'en'), 'https://dovego.it/en/event/festa-2026-08-20-abc/');
     assert.equal(eventUrl(event, 'it'), 'https://dovego.it/it/event/festa-2026-08-20-abc/');
   });
 });

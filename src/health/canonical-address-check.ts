@@ -1,4 +1,4 @@
-import { eventSlug } from '../domain/event-slug.ts';
+import { eventUrl } from '../links/event-url.ts';
 import { fetchStatus } from './fetch-text.ts';
 import { bad, ok } from './result.ts';
 import type { CheckResult } from './types.ts';
@@ -26,7 +26,9 @@ export const canonicalAddressCheck = async (
   if (event === undefined) {
     return { id, title, status: 'warn', detail: 'no event in the index to check with' };
   }
-  const path = `/event/${eventSlug(event)}/`;
+  // The address this worker publishes, built by the same function that builds
+  // the links it sends, so the two cannot drift apart silently.
+  const path = new URL(eventUrl(event, 'en')).pathname;
   const status = await fetchStatus(fetchFn, `${origin}${path}`, 'manual');
   return status === 200
     ? ok(id, title, `${path} answers 200`)

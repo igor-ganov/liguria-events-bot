@@ -1,3 +1,4 @@
+import { enPage } from './en-page.ts';
 import { bad, ok } from './result.ts';
 import { fetchStatus, fetchText } from './fetch-text.ts';
 import { asArray, asNonEmptyString, parseJson, readProp } from '../util/json.ts';
@@ -46,7 +47,7 @@ export const pastEventCheck = async (
   const key = 'past-event-page';
   const title = 'A link to an event that has happened still opens';
   if (id === undefined) return { id: key, title, status: 'warn', detail: 'no archived event to test with yet' };
-  const paths = [`/event/${id}/`, `/it/event/${id}/`, `/ru/event/${id}/`];
+  const paths = [enPage(`event/${id}/`), `/it/event/${id}/`, `/ru/event/${id}/`];
   const codes = await Promise.all(paths.map((path) => fetchStatus(fetchFn, `${origin}${path}`)));
   const dead = paths.filter((_, i) => codes[i] !== 200);
   return dead.length === 0
@@ -70,9 +71,9 @@ export const httpSemanticsCheck = async (
   const id = 'http-semantics';
   const title = 'Absent, gone and never-were answer different codes';
   const cases: readonly Readonly<{ path: string; want: number; what: string }>[] = [
-    { path: '/liguria/savona/', want: 200, what: 'a city with nothing on' },
-    { path: `/event/${goneId ?? 'ffffffffffff'}/`, want: 410, what: 'an event that is gone' },
-    { path: '/event/zzz/', want: 404, what: 'an id that was never ours' },
+    { path: enPage('liguria/savona/'), want: 200, what: 'a city with nothing on' },
+    { path: enPage(`event/${goneId ?? 'ffffffffffff'}/`), want: 410, what: 'an event that is gone' },
+    { path: enPage('event/zzz/'), want: 404, what: 'an id that was never ours' },
   ];
   const codes = await Promise.all(cases.map((one) => fetchStatus(fetchFn, `${origin}${one.path}`)));
   const wrong = cases.filter((one, i) => codes[i] !== one.want);
@@ -102,7 +103,12 @@ export const ogImageCheck = async (
 ): Promise<CheckResult> => {
   const id = 'og-images';
   const title = 'A shared link carries a picture, served by us';
-  const paths = ['/liguria/', '/liguria/genova/', '/liguria/genova/teatro-carlo-felice/', `/event/${sampleEventId}/`];
+  const paths = [
+    enPage('liguria/'),
+    enPage('liguria/genova/'),
+    enPage('liguria/genova/teatro-carlo-felice/'),
+    enPage(`event/${sampleEventId}/`),
+  ];
   const pages = await Promise.all(paths.map((path) => fetchText(fetchFn, `${origin}${path}`)));
   const images = pages.map((page) => /<meta property="og:image" content="([^"]+)"/.exec(page.body)?.[1] ?? '');
   // On our own origin — either a cropped source photograph or the brand card.
@@ -150,7 +156,7 @@ const PM_BEACON = /<script[^>]*src="[^"]*\/pm\.js"[^>]*data-project="dovego-it"/
 export const analyticsCheck = async (fetchFn: FetchFn, origin: string): Promise<CheckResult> => {
   const id = 'analytics-beacon';
   const title = 'Visits are actually being counted';
-  const { status, body } = await fetchText(fetchFn, `${origin}/liguria/`);
+  const { status, body } = await fetchText(fetchFn, `${origin}${enPage('liguria/')}`);
   if (status !== 200) return bad(id, title, `the page answered ${status}`);
   if (!PM_BEACON.test(body)) return bad(id, title, 'no pro-motion beacon on the page — nothing is being counted');
   return ok(id, title, 'the pro-motion beacon is on the page');
@@ -181,7 +187,7 @@ export const platformFeedCheck = async (fetchFn: FetchFn, origin: string): Promi
     .map((event) => asNonEmptyString(readProp(event, 'id')))
     .filter((eventId): eventId is string => eventId !== undefined)
     .slice(0, SAMPLE);
-  const pages = await Promise.all(ids.map((eventId) => fetchText(fetchFn, `${origin}/event/${eventId}/`)));
+  const pages = await Promise.all(ids.map((eventId) => fetchText(fetchFn, `${origin}${enPage(`event/${eventId}/`)}`)));
   const leaked = ids.filter((_, i) => (pages[i]?.body ?? '').includes('name="robots"'));
   return leaked.length === 0
     ? ok(id, title, `${events.length} published, ${ids.length} sampled and all indexable`)

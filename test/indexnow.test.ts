@@ -5,6 +5,7 @@ import { describe, test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { newSince } from '../src/indexnow/new-since.ts';
 import { eventUrls } from '../src/indexnow/event-urls.ts';
+import { placeUrls } from '../src/indexnow/place-urls.ts';
 import { indexNowBody } from '../src/indexnow/index-now-body.ts';
 import { pingIndexNow } from '../src/indexnow/ping-index-now.ts';
 import { readProp } from '../src/util/json.ts';
@@ -60,10 +61,56 @@ describe('eventUrls', () => {
     // The address the page answers at, not a bare id that only redirects to it.
     const event = { id: 'aaaabbbbcccc', t: 'Concerto in cortile', s: '2026-12-05', v: 'Palazzo Spinola' };
     assert.deepEqual(eventUrls(event), [
-      'https://dovego.it/event/concerto-in-cortile-palazzo-spinola-2026-12-05-aaaabbbbcccc/',
+      'https://dovego.it/en/event/concerto-in-cortile-palazzo-spinola-2026-12-05-aaaabbbbcccc/',
       'https://dovego.it/it/event/concerto-in-cortile-palazzo-spinola-2026-12-05-aaaabbbbcccc/',
       'https://dovego.it/ru/event/concerto-in-cortile-palazzo-spinola-2026-12-05-aaaabbbbcccc/',
     ]);
+  });
+});
+
+describe('placeUrls', () => {
+  // Until now IndexNow was offered event pages and nothing else, so the pages
+  // that can actually rank for "cosa fare a Genova" — the city, its three
+  // facets, the venue with a programme — were never announced to the one
+  // engine that sends this site every search visit it gets.
+  const located = (over: Partial<CompactEvent> = {}): CompactEvent =>
+    ({ ...compact(), ct: 'genova', rg: 'liguria', v: 'Teatro Carlo Felice', ...over });
+
+  test('a new event announces the pages it appears on, not just its own', () => {
+    assert.deepEqual(placeUrls([located()]), [
+      'https://dovego.it/it/liguria/genova/',
+      'https://dovego.it/it/liguria/genova/today/',
+      'https://dovego.it/it/liguria/genova/tomorrow/',
+      'https://dovego.it/it/liguria/genova/this-weekend/',
+      'https://dovego.it/it/liguria/genova/teatro-carlo-felice/',
+    ]);
+  });
+
+  test('two events in one city announce that city once', () => {
+    const urls = placeUrls([located(), located({ v: 'Teatro Carlo Felice' })]);
+    assert.equal(urls.filter((url) => url.endsWith('/genova/')).length, 1);
+  });
+
+  test('an event the geocoder could not place announces nothing', () => {
+    const { ct: _city, ...unplaced } = located();
+    const { rg: _region, ...regionless } = located();
+    assert.deepEqual(placeUrls([unplaced]), []);
+    assert.deepEqual(placeUrls([regionless]), []);
+  });
+
+  test('a venue that is really the city, or a facet word, is not a venue page', () => {
+    // The crawler fills the venue with the city's own name often enough to
+    // matter, and a venue slug that collides with a facet would announce the
+    // facet twice under a different meaning.
+    const asCity = placeUrls([located({ v: 'Genova' })]);
+    assert.equal(asCity.length, 4);
+    const asFacet = placeUrls([located({ v: 'Today' })]);
+    assert.equal(asFacet.length, 4);
+  });
+
+  test('it is bounded, because a submission that is too large is refused', () => {
+    const many = Array.from({ length: 40 }, (_, i) => located({ ct: `city${i}` }));
+    assert.ok(placeUrls(many).length <= 60);
   });
 });
 
