@@ -36,7 +36,7 @@ describe('canonicalAddressCheck', () => {
   test('a plain 200 at the address we would publish is the passing case', async () => {
     const result = await canonicalAddressCheck(answering(200), 'https://dovego.it', event);
     assert.equal(result.status, 'ok');
-    assert.ok(result.detail.includes('concerto-in-cortile-palazzo-spinola-2026-12-05-aaaabbbbcccc'));
+    assert.ok(result.detail.includes('/en/event/concerto-in-cortile-palazzo-spinola-2026-12-05-aaaabbbbcccc/'));
   });
 
   test('a redirect is drift, and drift fails', async () => {

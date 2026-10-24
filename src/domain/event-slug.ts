@@ -1,3 +1,4 @@
+import { slugify } from './slugify.ts';
 import type { CompactEvent } from './event.ts';
 
 /**
@@ -12,15 +13,6 @@ import type { CompactEvent } from './event.ts';
  */
 const TITLE = 56;
 const HOST = 28;
-
-const slugify = (name: string): string =>
-  name
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{M}+/gu, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60) || 'x';
 
 const capped = (value: string, max: number): string => slugify(value).slice(0, max).replace(/-+$/, '');
 

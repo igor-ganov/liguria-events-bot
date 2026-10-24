@@ -160,7 +160,7 @@ describe('robotsCheck', () => {
 });
 
 describe('eventMarkupCheck', () => {
-  const url = 'https://dovego.it/event/abc/';
+  const url = 'https://dovego.it/en/event/abc/';
   const ld = (json: unknown): string =>
     `<html><script type="application/ld+json">${JSON.stringify(json)}</script></html>`;
 
@@ -313,9 +313,9 @@ describe('httpSemanticsCheck', () => {
   const base = 'https://dovego.it';
   const routes = (city: number, gone: number, nonsense: number) =>
     serving({
-      [`${base}/liguria/savona/`]: { status: city },
-      [`${base}/event/1e6b4b74d225/`]: { status: gone },
-      [`${base}/event/zzz/`]: { status: nonsense },
+      [`${base}/en/liguria/savona/`]: { status: city },
+      [`${base}/en/event/1e6b4b74d225/`]: { status: gone },
+      [`${base}/en/event/zzz/`]: { status: nonsense },
     });
 
   test('200 / 410 / 404 is the shape it wants', async () => {
@@ -352,10 +352,10 @@ describe('ogImageCheck', () => {
 
   const pages = (...images: readonly string[]) =>
     serving({
-      [`${base}/liguria/`]: { body: head(images[0] ?? '') },
-      [`${base}/liguria/genova/`]: { body: head(images[1] ?? '') },
-      [`${base}/liguria/genova/teatro-carlo-felice/`]: { body: head(images[2] ?? '') },
-      [`${base}/event/aaaabbbbcccc/`]: { body: head(images[3] ?? '') },
+      [`${base}/en/liguria/`]: { body: head(images[0] ?? '') },
+      [`${base}/en/liguria/genova/`]: { body: head(images[1] ?? '') },
+      [`${base}/en/liguria/genova/teatro-carlo-felice/`]: { body: head(images[2] ?? '') },
+      [`${base}/en/event/aaaabbbbcccc/`]: { body: head(images[3] ?? '') },
     });
 
   test('every page carrying one of ours passes, and says how many are photographs', async () => {
@@ -422,24 +422,24 @@ describe('analyticsCheck', () => {
 
   test('the first-party beacon on the page, tagged with this project, is the whole requirement', async () => {
     const body = `<html><head>${pm}</head></html>`;
-    const check = await analyticsCheck(serving({ [`${base}/liguria/`]: { body } }), base);
+    const check = await analyticsCheck(serving({ [`${base}/en/liguria/`]: { body } }), base);
     assert.equal(check.status, 'ok');
   });
 
   test('the Cloudflare beacon alone no longer counts: it never recorded a pageload here', async () => {
     const body = '<html><head><script data-cf-beacon=\'{"token":"x"}\'></script></head></html>';
-    const check = await analyticsCheck(serving({ [`${base}/liguria/`]: { body } }), base);
+    const check = await analyticsCheck(serving({ [`${base}/en/liguria/`]: { body } }), base);
     assert.equal(check.status, 'fail');
   });
 
   test('the beacon for some other project does not count either', async () => {
     const body = `<html><head>${pm.replace('dovego-it', 'someone-else')}</head></html>`;
-    const check = await analyticsCheck(serving({ [`${base}/liguria/`]: { body } }), base);
+    const check = await analyticsCheck(serving({ [`${base}/en/liguria/`]: { body } }), base);
     assert.equal(check.status, 'fail');
   });
 
   test('a page without it fails, because a flat dashboard looks like no traffic', async () => {
-    const check = await analyticsCheck(serving({ [`${base}/liguria/`]: { body: '<html></html>' } }), base);
+    const check = await analyticsCheck(serving({ [`${base}/en/liguria/`]: { body: '<html></html>' } }), base);
     assert.equal(check.status, 'fail');
   });
 });
@@ -447,7 +447,7 @@ describe('analyticsCheck', () => {
 describe('platformFeedCheck', () => {
   const base = 'https://dovego.it';
   const feed = `${base}/api/events/published.json`;
-  const page = (id: string) => `${base}/event/${id}/`;
+  const page = (id: string) => `${base}/en/event/${id}/`;
   const indexable = '<html><head><title>x</title></head></html>';
   const hidden = '<html><head><meta name="robots" content="noindex, nofollow"></head></html>';
 

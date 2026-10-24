@@ -1,5 +1,6 @@
 import { eventUrls } from './event-urls.ts';
 import { indexNowBody } from './index-now-body.ts';
+import { placeUrls } from './place-urls.ts';
 import { newSince } from './new-since.ts';
 import type { CompactEvent } from '../domain/event.ts';
 import type { Env } from '../config.ts';
@@ -46,7 +47,11 @@ export const pingIndexNow = async (
   }
   const fresh = newSince(index, Number(stored));
   if (fresh.length === 0) return { kind: 'nothing-new' };
-  const body = indexNowBody(key, fresh.flatMap((event) => eventUrls(event)));
+  // The event's own pages, and the pages it changed: a city, its facets, the
+  // venue it is at. Announcing only the event left the pages that can rank for
+  // "what is on in Genova" unannounced to the one engine that answers us.
+  const announced = [...fresh.flatMap((event) => eventUrls(event)), ...placeUrls(fresh)];
+  const body = indexNowBody(key, [...new Set(announced)]);
   const response = await fetchFn(ENDPOINT, {
     method: 'POST',
     headers: { 'content-type': 'application/json; charset=utf-8' },

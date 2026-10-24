@@ -36,7 +36,7 @@ describe('renderEventLine', () => {
     // links to comune and theatre websites — it sent them away from the site
     // it exists to fill, and Telegram brought one visit a week.
     const line = renderEventLine(compact, 'en');
-    assert.ok(line.includes('<a href="https://dovego.it/event/'), line);
+    assert.ok(line.includes('<a href="https://dovego.it/en/event/'), line);
     assert.ok(line.includes('utm_source=telegram'), line);
     assert.ok(!line.includes('https://example.org/1'), line);
     assert.ok(line.includes('Concert &lt;live&gt; &amp; loud'));
@@ -87,7 +87,7 @@ describe('renderCard', () => {
     assert.ok(card.includes('💶 € 15,00'));
     assert.ok(card.includes('Electronic music by the sea.'));
     // Our page first, and tagged: that is where the reader is taken.
-    assert.ok(card.includes('href="https://dovego.it/event/'), card);
+    assert.ok(card.includes('href="https://dovego.it/en/event/'), card);
     assert.ok(card.includes('utm_campaign='), card);
   });
 

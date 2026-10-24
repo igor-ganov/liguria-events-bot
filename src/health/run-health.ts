@@ -1,3 +1,4 @@
+import { enPage } from './en-page.ts';
 import { canonicalAddressCheck } from './canonical-address-check.ts';
 import { channelChecks } from './channel-checks.ts';
 import { corpusChecks } from './corpus-checks.ts';
@@ -40,7 +41,9 @@ export type HealthDeps = Readonly<{
 // Sampled rather than exhaustive: the point is to notice a class of breakage
 // within the hour, not to crawl the site. The pages chosen are the ones whose
 // hreflang was actually wrong.
-const HREFLANG_SAMPLE = ['/terms/', '/privacy/', '/liguria/'];
+// Terms and privacy are machinery: they were never in a language and did not
+// move when English took a prefix. A region page did.
+const HREFLANG_SAMPLE = ['/terms/', '/privacy/', enPage('liguria/')];
 
 /** Everything we know how to check, run together. */
 export const runHealth = async (deps: HealthDeps): Promise<HealthReport> => {

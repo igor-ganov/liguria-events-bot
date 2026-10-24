@@ -81,7 +81,7 @@ describe('buildIcs (AC-1.1, AC-1.3, AC-1.4)', () => {
     // Our page. A subscribed calendar is the stickiest thing the site offers —
     // it keeps working without the reader ever coming back — and every entry
     // in it used to open the source's website instead of ours.
-    assert.ok(ics.includes('URL:https://dovego.it/event/'), ics);
+    assert.ok(ics.includes('URL:https://dovego.it/en/event/'), ics);
     assert.ok(ics.includes('utm_source=calendar'), ics);
     assert.ok(ics.includes('utm_medium=ical'), ics);
     assert.ok(ics.includes('utm_campaign=2026-07-calendar'), ics);

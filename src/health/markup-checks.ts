@@ -1,3 +1,4 @@
+import { enPage } from './en-page.ts';
 import { fetchStatus, fetchText } from './fetch-text.ts';
 import type { CheckResult } from './types.ts';
 import type { FetchFn } from '../collectors/types.ts';
@@ -25,7 +26,7 @@ export const eventMarkupCheck = async (
 ): Promise<CheckResult> => {
   const id = 'event-jsonld';
   const title = 'An event page carries the markup Google needs to show it';
-  const { status, body } = await fetchText(fetchFn, `${origin}/event/${eventId}/`);
+  const { status, body } = await fetchText(fetchFn, `${origin}${enPage(`event/${eventId}/`)}`);
   if (status !== 200) return { id, title, status: 'fail', detail: `the sample event answered ${status}` };
   const json = jsonLdOf(body);
   const missing = REQUIRED.filter((field) => json[field] === undefined);
