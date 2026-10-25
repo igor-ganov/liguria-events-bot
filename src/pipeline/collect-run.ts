@@ -40,6 +40,7 @@ import { pruneIndex } from './windows.ts';
 import { groupSeries } from './group-series.ts';
 import { duplicateClusters } from './duplicate-clusters.ts';
 import { needsReRead } from './needs-re-read.ts';
+import { spanContradictsText } from './span-contradicts-text.ts';
 import { narrowedToRun } from '../domain/narrowed-to-run.ts';
 import { mapBounded as mapBoundedBy } from '../util/bounded.ts';
 
@@ -211,6 +212,42 @@ const rawFromRecord = (record: EventRecord): RawEvent => ({
   ...(record.rawDescription === undefined ? {} : { rawDescription: record.rawDescription }),
 });
 
+/** How many records no listing shows are looked at per run: a KV read each. */
+const UNSIGHTED_PER_RUN = 24;
+
+/**
+ * The records that may be wrong but that no listing shows any more, so the
+ * re-sighting rule never reads them again: Baglioni's postponed concert stayed
+ * listed for the whole year in between. Found in the index — a container, or a
+ * span its own article contradicts, read at an older prompt — then confirmed
+ * against storage. The window over them moves every hour, so a suspect that is
+ * never read again (a programme a source listed date by date) cannot hold the
+ * slots for good.
+ */
+const unsightedSuspects = async (
+  deps: CollectDeps,
+  index: readonly CompactEvent[],
+  identified: readonly Identified[],
+  nowMs: number,
+): Promise<readonly EventRecord[]> => {
+  const sighted = new Set(identified.map((item) => item.id));
+  const suspects = index
+    .filter((event) => !sighted.has(event.id) && (event.ev ?? 0) < ENRICH_VERSION)
+    .filter(
+      (event) =>
+        event.k === true ||
+        spanContradictsText({
+          startDate: event.s,
+          ...(event.e === undefined ? {} : { endDate: event.e }),
+          descriptions: { en: event.d?.en ?? '' },
+        }),
+    );
+  const start = Math.floor(nowMs / 3_600_000) % Math.max(1, suspects.length);
+  const window = [...suspects.slice(start), ...suspects.slice(0, start)].slice(0, UNSIGHTED_PER_RUN);
+  const records = await mapBounded(window, (event) => readEventRecord(deps.kv, event.id));
+  return records.filter((record): record is EventRecord => record !== undefined && needsReRead(record));
+};
+
 type FuzzyOutcome = Readonly<{
   droppedIds: ReadonlySet<string>;
   replacements: ReadonlyMap<string, CompactEvent>;
@@ -354,6 +391,8 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
         retryRecords.push(event);
       }
     }
+
+    retryRecords.push(...(await unsightedSuspects(deps, index, identified, startedAt)));
 
     const detailed = await deps.details(freshItems.map((item) => item.raw));
     const freshDetailed = freshItems.map((item, i): Identified => {

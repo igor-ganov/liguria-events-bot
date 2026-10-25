@@ -226,6 +226,9 @@ export type CompactEvent = Readonly<{
   /** First-seen time (epoch seconds) — the crawler's `addedAt`, projected so the
    *  feed can offer a "newest added first" sort. */
   cr?: number;
+  /** The prompt version the record was last read at (ev = enrich version), so
+   *  a run can tell which records no listing shows any more still need it. */
+  ev?: number;
 }>;
 
 /** Display title in a language — falls back to the original (AC-2b.2). */
@@ -470,6 +473,7 @@ export const toCompact = (event: EventRecord): CompactEvent => {
   c: event.categories,
   u: event.url,
   cr: event.addedAt,
+  ...(event.enrichVersion === undefined ? {} : { ev: event.enrichVersion }),
   ...(event.endDate === undefined ? {} : { e: event.endDate }),
   ...(event.free === true ? { f: true } : {}),
   ...(venue === undefined ? {} : { v: venue }),
@@ -796,6 +800,10 @@ const parseCompact = (value: unknown): CompactEvent | undefined => {
     ...(l.length === 0 ? {} : { l }),
     ...(x === true ? { x: true } : {}),
     ...(cr === undefined ? {} : { cr }),
+    ...[asNumber(readProp(value, 'ev'))]
+      .filter((ev): ev is number => ev !== undefined)
+      .map((ev) => ({ ev }))
+      .at(0),
   };
 };
 

@@ -198,4 +198,34 @@ describe('the festival through the pipeline', () => {
     const [stored] = await readIndex(kv);
     assert.equal(stored?.k, undefined);
   });
+  test('is still read again when it may be wrong', async () => {
+    // Baglioni's postponed concert stayed listed for the whole year in
+    // between: it had left mentelocale's listings, and only what a listing
+    // shows was ever read again.
+    const kv = makeKvStub();
+    const concert: EventRecord = {
+      ...festival,
+      id: '0c07157ab408',
+      title: 'Claudio Baglioni in concerto in piazza San Carlo. Rimandato al 2027',
+      startDate: '2026-09-18',
+      endDate: '2027-09-17',
+      url: 'https://www.mentelocale.it/torino/baglioni.htm',
+      source: 'mentelocale',
+      descriptions: { ...festival.descriptions, en: 'Postponed.\n\n## [when] When\nFriday 17 September 2027.' },
+    };
+    await writeEventRecord(kv, concert, Date.parse('2026-10-20T10:00:00Z'));
+    await writeIndex(kv, [toCompact(concert)]);
+    const asked: string[] = [];
+    await runCollect({
+      ...deps(kv, new Map([[concert.id, answer({ start: '2027-09-17' })]])),
+      collectors: [async () => ({ source: 'mentelocale', events: [], posts: [], failed: false })],
+      enrich: async (pending) => {
+        asked.push(...pending.map((item) => item.id));
+        return new Map([[concert.id, answer({ start: '2027-09-17' })]]);
+      },
+    });
+    assert.deepEqual(asked, [concert.id]);
+    const [stored] = await readIndex(kv);
+    assert.equal(stored?.s, '2027-09-17');
+  });
 });
