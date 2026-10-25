@@ -228,4 +228,42 @@ describe('the festival through the pipeline', () => {
     const [stored] = await readIndex(kv);
     assert.equal(stored?.s, '2027-09-17');
   });
+
+  test('suspects already read are marked in the index and give their place to the next', async () => {
+    // Thirty containers no listing shows: the first runs found the same 24
+    // over and over, all read already, and the rest were never reached.
+    const kv = makeKvStub();
+    // An hour whose window, under the old rule, starts at the first entry.
+    const at = Date.parse('2026-10-20T18:00:00Z');
+    const read = (i: number): EventRecord => ({
+      ...festival,
+      id: `done${String(i).padStart(2, '0')}`,
+      url: `https://example.org/${i}`,
+      kind: 'container',
+      sessions: [{ date: '2026-10-24' }],
+      enrichVersion: 13,
+    });
+    const unread: EventRecord = { ...read(99), id: 'unread', enrichVersion: 12 };
+    const all = [...Array.from({ length: 30 }, (_, i) => read(i)), unread];
+    await Promise.all(all.map((record) => writeEventRecord(kv, record, at)));
+    // The index entries were written before it carried the version.
+    await writeIndex(kv, all.map((record) => {
+      const { ev: _none, ...entry } = toCompact(record);
+      return entry;
+    }));
+    const asked: string[] = [];
+    const run = (minutes: number) =>
+      runCollect({
+        ...deps(kv, new Map()),
+        collectors: [async () => ({ source: 'visitgenoa', events: [], posts: [], failed: false })],
+        enrich: async (pending) => {
+          asked.push(...pending.map((item) => item.id));
+          return new Map();
+        },
+        now: () => at + minutes * 60_000,
+      });
+    await run(0);
+    await run(4);
+    assert.deepEqual(asked.filter((id) => id === 'unread').length > 0, true);
+  });
 });
