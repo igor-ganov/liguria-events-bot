@@ -3,8 +3,16 @@
  * events, and extract structured events from Telegram post text. Both parse
  * defensively — an unusable LLM item is skipped, never trusted (AC-2.3).
  */
-import { CATEGORIES, hasCjk, isCategory, isIsoDate, parseLocalized, parseSessions } from '../domain/event.ts';
-import type { Category, EventKind, LocalizedText, RawEvent, Session } from '../domain/event.ts';
+import {
+  CATEGORIES,
+  hasCjk,
+  isCategory,
+  isIsoDate,
+  parseLocalized,
+  parseSessions,
+  parseStatedRun,
+} from '../domain/event.ts';
+import type { Category, EventKind, LocalizedText, RawEvent, Session, StatedRun } from '../domain/event.ts';
 import type { RawPost } from '../collectors/types.ts';
 import { extractJson } from './client.ts';
 import { classifyFailure, emptyReason, tallyFailures } from './llm-failure.ts';
@@ -40,6 +48,8 @@ export type Enrichment = Readonly<{
   /** Whether the dates are the event's own run (`standalone`) or only the days
    *  its programme occupies (`container`). See EventKind. */
   kind?: EventKind;
+  /** The run the source text states, when it states one (see narrowedToRun). */
+  run?: StatedRun;
   unusual: boolean;
   /** Content-policy violation — such events are dropped, never stored. */
   blocked?: boolean;
@@ -75,7 +85,10 @@ const ENRICH_BATCH = 1;
 // three structured articles ran past both providers' deadlines on the longest
 // sources — a third of the batches on some runs, and the event was lost each
 // time. Reading is the expensive part; the translations take a short input.
-export const ENRICH_VERSION = 12;
+// v13 = the "run" the source text states (a listing's dates can be wrong), and
+// a festival that runs every day is standalone however few sessions it names.
+// Not every record is read again for it: see needsReRead.
+export const ENRICH_VERSION = 13;
 const EXTRACT_BATCH = 20;
 
 export const chunk = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
@@ -158,9 +171,23 @@ export const ENRICH_SYSTEM = [
   '"standalone" — the tours are highlights inside a run that is open regardless.',
   'A festival whose ONLY content is its dated nights is "container", even when',
   'the source advertises it as one long season.',
+  'But a festival that runs every day of its run — "for eleven days the city',
+  'hosts 250 events", "from 22 October to 1 November, events all day" — is',
+  '"standalone", even when the sessions you list are only some of its dates:',
+  'those sessions are highlights, and a visitor can turn up on any day between',
+  'them. When the source names only a selection of its programme ("among the',
+  'guests", "highlights include", "tra gli ospiti"), the sessions are highlights',
+  'and the answer is "standalone".',
   'A single-date event is "standalone". When "sessions" is empty or absent, the',
   'answer is "standalone" — never mark an event a container with no programme to',
   'stand on, or it disappears from the site entirely.',
+  'Also give "run": { "start": "YYYY-MM-DD", "end": "YYYY-MM-DD" } — the days',
+  'the event itself runs, ONLY as the source TEXT states them in words or',
+  'dates ("da giovedì 22 ottobre a domenica 1° novembre 2026", "rinviato al 17',
+  'settembre 2027"). Never copy the input "dates" field: it is the listing\'s',
+  'own window and is sometimes wrong, which is exactly why this field exists.',
+  'Omit "end" for a single day. Omit the whole field when the text states no',
+  'run of its own.',
   'Also set "unusual": true ONLY for offbeat, niche, experimental or',
   'distinctly non-touristy happenings (a neighbourhood performance, an',
   'unconventional venue, an oddball one-off, immersive/site-specific art);',
@@ -178,7 +205,7 @@ export const ENRICH_SYSTEM = [
   'their own lines and "- " bullet lists, with real "\\n" newlines between them.',
   'That Markdown inside the strings is required, not a violation. Follow the',
   'shape of this example exactly (note the \\n newlines and the [tags]):',
-  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "title": "…", "description": "Two-time-Grammy pianist Andrea Bacchetti plays a candlelit recital in a Baroque villa — a rare chance to hear a 1772 Guadagnini up close.\\n\\n## [programme] Programme\\n- Beethoven — Romance in F\\n- Kreisler — Liebesleid\\n\\n## [getting-there] Getting there\\nVilla Borzino, Busalla (Genoa); A7 motorway or the Genoa–Arquata rail line.\\n\\n## [tickets] Tickets\\nFree admission, donation welcome.\\n\\n## [when] When\\nFriday 14 August 2026, 21:00.", "address": "…", "time": "HH:MM", "durationMin": 90, "sessions": [ { "date": "YYYY-MM-DD", "time": "HH:MM", "title": "…" } ], "kind": "container"|"standalone", "unusual": true|false, "blocked": true|false } ] }',
+  '{ "events": [ { "id": "<input id>", "categories": ["<category>", "..."], "title": "…", "description": "Two-time-Grammy pianist Andrea Bacchetti plays a candlelit recital in a Baroque villa — a rare chance to hear a 1772 Guadagnini up close.\\n\\n## [programme] Programme\\n- Beethoven — Romance in F\\n- Kreisler — Liebesleid\\n\\n## [getting-there] Getting there\\nVilla Borzino, Busalla (Genoa); A7 motorway or the Genoa–Arquata rail line.\\n\\n## [tickets] Tickets\\nFree admission, donation welcome.\\n\\n## [when] When\\nFriday 14 August 2026, 21:00.", "address": "…", "time": "HH:MM", "durationMin": 90, "sessions": [ { "date": "YYYY-MM-DD", "time": "HH:MM", "title": "…" } ], "kind": "container"|"standalone", "run": { "start": "YYYY-MM-DD", "end": "YYYY-MM-DD" }, "unusual": true|false, "blocked": true|false } ] }',
 ].join('\n');
 
 /** The reading of the source: everything except the other two languages. */
@@ -217,7 +244,9 @@ export const parseAnalysis = (value: unknown): readonly (readonly [string, Analy
   // Anything the model returns other than the exact word is standalone.
   const kind: EventKind | undefined =
     readProp(value, 'kind') === 'container' && sessions !== undefined ? 'container' : undefined;
+  const run = parseStatedRun(readProp(value, 'run'));
   const enrichment: Analysis = {
+    ...(run === undefined ? {} : { run }),
     categories,
     description,
     unusual: asBoolean(readProp(value, 'unusual')) === true,

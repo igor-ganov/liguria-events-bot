@@ -3,6 +3,7 @@
  * collected event; a CompactEvent is its index projection — one KV key holds
  * the whole upcoming corpus for cheap window queries.
  */
+import { listedProgrammeOf } from './listed-programme.ts';
 import {
   asArray,
   asBoolean,
@@ -70,6 +71,10 @@ export const descriptionOf = (text: LocalizedText | undefined, lang: Lang): stri
  */
 export type EventKind = 'standalone' | 'container';
 
+/** The days an event runs as its source page words them: 'YYYY-MM-DD', the
+ *  end absent for a single day. */
+export type StatedRun = Readonly<{ start: string; end?: string }>;
+
 /** A single dated occurrence of an event's programme — the individual concert on
  *  a given night of a months-long festival. For a `container` these ARE the
  *  event's occurrences; for a `standalone` they are highlights inside its run. */
@@ -97,6 +102,14 @@ export type EventRecord = Readonly<{
   /** The concrete dated programme inside a multi-day/umbrella event, so the feed
    *  can show the specific occurrence on each day instead of the whole run. */
   sessions?: readonly Session[];
+  /** The programme is the source's own list of dates (a show sold date by
+   *  date), not a model's reading of a text: re-reading the text never
+   *  replaces it, and a re-sighting adds the dates it lists. */
+  listedProgramme?: true;
+  /** The run the source page itself states, when it narrowed the listing's
+   *  dates (see narrowedToRun). A later sighting of the listing does not
+   *  widen the record past it. */
+  statedRun?: StatedRun;
   /** 'HH:MM' when the source exposes it. */
   time?: string;
   /** Attendance length in minutes, when the source stated it (AC-duration). */
@@ -246,6 +259,10 @@ export type RawEvent = Readonly<{
   photos?: readonly string[];
   /** Links of other sources that saw this event in the same run (AC-1.8). */
   altLinks?: readonly SourceLink[];
+  /** The dates the source itself lists for this event, one entry each — a
+   *  show sold date by date. Set by groupSeries, never by a model. */
+  sessions?: readonly Session[];
+  kind?: EventKind;
 }>;
 
 export const normalizeTitle = (title: string): string =>
@@ -329,12 +346,14 @@ export const mergeEvent = (
 ): Readonly<{ event: EventRecord; changed: boolean }> => {
   // A source can learn that an event runs longer than it first said — a listing
   // that publishes one entry per day of a run tells us its span only once we
-  // have seen every day. So the range widens, never narrows.
+  // have seen every day. So the range widens, never narrows — unless the
+  // source's own page stated the run, which the listing does not get to undo.
+  const widen = existing.statedRun === undefined;
   const startDate =
-    incoming.startDate < existing.startDate ? incoming.startDate : existing.startDate;
+    widen && incoming.startDate < existing.startDate ? incoming.startDate : existing.startDate;
   const existingEnd = existing.endDate ?? existing.startDate;
   const incomingEnd = incoming.endDate ?? incoming.startDate;
-  const endDate = existingEnd > incomingEnd ? existingEnd : incomingEnd;
+  const endDate = widen && incomingEnd > existingEnd ? incomingEnd : existingEnd;
 
   const event: EventRecord = {
     ...existing,
@@ -374,8 +393,13 @@ export const mergeEvent = (
       : {}),
     // Other sources resighted this event → keep every link (AC-1.8).
     ...mergedAltLinks(existing, incoming),
+    // The dates a source lists for a show sold date by date (see groupSeries).
+    ...listedProgrammeOf(existing, incoming),
   };
   const changed =
+    // By content: a re-listed programme is a new array every time.
+    JSON.stringify(event.sessions) !== JSON.stringify(existing.sessions) ||
+    event.kind !== existing.kind ||
     event.city !== existing.city ||
     event.startDate !== existing.startDate ||
     event.endDate !== existing.endDate ||
@@ -689,8 +713,23 @@ export const parseEventRecord = (text: string): EventRecord | undefined => {
     ...(city === undefined ? {} : { city }),
     ...(sessions === undefined ? {} : { sessions }),
     ...(kind === undefined ? {} : { kind }),
+    ...(readProp(value, 'listedProgramme') === true ? { listedProgramme: true as const } : {}),
+    ...[parseStatedRun(readProp(value, 'statedRun'))]
+      .filter((run): run is StatedRun => run !== undefined)
+      .map((statedRun) => ({ statedRun }))
+      .at(0),
     ...(altLinks.length === 0 ? {} : { altLinks }),
   };
+};
+
+/** A run as dates: a start, and an end not before it when there is one.
+ *  Anything else — words, a backwards range — is no run at all. */
+export const parseStatedRun = (value: unknown): StatedRun | undefined => {
+  const start = asNonEmptyString(readProp(value, 'start'));
+  const end = asNonEmptyString(readProp(value, 'end'));
+  if (start === undefined || !isIsoDate(start)) return undefined;
+  if (end === undefined || end === start) return { start };
+  return isIsoDate(end) && end > start ? { start, end } : undefined;
 };
 
 /** `c` was a single category before the multi-category revision — accept both. */
