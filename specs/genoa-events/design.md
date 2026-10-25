@@ -132,6 +132,18 @@ theatre agenda on the same CMS family as mentelocale: `div.Evento` cards with
 (`Dal 02/07/2026 al 26/07/2026`). Static `categoryHint: 'theatre'`; the
 abstract feeds `rawDescription`.
 
+*Amendment 2026-10-25.* `/eventi/` lists only the next ten shows (no further
+pages), which kept the corpus at ~11 of the site's ~80 shows. The collector now
+reads home (`/`, venue in `span.DownEventBox`, dated by NEXT performance — not
+used as a date), `/eventi/` and every `/argomenti/*.htm` page linked from home
+(runs as dates; the abstract there is the venue), unions the cards by url, then
+reads each show page (`p.EventDates`, `p.EventLocation` = "venue, street, city",
+`div.EventText`), capped at 120 pages per run. Venue: show page → listing →
+the one-stage house in the url path (`teatrodellatosse` → Teatro della Tosse);
+"GOG " prefixes are stripped and "Teatro Duse" is spelled "Teatro Eleonora
+Duse" to match the other sources. A show with no run from a show page or a
+run-dated listing is skipped.
+
 ### 4.4 palazzoducale.genova.it (`src/collectors/palazzoducale.ts`)
 
 *Amendment 2026-07-02 (2nd pass).* WordPress; the "in programma" tab is
