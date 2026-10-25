@@ -220,11 +220,12 @@ const UNSIGHTED_PER_RUN = 24;
  * re-sighting rule never reads them again: Baglioni's postponed concert stayed
  * listed for the whole year in between. Found in the index — a container, or a
  * span its own article contradicts, read at an older prompt — then confirmed
- * against storage. The window over them moves every hour, so a suspect that is
- * never read again (a programme a source listed date by date) cannot hold the
- * slots for good.
+ * against storage. Every record looked at comes back, so its index entry can
+ * carry the version it was read at and stop looking suspect; and the window
+ * moves every run, so a suspect that is never read again (a programme a source
+ * listed date by date) cannot hold the slots for good.
  */
-const unsightedSuspects = async (
+const unsightedLooked = async (
   deps: CollectDeps,
   index: readonly CompactEvent[],
   identified: readonly Identified[],
@@ -242,10 +243,10 @@ const unsightedSuspects = async (
           descriptions: { en: event.d?.en ?? '' },
         }),
     );
-  const start = Math.floor(nowMs / 3_600_000) % Math.max(1, suspects.length);
+  const start = Math.floor(nowMs / 60_000) % Math.max(1, suspects.length);
   const window = [...suspects.slice(start), ...suspects.slice(0, start)].slice(0, UNSIGHTED_PER_RUN);
   const records = await mapBounded(window, (event) => readEventRecord(deps.kv, event.id));
-  return records.filter((record): record is EventRecord => record !== undefined && needsReRead(record));
+  return records.filter((record): record is EventRecord => record !== undefined);
 };
 
 type FuzzyOutcome = Readonly<{
@@ -392,7 +393,8 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       }
     }
 
-    retryRecords.push(...(await unsightedSuspects(deps, index, identified, startedAt)));
+    const looked = await unsightedLooked(deps, index, identified, startedAt);
+    retryRecords.push(...looked.filter(needsReRead));
 
     const detailed = await deps.details(freshItems.map((item) => item.raw));
     const freshDetailed = freshItems.map((item, i): Identified => {
@@ -510,6 +512,11 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       index.map((event) => [event.id, event]),
     );
     for (const id of blockedIds) compactById.delete(id);
+    // A record looked at and found right needs no write; its index entry is
+    // projected again, so it carries the version it was read at.
+    for (const record of looked.filter((one) => !blockedIds.has(one.id))) {
+      compactById.set(record.id, toCompact(record));
+    }
     for (const record of written.values()) compactById.set(record.id, toCompact(record));
     const allCompact = [...compactById.values()];
     const prunedIndex = pruneIndex(allCompact, today);
