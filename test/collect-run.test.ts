@@ -346,3 +346,50 @@ describe('runCollect: catching up on photographs', () => {
     assert.deepEqual((await readEventRecord(kv, id))?.photos, []);
   });
 });
+
+// genovateatro used to hand over no venue, so its shows were stored without
+// one. The collector now reads it; the stored records must take it on their
+// next sighting, while a venue a record already has stays as it is.
+describe('runCollect: venues backfilled onto stored records', () => {
+  const TOSSE = 'https://www.genovateatro.it/eventi/2026-2027/teatrodellatosse';
+
+  test('a stored show without a venue takes the one the source now gives', async () => {
+    const kv = makeKvStub();
+    const bare = rawEvent({ title: 'Kaguya-Hime', url: `${TOSSE}/kaguya-hime.htm`, source: 'genovateatro' });
+    const id = await eventIdOf(bare.title, bare.startDate);
+    const enriched = new Map<string, Enrichment>([
+      [id, { categories: ['theatre'], descriptions: { en: 'A show.', it: 'Uno spettacolo.', ru: 'A show.' }, address: 'Genova, GE', unusual: false }],
+    ]);
+    await runCollect(makeDeps(kv, [okCollector([bare])], enriched));
+    assert.equal((await readEventRecord(kv, id))?.venue, undefined);
+
+    const named: RawEvent = {
+      ...bare,
+      venue: 'Teatro della Tosse',
+      address: 'Teatro della Tosse, piazza Renato Negri 4, Genova',
+    };
+    await runCollect(makeDeps(kv, [okCollector([named])], enriched));
+    assert.equal((await readEventRecord(kv, id))?.venue, 'Teatro della Tosse');
+    assert.equal((await readIndex(kv)).find((event) => event.id === id)?.v, 'Teatro della Tosse');
+  });
+
+  test('a venue the record already has is not overwritten', async () => {
+    const kv = makeKvStub();
+    const title = 'Bambù, danza e teatro contemporanei';
+    const fromMentelocale = rawEvent({
+      title,
+      url: 'https://www.mentelocale.it/genova/138050-bambu.htm',
+      source: 'mentelocale',
+      venue: "Teatro Sant'Agostino",
+    });
+    const fromGenovateatro = rawEvent({ title, url: `${TOSSE}/bambu-2026.htm`, source: 'genovateatro' });
+    await runCollect(makeDeps(kv, [okCollector([fromMentelocale, fromGenovateatro])]));
+    const id = await eventIdOf(title, fromMentelocale.startDate);
+
+    // Re-sighted under genovateatro's own title, matched by its url.
+    const resighted: RawEvent = { ...fromGenovateatro, title: 'Bambu', venue: 'Teatro della Tosse' };
+    await runCollect(makeDeps(kv, [okCollector([resighted])]));
+    assert.equal((await readIndex(kv)).length, 1);
+    assert.equal((await readEventRecord(kv, id))?.venue, "Teatro Sant'Agostino");
+  });
+});

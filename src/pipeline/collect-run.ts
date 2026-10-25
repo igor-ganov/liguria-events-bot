@@ -37,6 +37,7 @@ import {
 import type { KvLike } from './store.ts';
 import { romeDate } from './clock.ts';
 import { pruneIndex } from './windows.ts';
+import { mapBounded as mapBoundedBy } from '../util/bounded.ts';
 
 export type SourceStat = Readonly<{
   source: string;
@@ -89,16 +90,7 @@ const identify = async (events: readonly RawEvent[]): Promise<readonly Identifie
  *  firing all 1300 at once risks tripping KV's rate limits. */
 const CONCURRENCY = 32;
 
-const mapBounded = async <T, R>(
-  items: readonly T[],
-  fn: (item: T) => Promise<R>,
-): Promise<readonly R[]> => {
-  const out: R[] = [];
-  for (let i = 0; i < items.length; i += CONCURRENCY) {
-    out.push(...(await Promise.all(items.slice(i, i + CONCURRENCY).map(fn))));
-  }
-  return out;
-};
+const mapBounded = mapBoundedBy(CONCURRENCY);
 
 /** Collapse same-id sightings within one run: first wins, gaps fill (AC-1.2). */
 const dedupeWithinRun = (identified: readonly Identified[]): readonly Identified[] => {
