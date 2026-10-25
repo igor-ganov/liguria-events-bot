@@ -13,8 +13,8 @@ import {
   toCompact,
   withDerivedSpan,
 } from '../domain/event.ts';
-import type { CompactEvent, EventRecord, RawEvent } from '../domain/event.ts';
-import { mergeDuplicates, orderByAge } from '../domain/merge-duplicates.ts';
+import type { CompactEvent, EventRecord, RawEvent, StatedRun } from '../domain/event.ts';
+import { mergeDuplicates } from '../domain/merge-duplicates.ts';
 import type { Collector, FetchFn, RawPost } from '../collectors/types.ts';
 import { ENRICH_VERSION, lastEnrichFailures } from '../llm/enrich.ts';
 import type { Enrichment, PendingEnrich } from '../llm/enrich.ts';
@@ -37,6 +37,10 @@ import {
 import type { KvLike } from './store.ts';
 import { romeDate } from './clock.ts';
 import { pruneIndex } from './windows.ts';
+import { groupSeries } from './group-series.ts';
+import { duplicateClusters } from './duplicate-clusters.ts';
+import { needsReRead } from './needs-re-read.ts';
+import { narrowedToRun } from '../domain/narrowed-to-run.ts';
 import { mapBounded as mapBoundedBy } from '../util/bounded.ts';
 
 export type SourceStat = Readonly<{
@@ -80,6 +84,11 @@ export type CollectDeps = Readonly<{
 
 type Identified = Readonly<{ id: string; raw: RawEvent }>;
 
+/** A record on the days it is really on: a container on its programme, any
+ *  other event on the run its page states (narrowedToRun). */
+const onItsDates = (record: EventRecord, run: StatedRun | undefined): EventRecord =>
+  withDerivedSpan(narrowedToRun(record, run));
+
 const identify = async (events: readonly RawEvent[]): Promise<readonly Identified[]> =>
   Promise.all(
     events.map(async (raw) => ({ id: await eventIdOf(raw.title, raw.startDate), raw })),
@@ -115,8 +124,8 @@ const toRecord = (
   const address = raw.address ?? enrichment?.address;
   const time = raw.time ?? enrichment?.time;
   // A container's span is its programme, not the window the source advertised —
-  // withDerivedSpan rewrites it so the stored dates match the days it is really on.
-  return withDerivedSpan({
+  // onItsDates rewrites it so the stored dates match the days it is really on.
+  return onItsDates({
     id: item.id,
     title: raw.title,
     startDate: raw.startDate,
@@ -134,8 +143,13 @@ const toRecord = (
     ...(raw.endDate === undefined ? {} : { endDate: raw.endDate }),
     ...(time === undefined ? {} : { time }),
     ...(enrichment?.durationMin === undefined ? {} : { durationMin: enrichment.durationMin }),
-    ...(enrichment?.sessions === undefined ? {} : { sessions: enrichment.sessions }),
-    ...(enrichment?.kind === undefined ? {} : { kind: enrichment.kind }),
+    // The dates a source lists outright beat a model's reading of its text.
+    ...(raw.sessions === undefined
+      ? {
+          ...(enrichment?.sessions === undefined ? {} : { sessions: enrichment.sessions }),
+          ...(enrichment?.kind === undefined ? {} : { kind: enrichment.kind }),
+        }
+      : { sessions: raw.sessions, kind: raw.kind ?? ('container' as const), listedProgramme: true as const }),
     ...(raw.venue === undefined ? {} : { venue: raw.venue }),
     ...(address === undefined ? {} : { address }),
     ...(raw.priceInfo === undefined ? {} : { priceInfo: raw.priceInfo }),
@@ -147,7 +161,7 @@ const toRecord = (
     ...(enrichment?.titles === undefined ? {} : { titles: enrichment.titles }),
     ...(enrichment?.unusual === true ? { unusual: true } : {}),
     ...(free ? { free: true } : {}),
-  });
+  }, enrichment?.run);
 };
 
 const pendingOf = (item: Identified): PendingEnrich => ({
@@ -221,16 +235,19 @@ const mergeFuzzyDuplicates = async (
   const judged =
     candidates.length === 0 ? [] : await deps.judgeSameEvent(candidates).catch(() => []);
   const confirmed = [...certain, ...judged];
-  for (const pair of confirmed) {
-    if (dropped.has(pair.a.id) || dropped.has(pair.b.id)) continue;
-    const recordA = await readEventRecord(deps.kv, pair.a.id);
-    const recordB = await readEventRecord(deps.kv, pair.b.id);
-    if (recordA === undefined || recordB === undefined) continue;
-    const merged = mergeDuplicates(recordA, recordB);
-    const { secondary } = orderByAge(recordA, recordB);
+  // One group at a time, each read once and written once: the oldest record
+  // stays, every other one folds into it and is deleted.
+  for (const group of duplicateClusters(confirmed)) {
+    const records = (await mapBounded(group, (id) => readEventRecord(deps.kv, id))).filter(
+      (record): record is EventRecord => record !== undefined,
+    );
+    // Oldest first; a tie keeps the order the pairs named them in (stable sort).
+    const [primary, ...others] = records.toSorted((a, b) => a.addedAt - b.addedAt);
+    if (primary === undefined || others.length === 0) continue;
+    const merged = withDerivedSpan(others.reduce(mergeDuplicates, primary));
     await writeEventRecord(deps.kv, merged, nowMs);
-    await deps.kv.delete(eventKey(secondary.id));
-    dropped.add(secondary.id);
+    await mapBounded(others, (record) => deps.kv.delete(eventKey(record.id)));
+    others.forEach((record) => dropped.add(record.id));
     replacements.set(merged.id, toCompact(merged));
   }
   return { droppedIds: dropped, replacements };
@@ -250,8 +267,11 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
     const extracted = posts.length === 0 ? [] : await deps.extract(posts, today);
 
     const collected = [...outcomes.flatMap((outcome) => outcome.events), ...extracted];
-    const upcoming = collected.filter(
-      (raw) => (raw.endDate ?? raw.startDate) >= today, // AC-1.5
+    // A show a source sells date by date is one event (groupSeries).
+    const upcoming = groupSeries(
+      collected.filter(
+        (raw) => (raw.endDate ?? raw.startDate) >= today, // AC-1.5
+      ),
     );
     const index = await readIndex(deps.kv);
     // URL → record alias map: a fuzzy-merged duplicate's url lives in the
@@ -322,7 +342,7 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       // character in the stored text without a whole-corpus version bump.
       if (
         !event.enriched ||
-        (event.enrichVersion ?? 0) < ENRICH_VERSION ||
+        needsReRead(event) ||
         hasCjk(event.descriptions) ||
         // A programme whose titles are still only as they were read. Found
         // by what is missing rather than by a version bump, so the few
@@ -399,8 +419,9 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
         : // The programme and the kind are re-applied on every pass, not just
           // filled when absent: this is how the corpus MIGRATES onto a new
           // classification, and how a mis-read programme gets corrected. The
-          // span then follows the programme for a container.
-          withDerivedSpan({
+          // span then follows the programme for a container, and the run the
+          // page states for anything else.
+          onItsDates({
             ...withoutKind,
             categories: enrichment.categories,
             descriptions: enrichment.descriptions,
@@ -412,14 +433,22 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
             ...(record.durationMin === undefined && enrichment.durationMin !== undefined
               ? { durationMin: enrichment.durationMin }
               : {}),
-            ...(enrichment.sessions === undefined ? {} : { sessions: enrichment.sessions }),
-            ...(enrichment.kind === 'container' ? { kind: 'container' as const } : {}),
+            // A programme the source lists date by date is not the model's to
+            // replace; only a programme read from text is read again.
+            ...(record.listedProgramme === true
+              ? record.kind === undefined
+                ? {}
+                : { kind: record.kind }
+              : {
+                  ...(enrichment.sessions === undefined ? {} : { sessions: enrichment.sessions }),
+                  ...(enrichment.kind === 'container' ? { kind: 'container' as const } : {}),
+                }),
             ...(enrichment.titles === undefined ? {} : { titles: enrichment.titles }),
             ...(record.address === undefined && enrichment.address !== undefined
               ? { address: enrichment.address }
               : {}),
             ...(enrichment.unusual === true ? { unusual: true } : {}),
-          });
+          }, enrichment.run);
     });
 
     // Content-policy gate (same rules as user submissions): the enrichment

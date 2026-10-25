@@ -4,6 +4,7 @@
  * chats and calendars); the newer one fills gaps and donates its links.
  */
 import { dedupeLinks, linkOf } from './event.ts';
+import { unionSessions } from './listed-programme.ts';
 import type { Category, EventRecord, SourceLink } from './event.ts';
 
 const unionCategories = (
@@ -57,6 +58,15 @@ export const mergeDuplicates = (a: EventRecord, b: EventRecord): EventRecord => 
       ? { image: secondary.image }
       : {}),
     ...(altLinks.length === 0 ? {} : { altLinks }),
+    // A programme a source lists date by date survives the merge whichever
+    // record carried it, joined by every date the other one knew.
+    ...(primary.listedProgramme === true || secondary.listedProgramme === true
+      ? {
+          sessions: unionSessions(primary.sessions ?? [], secondary.sessions ?? []),
+          kind: 'container' as const,
+          listedProgramme: true as const,
+        }
+      : {}),
     ...(primary.free === true || secondary.free === true ? { free: true } : {}),
     ...(primary.unusual === true || secondary.unusual === true ? { unusual: true } : {}),
   };
