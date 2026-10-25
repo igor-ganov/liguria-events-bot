@@ -1,4 +1,6 @@
-import type { EventRecord } from '../domain/event.ts';
+/** What the check reads: a span and its English article. A stored record has
+ *  this shape, and so does an index entry once its keys are spelled out. */
+type Spanned = Readonly<{ startDate: string; endDate?: string; descriptions: Readonly<{ en: string }> }>;
 
 const MONTHS = [
   'january', 'february', 'march', 'april', 'may', 'june',
@@ -10,7 +12,7 @@ const DAY_MS = 86_400_000;
 
 // Days the English article's "When" section names, read as dates. A day with
 // no year takes the year the record starts in.
-const whenDates = (event: EventRecord): readonly string[] => {
+const whenDates = (event: Spanned): readonly string[] => {
   const when = event.descriptions.en.split('## [when]')[1]?.split('\n## ')[0] ?? '';
   return [...when.toLowerCase().matchAll(DATE)].flatMap((match) => {
     const month = MONTHS.findIndex((name) => name === match[2]) + 1;
@@ -30,7 +32,7 @@ const daysBetween = (from: string, to: string): number => (Date.parse(to) - Date
  * to 1 November. It is a reason to read the page again, not proof: an article
  * may name one evening of a months-long exhibition.
  */
-export const spanContradictsText = (event: EventRecord): boolean => {
+export const spanContradictsText = (event: Spanned): boolean => {
   const named = whenDates(event).toSorted();
   const [first, last] = [named[0], named.at(-1)];
   return (
