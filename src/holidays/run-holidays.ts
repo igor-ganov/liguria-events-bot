@@ -6,7 +6,7 @@
 import { addDays } from '../pipeline/clock.ts';
 import { chunk } from '../llm/enrich.ts';
 import { extractJson } from '../llm/client.ts';
-import { CLASSIFY_BATCH, candidatesFor, classifyInput, parseMembers } from './candidates.ts';
+import { CLASSIFY_BATCH, candidatesFor, classifyInput, namesHoliday, parseMembers } from './candidates.ts';
 import { HORIZON_DAYS } from './holiday.ts';
 import { parseHolidays } from './parse-holidays.ts';
 import { CALENDAR_SYSTEM, calendarInput, classifySystem } from './prompts.ts';
@@ -55,6 +55,11 @@ const inWaves = async <T, R>(items: readonly T[], work: (item: T) => Promise<R>)
     Promise.resolve([]),
   );
 
+// What the model chose, joined by every candidate that names the holiday in
+// its title, in candidate order.
+const membersOf = (holiday: Holiday, candidates: readonly CompactEvent[], chosen: readonly string[]): readonly string[] =>
+  candidates.filter((event) => chosen.includes(event.id) || namesHoliday(holiday)(event)).map((event) => event.id);
+
 type Classified = Readonly<{ holiday: Holiday; candidates: number; failed: number }>;
 
 const classify =
@@ -63,7 +68,7 @@ const classify =
     const candidates = candidatesFor(holiday, deps.index, deps.today);
     const results = await inWaves(chunk(candidates, CLASSIFY_BATCH), classifyBatch(deps.chat, holiday));
     return {
-      holiday: { ...holiday, events: results.flatMap((result) => result.ids) },
+      holiday: { ...holiday, events: membersOf(holiday, candidates, results.flatMap((result) => result.ids)) },
       candidates: candidates.length,
       failed: results.filter((result) => result.failed).length,
     };
