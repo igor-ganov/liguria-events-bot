@@ -93,6 +93,8 @@ import { reading } from './analytics/reading.ts';
 import { track } from './analytics/track.ts';
 import { buildCollectDeps, buildGeocodeDeps, chatOf } from './wire.ts';
 import { runGeocode } from './pipeline/geocode.ts';
+import { runHolidays } from './holidays/run-holidays.ts';
+import { currentHolidays, holidaysDue, readHolidays } from './holidays/store.ts';
 import { CATEGORIES } from './domain/event.ts';
 import { asArray, asBoolean, asNonEmptyString, asNumber, readProp } from './util/json.ts';
 
@@ -917,6 +919,46 @@ const pushDigests = async (env: Env, nowMs: number, hour: number): Promise<unkno
   return { woken: sent.filter((status) => status >= 200 && status < 300).length, of: subs.length };
 };
 
+/** The holiday job, through the worker's own model and corpus. */
+const holidaysNow = async (env: Env, index: readonly CompactEvent[], nowMs: number): Promise<unknown> => {
+  const run = await runHolidays({
+    chat: chatOf(env),
+    kv: env.EVENTS,
+    index,
+    today: romeDate(nowMs),
+    nowIso: new Date(nowMs).toISOString(),
+  });
+  return {
+    holidays: run.payload.holidays.map((holiday) => ({
+      id: holiday.id,
+      themeFrom: holiday.themeFrom,
+      themeTo: holiday.themeTo,
+      theme: holiday.theme,
+      events: holiday.events.length,
+      candidates: run.candidates[holiday.id] ?? 0,
+    })),
+    rejected: run.rejected,
+    failedBatches: run.failedBatches,
+  };
+};
+
+/** Once per Rome day; a failed run is simply retried on the next pulse. */
+const holidaysIfDue = async (env: Env, index: readonly CompactEvent[], nowMs: number): Promise<unknown> =>
+  holidaysDue(await readHolidays(env.EVENTS), romeDate(nowMs))
+    ? holidaysNow(env, index, nowMs)
+    : { kind: 'fresh' };
+
+const serveHolidays = async (env: Env): Promise<Response> => {
+  const stored = await readHolidays(env.EVENTS);
+  const payload = currentHolidays(
+    stored ?? { generatedAt: new Date().toISOString(), holidays: [] },
+    romeDate(Date.now()),
+  );
+  return Response.json(payload, {
+    headers: { 'cache-control': 'public, max-age=300', 'access-control-allow-origin': '*' },
+  });
+};
+
 const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
   const hour = romeHour(nowMs);
   const today = romeDate(nowMs);
@@ -944,6 +986,10 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
   const indexNow = await pingIndexNow(env, index, nowMs).catch((error: unknown) => ({
     error: String(error),
   }));
+  // Holidays the site dresses up for, decided by the model once a day.
+  const holidays = await holidaysIfDue(env, index, nowMs).catch((error: unknown) => ({
+    error: String(error),
+  }));
   const userIds = await listUserIds(env.EVENTS);
   for (const userId of userIds) {
     await pushDigest(env, userId, index, today, hour).catch(() => undefined);
@@ -956,7 +1002,7 @@ const runScheduled = async (env: Env, nowMs: number): Promise<unknown> => {
   // through the /events.json probe, so it is not sent twice.
   await track(env, { event: 'tick' });
   await track(env, reading('users', userIds.length));
-  return { collect, geocode, health, channel, indexNow, pushed };
+  return { collect, geocode, health, channel, indexNow, pushed, holidays };
 };
 
 // ─────────────────────────────────────────────────────────────── export ──
@@ -981,6 +1027,11 @@ const worker = {
 
     if (url.pathname === '/events.json' && request.method === 'GET') {
       return serveEventsJson(env, url);
+    }
+
+    // The holidays near today, their theme and their events — see src/holidays.
+    if (url.pathname === '/holidays.json' && request.method === 'GET') {
+      return serveHolidays(env);
     }
 
     // Everything that has been and gone. The pages never went away — the
@@ -1332,6 +1383,14 @@ const worker = {
         );
         await writeIndex(env.EVENTS, index);
         return Response.json({ recordsUpdated: updated.length, imagesFilled });
+      }
+      // Decide the holidays and their events now instead of on the next day's pulse.
+      if (url.searchParams.get('force') === 'holidays') {
+        try {
+          return Response.json(await holidaysNow(env, await readIndex(env.EVENTS), Date.now()));
+        } catch (error) {
+          return Response.json({ error: String(error) }, { status: 500 });
+        }
       }
       if (url.searchParams.get('force') === 'geocode') {
         try {
