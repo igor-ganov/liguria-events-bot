@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: 'Set to "collect" to crawl now, or "geocode" to run the geocoding pass'
+        description: 'Set to "collect" to crawl now, "geocode" to run the geocoding pass, or "holidays" to decide the holidays now'
         required: false
         default: ''
 
