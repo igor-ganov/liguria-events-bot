@@ -43,7 +43,10 @@ export const classifyInput = (batch: readonly CompactEvent[]): readonly Classify
     text: (event.d?.en ?? '').replace(/\s+/g, ' ').trim().slice(0, TEXT_CHARS),
   }));
 
-const plain = (text: string): string => text.toLowerCase().replace(/s+/g, ' ').trim();
+// Words only: a quote and the text it came from are compared without the
+// punctuation and spacing a model drops or adds ("Torino: Mariachi").
+const plain = (text: string): string =>
+  text.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 // Everything the model was shown of one event, as it was shown.
 const shownOf = (event: CompactEvent): string =>
@@ -67,3 +70,18 @@ export const parseMembers = (value: unknown, batch: readonly CompactEvent[]): re
     })
     .map((event) => event.id);
 };
+
+/**
+ * Whether an event's title names the holiday in any of its languages. Such an
+ * event is the holiday's whatever the model answered: "Halloween 2026 a
+ * Torino" was left out on a quote that missed by a colon.
+ */
+export const namesHoliday =
+  (holiday: Holiday) =>
+  (event: CompactEvent): boolean => {
+    const title = ` ${plain([event.t, ...Object.values(event.tl ?? {})].join(' '))} `;
+    return Object.values(holiday.name)
+      .map(plain)
+      .filter((name) => name.length >= 4)
+      .some((name) => title.includes(` ${name} `));
+  };

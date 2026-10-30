@@ -290,6 +290,21 @@ describe('runHolidays', () => {
     assert.equal(stored.holidays[0].id, 'halloween-2026');
   });
 
+  test('an event whose title names the holiday belongs even when the model missed it', async () => {
+    const kv = makeKvStub();
+    const named = { ...event('named', TODAY), t: 'Halloween 2026 a Torino: Mariachi live e dj set' };
+    const index = [named, event('plain', TODAY)];
+    const chat: ChatFn = async (system) =>
+      system.includes('holiday calendar') ? JSON.stringify({ holidays: [halloween] }) : JSON.stringify({ members: [] });
+    const result = await runHolidays({ chat, kv, index, today: TODAY, nowIso: 'x' });
+    assert.deepEqual(result.payload.holidays[0]?.events, ['named']);
+  });
+
+  test('a quote counts whatever punctuation the model dropped', () => {
+    const party = { ...event('a', TODAY), t: 'Halloween 2026 a Torino: Mariachi live' };
+    assert.deepEqual(parseMembers({ members: [{ id: 'a', evidence: 'Torino Mariachi live' }] }, [party]), ['a']);
+  });
+
   test('a failed classification batch costs its events, not the holiday', async () => {
     const kv = makeKvStub();
     const chat: ChatFn = async (system) => {
