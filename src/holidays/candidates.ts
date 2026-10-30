@@ -7,10 +7,10 @@ import type { CompactEvent } from '../domain/event.ts';
 import type { Holiday } from './holiday.ts';
 
 /** One classification call: cheap enough to stay well inside the model's budget. */
-export const CLASSIFY_BATCH = 40;
+export const CLASSIFY_BATCH = 20;
 /** Hard ceiling on events asked about per holiday — bounds the run's calls. */
 export const MAX_CANDIDATES = 400;
-const TEXT_CHARS = 200;
+const TEXT_CHARS = 400;
 
 const lastDay = (event: CompactEvent): string => event.e ?? event.s;
 
@@ -43,8 +43,27 @@ export const classifyInput = (batch: readonly CompactEvent[]): readonly Classify
     text: (event.d?.en ?? '').replace(/\s+/g, ' ').trim().slice(0, TEXT_CHARS),
   }));
 
-/** The `{ ids: [...] }` the model answered, kept to ids that were asked about. */
+const plain = (text: string): string => text.toLowerCase().replace(/s+/g, ' ').trim();
+
+// Everything the model was shown of one event, as it was shown.
+const shownOf = (event: CompactEvent): string =>
+  plain([event.t, event.tl?.en ?? '', ...classifyInput([event]).map((line) => line.text)].join(' '));
+
+/**
+ * The members the model named, each kept only when the words it quotes as the
+ * tie to the holiday are really in that event's own title or text. A model
+ * that answers by id alone can name anything — the first run filed a talk by
+ * a journalist from Gaza under Halloween — and a quote it has to find in the
+ * text it was given is how that is caught.
+ */
 export const parseMembers = (value: unknown, batch: readonly CompactEvent[]): readonly string[] => {
-  const named = new Set((asArray(readProp(value, 'ids')) ?? []).map(asString));
-  return batch.map((event) => event.id).filter((id) => named.has(id));
+  const quoted = new Map(
+    (asArray(readProp(value, 'members')) ?? []).map((item) => [asString(readProp(item, 'id')) ?? '', plain(asString(readProp(item, 'evidence')) ?? '')]),
+  );
+  return batch
+    .filter((event) => {
+      const evidence = quoted.get(event.id) ?? '';
+      return evidence.length >= 3 && shownOf(event).includes(evidence);
+    })
+    .map((event) => event.id);
 };

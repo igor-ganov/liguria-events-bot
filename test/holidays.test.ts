@@ -10,6 +10,7 @@ import { candidatesFor, classifyInput, parseMembers } from '../src/holidays/cand
 import { currentHolidays, holidaysDue } from '../src/holidays/store.ts';
 import { runHolidays } from '../src/holidays/run-holidays.ts';
 import { MOTIFS } from '../src/holidays/holiday.ts';
+import { classifySystem } from '../src/holidays/prompts.ts';
 import type { Holiday } from '../src/holidays/holiday.ts';
 import type { CompactEvent } from '../src/domain/event.ts';
 import type { ChatFn } from '../src/llm/client.ts';
@@ -217,17 +218,43 @@ describe('candidates', () => {
     );
   });
 
-  test('the classifier sees id, title and at most 200 characters of English', () => {
+  test('the classifier sees id, title and at most 400 characters of English', () => {
     const [line] = classifyInput([event('a', TODAY)]);
     assert.equal(line?.id, 'a');
     assert.equal(line?.title, 'Event a');
-    assert.ok((line?.text.length ?? 0) <= 200);
+    assert.ok((line?.text.length ?? 0) <= 400);
   });
 
-  test('members are the ids the model named that were in the batch', () => {
+  test('a member counts only with words from its own text that tie it to the holiday', () => {
+    const party = { ...event('a', TODAY), t: 'Festa di Halloween al Porto Antico' };
+    const talk = { ...event('b', TODAY), t: 'Incontro con un giornalista' };
+    const batch = [party, talk];
+    assert.deepEqual(
+      parseMembers(
+        {
+          members: [
+            { id: 'a', evidence: 'Festa di Halloween' },
+            // Named, but the words are not in its text: the model made the tie up.
+            { id: 'b', evidence: 'Halloween night' },
+            { id: 'zzz', evidence: 'Halloween' },
+          ],
+        },
+        batch,
+      ),
+      ['a'],
+    );
+  });
+
+  test('an answer without evidence names no member', () => {
     const batch = [event('a', TODAY), event('b', TODAY)];
-    assert.deepEqual(parseMembers({ ids: ['b', 'zzz', 'b'] }, batch), ['b']);
+    assert.deepEqual(parseMembers({ ids: ['a', 'b'] }, batch), []);
+    assert.deepEqual(parseMembers({ members: [{ id: 'a', evidence: '' }] }, batch), []);
     assert.deepEqual(parseMembers('nonsense', batch), []);
+  });
+
+  test('the prompt asks for the evidence it is checked against', () => {
+    assert.match(classifySystem(theHoliday), /"evidence"/);
+    assert.match(classifySystem(theHoliday), /exact words/i);
   });
 });
 
@@ -254,10 +281,10 @@ describe('runHolidays', () => {
       prompts.push(system);
       if (system.includes('holiday calendar')) return JSON.stringify({ holidays: [halloween] });
       const ids: readonly string[] = JSON.parse(user).events.map((one: { id: string }) => one.id);
-      return JSON.stringify({ ids: ids.filter((id) => id.endsWith('1')) });
+      return JSON.stringify({ members: ids.filter((id) => id.endsWith('1')).map((id) => ({ id, evidence: `Event ${id}` })) });
     };
     const result = await runHolidays({ chat, kv, index, today: TODAY, nowIso: '2026-10-31T09:00:00.000Z' });
-    assert.equal(prompts.length, 3); // one for the calendar, two batches of 40 + 5
+    assert.equal(prompts.length, 4); // one for the calendar, three batches of 20 + 20 + 5
     assert.deepEqual(result.payload.holidays[0]?.events, ['e1', 'e11', 'e21', 'e31', 'e41']);
     const stored = JSON.parse(kv.data.get('holidays') ?? '{}');
     assert.equal(stored.holidays[0].id, 'halloween-2026');
