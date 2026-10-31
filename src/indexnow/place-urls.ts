@@ -1,3 +1,4 @@
+import { FACET_PATHS } from './facet-paths.ts';
 import { slugify } from '../domain/slugify.ts';
 import type { CompactEvent } from '../domain/event.ts';
 
@@ -12,9 +13,6 @@ const SITE = 'https://dovego.it';
  * pages that say the same thing.
  */
 const LANG = 'it';
-
-/** A city page and the three time facets that share its programme. */
-const FACETS: readonly string[] = ['', 'today/', 'tomorrow/', 'this-weekend/'];
 
 /** Enough for a crawl's worth of new events; 900 URLs in one submission came
  *  back 429, and a city's pages are offered again the next time it changes. */
@@ -31,7 +29,7 @@ const venueSlug = (event: CompactEvent): readonly string[] =>
   [slugify(event.v ?? '')]
     .filter((slug) => slug !== 'x')
     .filter((slug) => slug !== slugify(event.ct ?? ''))
-    .filter((slug) => !FACETS.includes(`${slug}/`));
+    .filter((slug) => !FACET_PATHS.includes(`${slug}/`));
 
 /**
  * The pages a batch of new events changed, beyond the events' own.
@@ -45,7 +43,7 @@ export const placeUrls = (events: readonly CompactEvent[], limit = LIMIT): reado
   const paths = events
     .filter(located)
     .flatMap((event) => [
-      ...FACETS.map((facet) => `${cityOf(event)}${facet}`),
+      ...FACET_PATHS.map((facet) => `${cityOf(event)}${facet}`),
       ...venueSlug(event).map((slug) => `${cityOf(event)}${slug}/`),
     ]);
   return [...new Set(paths)].slice(0, limit).map((path) => `${SITE}/${LANG}/${path}`);

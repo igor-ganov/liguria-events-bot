@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { newSince } from '../src/indexnow/new-since.ts';
 import { eventUrls } from '../src/indexnow/event-urls.ts';
 import { placeUrls } from '../src/indexnow/place-urls.ts';
+import { placeSweep } from '../src/indexnow/place-sweep.ts';
 import { indexNowBody } from '../src/indexnow/index-now-body.ts';
 import { pingIndexNow } from '../src/indexnow/ping-index-now.ts';
 import { readProp } from '../src/util/json.ts';
@@ -188,8 +189,44 @@ describe('pingIndexNow', () => {
   });
 
   test('says nothing twice about the same event', async () => {
-    const { binding } = kv({ 'indexnow:watermark': '150' });
-    assert.deepEqual(await pingIndexNow(env('k123', binding), index, NOW), { kind: 'nothing-new' });
+    // The watermark does not move, because nothing new was said.
+    const { binding, store } = kv({ 'indexnow:watermark': '150' });
+    const seen: { body?: unknown } = {};
+    await pingIndexNow(env('k123', binding), index, NOW, answering(200, seen));
+    assert.equal(store.get('indexnow:watermark'), '150');
+    const list = readProp(seen.body, 'urlList');
+    assert.equal(
+      (Array.isArray(list) ? list : []).some((url) => String(url).includes('/event/')),
+      false,
+    );
+  });
+
+  test('an hour with no new event re-announces the pages that change by themselves', async () => {
+    // "What is on today" is a different page every morning with no event
+    // added anywhere, and in ten days neither bingbot nor Googlebot fetched a
+    // single facet page: announcing them only when an event appears in that
+    // city was never going to reach them.
+    const placed: CompactEvent = { ...compact({ addedAt: 150 }), rg: 'liguria', ct: 'genova' };
+    const { binding, store } = kv({ 'indexnow:watermark': '150' });
+    const seen: { body?: unknown } = {};
+    const result = await pingIndexNow(env('k123', binding), [placed], NOW, answering(200, seen));
+    assert.equal(readProp(result, 'kind'), 'swept');
+    const list = readProp(seen.body, 'urlList');
+    assert.deepEqual(Array.isArray(list) ? list : [], [
+      'https://dovego.it/it/liguria/genova/',
+      'https://dovego.it/it/liguria/genova/today/',
+      'https://dovego.it/it/liguria/genova/tomorrow/',
+      'https://dovego.it/it/liguria/genova/this-weekend/',
+    ]);
+    assert.equal(store.get('indexnow:place-cursor'), '0');
+  });
+
+  test('a swept batch that is refused leaves the cursor where it was', async () => {
+    const placed: CompactEvent = { ...compact({ addedAt: 150 }), rg: 'liguria', ct: 'genova' };
+    const { binding, store } = kv({ 'indexnow:watermark': '150', 'indexnow:place-cursor': '2' });
+    const result = await pingIndexNow(env('k123', binding), [placed], NOW, answering(422, {}));
+    assert.equal(readProp(result, 'kind'), 'refused');
+    assert.equal(store.get('indexnow:place-cursor'), '2');
   });
 
   test('a refused batch is retried, not silently lost', async () => {
@@ -262,5 +299,40 @@ describe('pingIndexNow backs off', () => {
     const { binding } = kv({ 'indexnow:watermark': '100', 'indexnow:retry-after': String(NOW - 1) });
     const result = await pingIndexNow(env(binding), index, NOW, answering(200));
     assert.equal(readProp(result, 'kind'), 'submitted');
+  });
+});
+
+describe('placeSweep', () => {
+  const city = (id: string, region: string, name: string): CompactEvent =>
+    ({ ...compact({ id }), rg: region, ct: name });
+
+  const corpus = [city('aaaabbbbccc1', 'liguria', 'genova'), city('aaaabbbbccc2', 'lombardia', 'milano')];
+
+  test('offers a city and its three time facets, in a stable order', () => {
+    assert.deepEqual(placeSweep(corpus, 0, 4).urls, [
+      'https://dovego.it/it/liguria/genova/',
+      'https://dovego.it/it/liguria/genova/today/',
+      'https://dovego.it/it/liguria/genova/tomorrow/',
+      'https://dovego.it/it/liguria/genova/this-weekend/',
+    ]);
+  });
+
+  test('picks up where the last hour stopped', () => {
+    const { urls, next } = placeSweep(corpus, 4, 2);
+    assert.deepEqual(urls, ['https://dovego.it/it/lombardia/milano/', 'https://dovego.it/it/lombardia/milano/today/']);
+    assert.equal(next, 6);
+  });
+
+  test('and wraps round, so every city is offered again rather than once', () => {
+    const { urls, next } = placeSweep(corpus, 7, 2);
+    assert.deepEqual(urls, [
+      'https://dovego.it/it/lombardia/milano/this-weekend/',
+      'https://dovego.it/it/liguria/genova/',
+    ]);
+    assert.equal(next, 1);
+  });
+
+  test('an event with no city of its own is not a place', () => {
+    assert.deepEqual(placeSweep([compact({ id: 'aaaabbbbccc3' })], 0, 4), { urls: [], next: 0 });
   });
 });
