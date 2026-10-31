@@ -782,10 +782,21 @@ const healthReport = async (env: Env) => {
     // A record that expired before the archive existed: the case 410 is for.
     goneId: '1e6b4b74d225',
     indexNowKey: env.INDEXNOW_KEY ?? '',
+    indexNow: {
+      watermark: await readNumber(env.EVENTS, 'indexnow:watermark'),
+      retryAfterMs: (await readNumber(env.EVENTS, 'indexnow:retry-after')) ?? 0,
+    },
     registry: channelsOf(env),
     today: romeDate(Date.now()),
     nowMs: Date.now(),
   });
+};
+
+/** A number held in KV, or nothing when the key has never been written — the
+ *  difference between "not primed yet" and "primed at zero". */
+const readNumber = async (kv: Env['EVENTS'], key: string): Promise<number | undefined> => {
+  const raw = await kv.get(key);
+  return raw === null ? undefined : Number(raw);
 };
 
 const serveEventsJson = async (env: Env, url: URL): Promise<Response> => {
