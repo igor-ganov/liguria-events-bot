@@ -4,6 +4,7 @@ import { channelChecks } from './channel-checks.ts';
 import { corpusChecks } from './corpus-checks.ts';
 import { eventMarkupCheck, hreflangCheck } from './markup-checks.ts';
 import { indexCheck, lastRunCheck } from './pipeline-checks.ts';
+import { indexNowFlowCheck } from './indexnow-flow-check.ts';
 import {
   analyticsCheck,
   httpSemanticsCheck,
@@ -31,6 +32,10 @@ export type HealthDeps = Readonly<{
   goneId: string | undefined;
   /** The IndexNow key, so the check can read it back off the site. */
   indexNowKey: string;
+  /** What IndexNow has been told and whether it is being refused: the
+   *  watermark and the cooldown, read from KV by the caller so the check
+   *  itself stays a function of its inputs. */
+  indexNow: Readonly<{ watermark: number | undefined; retryAfterMs: number }>;
   /** The channel registry, so a mistyped region shows up as a fault rather
    *  than as a channel that is quietly never posted to. */
   registry: Registry;
@@ -67,6 +72,7 @@ export const runHealth = async (deps: HealthDeps): Promise<HealthReport> => {
     ...corpusChecks(deps.index),
     ...lastRunCheck(deps.runLog, deps.nowMs),
     ...channelChecks(deps.registry, deps.index, deps.today),
+    indexNowFlowCheck(deps.indexNow, deps.index, deps.nowMs),
   ];
   return { at: Math.floor(deps.nowMs / 1000), status: worstOf(checks), checks };
 };

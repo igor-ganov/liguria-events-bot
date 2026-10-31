@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { channelChecks } from '../src/health/channel-checks.ts';
 import { corpusChecks } from '../src/health/corpus-checks.ts';
 import { indexCheck, lastRunCheck } from '../src/health/pipeline-checks.ts';
+import { indexNowFlowCheck } from '../src/health/indexnow-flow-check.ts';
 import {
   analyticsCheck,
   httpSemanticsCheck,
@@ -548,5 +549,51 @@ describe('channelChecks', () => {
     };
     const checks = channelChecks(registry, inFirenze(5), TODAY);
     assert.equal(byId(checks, 'channel-coverage')?.status, 'ok');
+  });
+});
+
+// IndexNow is the only channel that reaches Bing without an account, and on
+// 2026-10-31 it was found stuck: the KV watermark had not moved since
+// 2026-09-04 while 980 of 1 365 events were newer, and the cooldown key said
+// the last submission had been answered 429 two hours earlier. Nothing in the
+// health suite said so — indexnow-key only proves the key file is served.
+describe('indexNowFlowCheck', () => {
+  const HOUR = 3_600_000;
+  const NOW = 1_793_400_000_000;
+  const at = (seconds: number): CompactEvent => ({ ...compact(), cr: seconds });
+  const quiet = { watermark: Math.floor(NOW / 1000), retryAfterMs: 0 };
+
+  test('nothing waiting is nothing wrong', () => {
+    const check = indexNowFlowCheck(quiet, [at(Math.floor(NOW / 1000) - 60)], NOW);
+    assert.equal(check.status, 'ok');
+  });
+
+  test('before the first run there is nothing to judge', () => {
+    const check = indexNowFlowCheck({ watermark: undefined, retryAfterMs: 0 }, [at(1)], NOW);
+    assert.equal(check.status, 'ok');
+    assert.ok(check.detail.includes('not primed'));
+  });
+
+  test('a backlog older than two days is a submission that never lands', () => {
+    // The real shape: the watermark weeks behind, with hundreds of events past
+    // it, which is a batch refused and retried for ever rather than drained.
+    const watermark = Math.floor((NOW - 56 * 24 * HOUR) / 1000);
+    const index = [at(watermark - 10), at(watermark + 10), at(Math.floor(NOW / 1000) - 600)];
+    const check = indexNowFlowCheck({ watermark, retryAfterMs: 0 }, index, NOW);
+    assert.equal(check.status, 'fail');
+    assert.ok(check.detail.includes('2 events'));
+    assert.ok(check.detail.includes('56 days'));
+  });
+
+  test('being throttled right now is worth saying out loud', () => {
+    const check = indexNowFlowCheck({ ...quiet, retryAfterMs: NOW + HOUR }, [at(Math.floor(NOW / 1000))], NOW);
+    assert.equal(check.status, 'warn');
+    assert.ok(check.detail.includes('refused'));
+  });
+
+  test('a day behind is a warning, not yet a fault', () => {
+    const watermark = Math.floor((NOW - 20 * HOUR) / 1000);
+    const check = indexNowFlowCheck({ watermark, retryAfterMs: 0 }, [at(Math.floor(NOW / 1000))], NOW);
+    assert.equal(check.status, 'warn');
   });
 });

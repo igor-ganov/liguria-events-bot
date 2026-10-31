@@ -10,7 +10,7 @@ import { candidatesFor, classifyInput, parseMembers } from '../src/holidays/cand
 import { currentHolidays, holidaysDue } from '../src/holidays/store.ts';
 import { runHolidays } from '../src/holidays/run-holidays.ts';
 import { MOTIFS } from '../src/holidays/holiday.ts';
-import { classifySystem } from '../src/holidays/prompts.ts';
+import { CALENDAR_SYSTEM, classifySystem } from '../src/holidays/prompts.ts';
 import type { Holiday } from '../src/holidays/holiday.ts';
 import type { CompactEvent } from '../src/domain/event.ts';
 import type { ChatFn } from '../src/llm/client.ts';
@@ -83,6 +83,19 @@ describe('deny list', () => {
     assert.equal(deniedReason(['Festa della Donna']), undefined);
     assert.equal(deniedReason(['San Valentino', 'Valentine’s Day']), undefined);
     assert.equal(deniedReason(['Silent night', 'Talented']), undefined);
+  });
+
+  test('Christmas and the First of May are holidays the site dresses for', () => {
+    // The owner's decision (2026-10-31): both are celebrated by everyone here —
+    // markets, lights, concerts, the Primo Maggio concert — whatever their origin.
+    assert.equal(deniedReason(['christmas', 'Christmas', 'Natale', 'Рождество']), undefined);
+    assert.equal(deniedReason(['natale-2026', 'Christmas season', 'Feste di Natale']), undefined);
+    assert.equal(deniedReason(['labour-day', 'Labour Day', 'Festa dei Lavoratori', 'Primo Maggio', 'День труда']), undefined);
+  });
+
+  test('the model is told both are allowed', () => {
+    assert.match(CALENDAR_SYSTEM, /Christmas \(Natale\)/);
+    assert.match(CALENDAR_SYSTEM, /Labour Day \(Primo Maggio/);
   });
 });
 
