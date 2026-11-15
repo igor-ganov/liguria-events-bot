@@ -24,7 +24,3 @@ export const DESCRIPTION: Readonly<Record<Lang, string>> = {
   it: "Eventi in tutta Italia, raccolti ogni ora dai siti che li annunciano.\n\nChiedi cosa c'è nella tua città oggi, questo weekend o in una data qualsiasi. Filtra per categoria, salva quelli che ti interessano e ricevi un promemoria prima che inizino.\n\nTutto anche su dovego.it",
   ru: 'События по всей Италии, собираются каждый час с сайтов, которые их публикуют.\n\nСпросите, что происходит в вашем городе сегодня, в выходные или в любую дату. Фильтр по категориям, избранное и напоминание перед началом.\n\nВсё это есть и на dovego.it',
 };
-
-/** The channel's own description, on its profile card. */
-export const CHANNEL_DESCRIPTION =
-  "Cosa fare in Italia, ogni giorno. Concerti, mostre, teatro, sagre e mercatini — raccolti automaticamente e pubblicati in un digest quotidiano.\n\nCerca per città e data su dovego.it";

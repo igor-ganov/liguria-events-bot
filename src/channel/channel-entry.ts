@@ -4,8 +4,13 @@ import { readProp } from '../util/json.ts';
 import type { Lang } from '../domain/event.ts';
 
 /** The reserved key for the channel that speaks for the whole country. It is
- *  not a region and must not be spelled like one: @dovegoit says Italy on the
- *  tin, and turning it into a Liguria channel would lie to its subscribers. */
+ *  not a region and must not be spelled like one.
+ *
+ *  Nothing is configured under it today: @dovegoit was pointed at Liguria on
+ *  2026-11-15, with two subscribers and a daily post that opened with Genova
+ *  and then listed Milano. A channel's profile card is now written from its
+ *  own region, so the switch tells its readers what it is instead of leaving
+ *  the old promise standing. */
 export const WHOLE_COUNTRY = 'italia';
 
 export type Channel = Readonly<{ region: string; chat: string; lang: Lang; hour: number }>;

@@ -37,10 +37,17 @@
     "TG_CHANNELS": "[\"aluhaevents\"]",
     // How many visitgenoa listing pages to fetch per collection run.
     "SOURCE_PAGES": "3",
-    // Public channel the bot broadcasts one event a day to (t.me/dovegoit).
-    // EMPTY switches the broadcast off entirely. The bot must be an
-    // administrator of the channel with "post messages".
-    "CHANNEL_CHAT_ID": "@dovegoit",
+    // Which channel speaks for which region, as {"<region slug>": "<chat>"}.
+    // t.me/dovegoit is pointed at Liguria: the catalogue holds 344 Liguria
+    // events against 1 213 for the whole country, and a daily post that opens
+    // with Genova and then lists Milano is a post nobody in either city reads
+    // to the end. The country-wide entry is the reserved key "italia"; adding
+    // a second region is a line here, not a deploy of new code. The bot must
+    // be an administrator of each channel with "post messages".
+    "CHANNEL_CHATS": "{\"liguria\": \"@dovegoit\"}",
+    // Superseded by CHANNEL_CHATS and read only when that is absent. EMPTY
+    // switches the broadcast off entirely.
+    "CHANNEL_CHAT_ID": "",
     // The channel's own language — its readers are in Italy.
     "CHANNEL_LANG": "it",
     // Rome hour the daily post goes out at.
