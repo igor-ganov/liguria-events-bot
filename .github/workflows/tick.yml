@@ -13,6 +13,10 @@ on:
         description: 'Set to "collect" to crawl now, "geocode" to run the geocoding pass, or "holidays" to decide the holidays now'
         required: false
         default: ''
+      limit:
+        description: 'With force=rebuild: the most records one run writes (KV free tier allows 1000 writes a day, two per record)'
+        required: false
+        default: ''
 
 jobs:
   tick:
@@ -23,6 +27,9 @@ jobs:
           URL="https://liguria-events-bot.igor-ganov.workers.dev/tick"
           if [ -n "${{ inputs.force }}" ]; then
             URL="${URL}?force=${{ inputs.force }}"
+          fi
+          if [ -n "${{ inputs.limit }}" ]; then
+            URL="${URL}&limit=${{ inputs.limit }}"
           fi
           echo "POST $URL"
           curl -s --max-time 890 -X POST "$URL" \

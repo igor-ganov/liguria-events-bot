@@ -42,7 +42,9 @@ import { duplicateClusters } from './duplicate-clusters.ts';
 import { needsReRead } from './needs-re-read.ts';
 import { spanContradictsText } from './span-contradicts-text.ts';
 import { narrowedToRun } from '../domain/narrowed-to-run.ts';
+import { withExactSchedule } from '../schedule/exact-schedule.ts';
 import { mapBounded as mapBoundedBy } from '../util/bounded.ts';
+import { sameJson } from '../util/json.ts';
 
 export type SourceStat = Readonly<{
   source: string;
@@ -85,10 +87,15 @@ export type CollectDeps = Readonly<{
 
 type Identified = Readonly<{ id: string; raw: RawEvent }>;
 
+/** A record on the days and at the hour its text gives (withExactSchedule),
+ *  a container on its programme. */
+const onItsDays = (record: EventRecord): EventRecord => withDerivedSpan(withExactSchedule(record));
+
 /** A record on the days it is really on: a container on its programme, any
- *  other event on the run its page states (narrowedToRun). */
+ *  other event on the run its page states (narrowedToRun), and either one on
+ *  the weekdays and at the hour its own text gives. */
 const onItsDates = (record: EventRecord, run: StatedRun | undefined): EventRecord =>
-  withDerivedSpan(narrowedToRun(record, run));
+  onItsDays(narrowedToRun(record, run));
 
 const identify = async (events: readonly RawEvent[]): Promise<readonly Identified[]> =>
   Promise.all(
@@ -282,7 +289,7 @@ const mergeFuzzyDuplicates = async (
     // Oldest first; a tie keeps the order the pairs named them in (stable sort).
     const [primary, ...others] = records.toSorted((a, b) => a.addedAt - b.addedAt);
     if (primary === undefined || others.length === 0) continue;
-    const merged = withDerivedSpan(others.reduce(mergeDuplicates, primary));
+    const merged = onItsDays(others.reduce(mergeDuplicates, primary));
     await writeEventRecord(deps.kv, merged, nowMs);
     await mapBounded(others, (record) => deps.kv.delete(eventKey(record.id)));
     others.forEach((record) => dropped.add(record.id));
@@ -364,13 +371,12 @@ export const runCollect = async (deps: CollectDeps): Promise<RunSummary> => {
       // a record written before that rule (or by an older prompt) is repaired
       // here, with no LLM call and no version bump.
       const caught = merged.event.photos === undefined ? photosById.get(item.id) : undefined;
-      const event = withDerivedSpan(
-        caught === undefined ? merged.event : { ...merged.event, photos: caught },
-      );
-      const spanChanged =
-        event.startDate !== record.startDate || event.endDate !== record.endDate;
+      // The weekdays and hour the text gives are applied the same way, so the
+      // stored corpus is repaired as its listings show it again.
+      const event = onItsDays(caught === undefined ? merged.event : { ...merged.event, photos: caught });
+      const repaired = !sameJson(event, merged.event);
       if (merged.changed) mergedIds.add(item.id);
-      if (merged.changed || spanChanged || caught !== undefined) {
+      if (merged.changed || repaired || caught !== undefined) {
         updatedRecords.push(event);
       }
       // Re-enrich when it never succeeded OR was written by an older prompt

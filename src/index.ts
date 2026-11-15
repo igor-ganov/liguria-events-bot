@@ -41,6 +41,7 @@ import { healthAlert } from './health/health-alert.ts';
 import { runHealth } from './health/run-health.ts';
 import { mergedArchive } from './pipeline/archive-index.ts';
 import { runCollect } from './pipeline/collect-run.ts';
+import { rebuildCorpus } from './pipeline/rebuild-corpus.ts';
 import type { RunSummary } from './pipeline/collect-run.ts';
 import { romeDate, romeHour } from './pipeline/clock.ts';
 import { dueReminders, readSaved, toggleSaved, writeSaved } from './pipeline/saved.ts';
@@ -1299,24 +1300,13 @@ const worker = {
       // carried forward untouched for events that did not change, so a new
       // projected field (the region) would never reach the events already in it.
       if (url.searchParams.get('force') === 'rebuild') {
-        const stored = await readAllRecords(env.EVENTS);
-        const today = romeDate(Date.now());
-        // Repair pass, no LLM involved: re-read the programme (which drops the
-        // repeated evenings older runs stored) and re-derive the container's
-        // run from it, then write back whatever actually changed. Idempotent.
-        const records = stored.map((record) => {
-          const sessions = parseSessions(record.sessions);
-          return withDerivedSpan(sessions === undefined ? record : { ...record, sessions });
-        });
-        const repaired = records.filter(
-          (record, i) => JSON.stringify(stored[i]) !== JSON.stringify(record),
+        // Repair pass, no LLM involved (rebuildCorpus). `limit` bounds the
+        // records written in one call; the response's `pending` says how
+        // many the next call still has to write.
+        const limit = Number(url.searchParams.get('limit') ?? '');
+        return Response.json(
+          await rebuildCorpus(env.EVENTS, Date.now(), Number.isInteger(limit) && limit > 0 ? limit : undefined),
         );
-        await Promise.all(repaired.map((record) => writeEventRecord(env.EVENTS, record, Date.now())));
-        const index = pruneIndex(records.map(toCompact), today).toSorted((a, b) =>
-          a.s < b.s ? -1 : a.s > b.s ? 1 : a.t.localeCompare(b.t),
-        );
-        await writeIndex(env.EVENTS, index);
-        return Response.json({ rebuilt: index.length, records: records.length, repaired: repaired.length });
       }
       // Post to the channel now instead of waiting for CHANNEL_HOUR. The daily
       // gate is what keeps the channel to one post; being able to reach it on
