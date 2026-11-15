@@ -36,3 +36,16 @@ export const parseJson = (text: string): unknown => {
     return undefined;
   }
 };
+
+/** A value with every object's keys in one order, so two values that hold the
+ *  same data compare equal however their objects were spread together. */
+const canonical = (value: unknown): unknown =>
+  Array.isArray(value)
+    ? value.map(canonical)
+    : isRecord(value)
+      ? Object.fromEntries(Object.keys(value).toSorted().map((key) => [key, canonical(value[key])]))
+      : value;
+
+/** Whether two JSON values hold the same data, key order aside. */
+export const sameJson = (a: unknown, b: unknown): boolean =>
+  JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
