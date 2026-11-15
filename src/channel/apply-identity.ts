@@ -1,4 +1,6 @@
-import { BOT_NAME, CHANNEL_DESCRIPTION, DESCRIPTION, SHORT_DESCRIPTION } from './identity.ts';
+import { BOT_NAME, DESCRIPTION, SHORT_DESCRIPTION } from './identity.ts';
+import { channelDescription } from './channel-description.ts';
+import { channelsOf } from './channels.ts';
 import { LANGS } from '../domain/event.ts';
 import { readProp } from '../util/json.ts';
 import type { Env } from '../config.ts';
@@ -63,7 +65,6 @@ const uploadPhoto = async (
  */
 export const applyIdentity = async (env: Env, fetchFn: FetchFn = fetch): Promise<unknown> => {
   const send = call(env.BOT_TOKEN, fetchFn);
-  const chat = env.CHANNEL_CHAT_ID ?? '';
   const perLanguage = await Promise.all(
     LANGS.flatMap((lang) => [
       send(`short-description:${lang}`, 'setMyShortDescription', {
@@ -77,15 +78,19 @@ export const applyIdentity = async (env: Env, fetchFn: FetchFn = fetch): Promise
     ]),
   );
   const name = await send('name', 'setMyName', { name: BOT_NAME });
-  const channel =
-    chat === ''
-      ? [{ step: 'channel', ok: false, error: 'no channel configured' }]
-      : [
-          await send('chat-description', 'setChatDescription', {
-            chat_id: chat,
-            description: CHANNEL_DESCRIPTION,
-          }),
-          await uploadPhoto(env.BOT_TOKEN, chat, fetchFn),
-        ];
-  return { steps: [...perLanguage, name, ...channel] };
+  // Every configured channel, each described as the region it speaks for. One
+  // at a time: Telegram counts messages per second across a bot, and the whole
+  // registry firing at once is how an identity run earns a 429.
+  const channels: Outcome[] = [];
+  for (const one of channelsOf(env).channels) {
+    channels.push(
+      await send(`chat-description:${one.region}`, 'setChatDescription', {
+        chat_id: one.chat,
+        description: channelDescription(one.region),
+      }),
+    );
+    channels.push(await uploadPhoto(env.BOT_TOKEN, one.chat, fetchFn));
+  }
+  const none = channels.length === 0 ? [{ step: 'channel', ok: false, error: 'no channel configured' }] : [];
+  return { steps: [...perLanguage, name, ...channels, ...none] };
 };

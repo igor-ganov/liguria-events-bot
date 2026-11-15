@@ -73,10 +73,24 @@ describe('pickDigest', () => {
     assert.deepEqual(picked.map((one) => one.id), ['today']);
   });
 
-  test('caps each city, so one big city cannot fill the post', () => {
+  // The cap decides who gets on the post FIRST, not how long the post is. Every
+  // city still has its three before any city has a fourth, and Genova's two are
+  // on the post whatever Milano brought.
+  test('caps each city first, then fills the post with what is left', () => {
     const picked = pickDigest([...many(6, { city: 'milano' }), ...many(2, { city: 'genova' })], TODAY, []);
-    assert.equal(picked.filter((one) => one.ct === 'milano').length, 3);
+    assert.equal(picked.slice(0, 3).every((one) => one.ct === 'milano'), true);
     assert.equal(picked.filter((one) => one.ct === 'genova').length, 2);
+    assert.equal(picked.length, 8);
+  });
+
+  // Liguria is Genova and almost nothing else: 337 of its 344 events. A channel
+  // for one region would have posted three lines a day out of three hundred,
+  // because a cap written to stop Milano taking a national digest has no other
+  // city to hand the rest of the post to.
+  test('a region that is one city still gets a full digest', () => {
+    const picked = pickDigest(many(20, { city: 'genova' }), TODAY, []);
+    assert.equal(picked.length, 12);
+    assert.equal(picked.every((one) => one.ct === 'genova'), true);
   });
 
   test('opens with the city that has the most on', () => {
@@ -345,6 +359,29 @@ describe('applyIdentity', () => {
     const channel = (Array.isArray(steps) ? steps : []).filter((s) => readProp(s, 'step') === 'channel');
     assert.equal(channel.length, 1);
     assert.equal(readProp(channel[0], 'error'), 'no channel configured');
+  });
+
+  // t.me/dovegoit now speaks for Liguria. The profile card is the first thing
+  // read before pressing Join, and a channel that posts Genova under a
+  // description promising all of Italy is a channel people leave.
+  test('the channel description names the region the channel speaks for', async () => {
+    const said: string[] = [];
+    const listening: FetchFn = async (input, init) => {
+      const body = JSON.parse(String(readProp(init, 'body') ?? '{}'));
+      // The bot's own description stays national — it answers for the whole
+      // country whatever any one channel posts. Only the channel card is read.
+      const channelCard = String(input).endsWith('/setChatDescription');
+      said.push(...[String(readProp(body, 'description') ?? '')].filter(() => channelCard));
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    };
+    const regional: Env = { ...env(''), CHANNEL_CHATS: '{"liguria": "@dovegoit"}' };
+    await applyIdentity(regional, listening);
+    assert.equal(said.length, 1);
+    assert.ok(said[0]?.includes('Liguria'));
+    assert.equal(said[0]?.includes('in tutta Italia'), false);
   });
 
   test('a refused step is reported, not swallowed', async () => {
