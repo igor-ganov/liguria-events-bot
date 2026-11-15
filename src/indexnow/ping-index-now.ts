@@ -3,6 +3,7 @@ import { indexNowBody } from './index-now-body.ts';
 import { placeSweep } from './place-sweep.ts';
 import { placeUrls } from './place-urls.ts';
 import { newSince } from './new-since.ts';
+import { submitBatch } from './submit-batch.ts';
 import type { CompactEvent } from '../domain/event.ts';
 import type { Env } from '../config.ts';
 import type { FetchFn } from '../util/http.ts';
@@ -10,7 +11,6 @@ import type { FetchFn } from '../util/http.ts';
 const WATERMARK_KEY = 'indexnow:watermark';
 const CURSOR_KEY = 'indexnow:place-cursor';
 const COOLDOWN_KEY = 'indexnow:retry-after';
-const ENDPOINT = 'https://api.indexnow.org/indexnow';
 /** Long enough to actually clear a throttle. Hourly retries are what keep a
  *  rate-limited host rate-limited. */
 const COOLDOWN_MS = 6 * 60 * 60 * 1000;
@@ -65,12 +65,7 @@ export const pingIndexNow = async (
   const urls = swept ? sweep.urls : [...new Set(announced)];
   if (urls.length === 0) return { kind: 'nothing-new' };
   const body = indexNowBody(key, urls);
-  const response = await fetchFn(ENDPOINT, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-    body: JSON.stringify(body),
-  }).catch(() => undefined);
-  const status = response?.status ?? 0;
+  const { status, endpoint } = await submitBatch(body, fetchFn);
   // 202 is IndexNow's "accepted, key validation pending" — a success, and the
   // usual answer for a key nobody has read yet.
   const ok = status === 200 || status === 202;
@@ -83,12 +78,14 @@ export const pingIndexNow = async (
   // The cursor is the sweep's own watermark, and moves on the same terms: a
   // refused slice is offered again rather than skipped.
   if (ok && swept) await env.EVENTS.put(CURSOR_KEY, String(sweep.next));
-  // Being throttled and answering by trying again in an hour is how a host
-  // stays throttled. Six of the six URLs it refused were new this hour.
+  // Only once every endpoint has refused the sender is there anything to wait
+  // out. Answering a throttle by trying again in an hour is how a sender stays
+  // throttled.
   if (status === 429) await env.EVENTS.put(COOLDOWN_KEY, String(nowMs + COOLDOWN_MS));
   return {
     kind: ok ? (swept ? 'swept' : 'submitted') : status === 429 ? 'throttled' : 'refused',
     urls: body.urlList.length,
     status,
+    endpoint,
   };
 };

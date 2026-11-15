@@ -184,7 +184,14 @@ describe('pingIndexNow', () => {
     const { binding, store } = kv({ 'indexnow:watermark': '100' });
     const seen: { body?: unknown } = {};
     const result = await pingIndexNow(env('k123', binding), index, NOW, answering(200, seen));
-    assert.deepEqual(result, { kind: 'submitted', urls: 3, status: 200 });
+    // The endpoint is part of the answer now: which of them took the batch is
+    // the difference between "throttled" and "announced".
+    assert.deepEqual(result, {
+      kind: 'submitted',
+      urls: 3,
+      status: 200,
+      endpoint: 'https://api.indexnow.org/indexnow',
+    });
     assert.equal(store.get('indexnow:watermark'), '150');
   });
 
@@ -334,5 +341,90 @@ describe('placeSweep', () => {
 
   test('an event with no city of its own is not a place', () => {
     assert.deepEqual(placeSweep([compact({ id: 'aaaabbbbccc3' })], 0, 4), { urls: [], next: 0 });
+  });
+});
+
+// Measured on 2026-11-15, after 72 days of "refused": the same 210 URLs, the
+// same key, the same minute — 200 from a laptop, 429 from the Worker. The
+// aggregator throttles by sender, and a Worker shares its egress address with
+// everything else on the colo, so no batch size or backoff was ever going to
+// clear it. Bing's own endpoint speaks the same protocol and is the engine
+// that actually sends this site readers.
+describe('pingIndexNow when the aggregator refuses the sender, not the batch', () => {
+  const NOW = 1_800_000_000_000;
+  const index = [compact({ id: 'aaaabbbbcccc', addedAt: 150 })];
+
+  const kv = (seed: Readonly<Record<string, string>>) => {
+    const store = new Map(Object.entries(seed));
+    const binding: KvLike = {
+      get: async (key) => store.get(key) ?? null,
+      put: async (key, value) => {
+        store.set(key, value);
+      },
+      delete: async (key) => {
+        store.delete(key);
+      },
+      list: async () => ({ keys: [], list_complete: true }),
+    };
+    return { store, binding };
+  };
+
+  const env = (binding: KvLike): Env => ({
+    EVENTS: binding,
+    AI: { run: async () => ({}) },
+    BOT_TOKEN: '',
+    WEBHOOK_SECRET: '',
+    OWNER_CHAT_ID: '',
+    INDEXNOW_KEY: 'k123',
+  });
+
+  const byHost = (statuses: Readonly<Record<string, number>>, asked: string[]): FetchFn =>
+    async (input) => {
+      const host = new URL(String(input)).host;
+      asked.push(host);
+      return new Response('', { status: statuses[host] ?? 500 });
+    };
+
+  test("a sender the aggregator throttles is offered to Bing's own endpoint", async () => {
+    const { binding } = kv({ 'indexnow:watermark': '100' });
+    const asked: string[] = [];
+    const result = await pingIndexNow(
+      env(binding),
+      index,
+      NOW,
+      byHost({ 'api.indexnow.org': 429, 'www.bing.com': 200 }, asked),
+    );
+    assert.equal(readProp(result, 'kind'), 'submitted');
+    assert.ok(asked.includes('www.bing.com'));
+  });
+
+  test('and what Bing accepted counts as announced', async () => {
+    const { binding, store } = kv({ 'indexnow:watermark': '100' });
+    await pingIndexNow(
+      env(binding),
+      index,
+      NOW,
+      byHost({ 'api.indexnow.org': 429, 'www.bing.com': 200 }, []),
+    );
+    assert.equal(store.get('indexnow:watermark'), '150');
+  });
+
+  test('only a refusal from both is a reason to stop asking for six hours', async () => {
+    const { binding, store } = kv({ 'indexnow:watermark': '100' });
+    const result = await pingIndexNow(
+      env(binding),
+      index,
+      NOW,
+      byHost({ 'api.indexnow.org': 429, 'www.bing.com': 429 }, []),
+    );
+    assert.equal(readProp(result, 'kind'), 'throttled');
+    assert.equal(Number(store.get('indexnow:retry-after')), NOW + 6 * 60 * 60 * 1000);
+  });
+
+  test('an accepted batch asks one endpoint and stops there', async () => {
+    const { binding } = kv({ 'indexnow:watermark': '100' });
+    const asked: string[] = [];
+    await pingIndexNow(env(binding), index, NOW, byHost({ 'api.indexnow.org': 200 }, asked));
+    assert.deepEqual(asked, ['api.indexnow.org']);
   });
 });
